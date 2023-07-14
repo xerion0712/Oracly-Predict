@@ -13,7 +13,7 @@ export default function Home() {
   return (
     <main className='min-h-screen bg-black text-white'>
 
-      <div className='h-screen bg-white relative'> 
+      <div className='h-screen bg-white relative'>
         <Jumbotron />
         <div className="absolute top-0 h-30 w-full z-100">
           <div className="mx-auto container">
@@ -39,19 +39,31 @@ export default function Home() {
       </div>
 
 
-      <div class="grid grid-cols-4 gap-3">
-        <div class="col-span-1 bg-slate-800 rounded-lg px-6 py-8 ring-1 ring-slate-900/5 shadow-xl">
-          <div>
-            <span class="inline-flex items-center justify-center p-2 bg-indigo-500 rounded-md shadow-lg">
-              <svg class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"></svg>
-            </span>
-          </div>
-          <h3 class="text-white mt-5 text-base font-medium tracking-tight">Writes Upside-Down</h3>
-          <p class="text-slate-400 mt-2 text-sm">
-            The Zero Gravity Pen can be used to write in any orientation, including upside-down. It even works in outer space.
-          </p>
+
+      <footer class="bg-transparent rounded-lg shadow mt-4 ">
+        <div class="w-full mx-auto max-w-screen-xl p-4 md:flex md:items-center md:justify-between">
+          <span class="text-sm">© 2023 Legato Finance
+          </span>
+          <span class=" text-sm   ">
+            Made with ❤️ during Move Hackathon by WebX
+          </span>
+          {/* <ul class="flex flex-wrap items-center mt-3 text-sm font-medium text-gray-500 dark:text-gray-400 sm:mt-0">
+            <li>
+              <a href="#" class="mr-4 hover:underline md:mr-6 ">About</a>
+            </li>
+            <li>
+              <a href="#" class="mr-4 hover:underline md:mr-6">Privacy Policy</a>
+            </li>
+            <li>
+              <a href="#" class="mr-4 hover:underline md:mr-6">Licensing</a>
+            </li>
+            <li>
+              <a href="#" class="hover:underline">Contact</a>
+            </li>
+          </ul> */}
         </div>
-      </div>
+      </footer>
+
 
 
 
