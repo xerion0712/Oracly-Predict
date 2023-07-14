@@ -1,11 +1,11 @@
 import Header from "@/components/Header"
 
-
 const MainLayout = ({ children }) => {
     return (
-        <main class="bg-black text-white">
-            <div class="flex h-screen flex-col mx-auto"> 
-                {children} 
+        <main class="bg-slate-950 text-white">
+            <div class="flex h-screen flex-col mx-auto">
+                <Header />
+                {children}
             </div>
         </main>
     )

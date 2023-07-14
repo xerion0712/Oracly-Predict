@@ -17,5 +17,45 @@
 }
 
 body {
+  .wkit-button {
+    background: transparent;
+    font-size: 14px;
+    border: 1px solid white;
+    border-radius: 0px;
+    padding: 10px;
+    margin-top: 7px;
+    margin-bottom: auto;
+  }
+  .wkit-button:hover {
+    background: transparent;
+    text-decoration: underline;
+    
+  }
+  .wkit-connected-container {
+    background-color: transparent;
+    margin-left: auto;
+    padding-top: 3px;
+  }
+  .wkit-connected-button { 
+    background-color: transparent;
+    font-size: 14px;  
+    padding: 10px;
+    margin-top: 7px;
+    margin-bottom: auto;
+  }
+  .wkit-connected-button__balance {
+    color: white;
+    font-size: 14px;
+  }
+  .wkit-connected-button__divider {
+    background: white;
+  }
+  .wkit-address-select__address {
+    color: white;
+    font-size: 14px;
+  }
+  .wkit-address-select__right-arrow {
+    color: white;
+  }
   
 }
