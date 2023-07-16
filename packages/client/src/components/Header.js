@@ -18,7 +18,6 @@ const Header = ({ landing }) => {
 
     const { pathname } = router
 
-
     if (landing) {
         return (
             <div class="grid grid-cols-2 gap-3 px-2 mt-4 mb-4 ">
@@ -68,8 +67,8 @@ const Header = ({ landing }) => {
                         <Link className={`hover:underline ${pathname.includes("/stake") && "underline"}`} href="/stake">
                             Stake
                         </Link>
-                        <Link className={`hover:underline ${pathname.includes("/rewards") && "underline"}`} href="/rewards">
-                            Rewards
+                        <Link className={`hover:underline ${pathname.includes("/faucet") && "underline"}`} href="/faucet">
+                        Faucet
                         </Link>
                     </div>
                 </div>

@@ -1,12 +1,12 @@
 import MainLayout from "@/layouts/mainLayout"
 
 
-const Rewards = () => {
+const Faucet = () => {
     return (
         <MainLayout>
-            Rewards
+            Faucet
         </MainLayout>
     )
 }
 
-export default Rewards
+export default Faucet
