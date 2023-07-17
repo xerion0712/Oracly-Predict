@@ -16,9 +16,9 @@ module legato::staked_sui_tests {
          
         next_tx(&mut scenario, addr1);
         {
-            let treasurycap = test_scenario::take_from_sender<TreasuryCap<STAKED_SUI>>(&scenario);
+            let treasurycap = test_scenario::take_shared<TreasuryCap<STAKED_SUI>>(&scenario);
             staked_sui::mint(&mut treasurycap, 100, test_scenario::ctx(&mut scenario));
-            test_scenario::return_to_address<TreasuryCap<STAKED_SUI>>(addr1, treasurycap);
+            test_scenario::return_shared<TreasuryCap<STAKED_SUI>>(treasurycap);
         };
 
         test_scenario::end(scenario);
