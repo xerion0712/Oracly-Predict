@@ -9,7 +9,7 @@ module legato::staked_sui {
     struct STAKED_SUI has drop {}
 
     fun init(witness: STAKED_SUI, ctx: &mut TxContext) {
-        let (treasury_cap, metadata) = coin::create_currency<STAKED_SUI>(witness, 8, b"STAKED_SUI", b"sSUI", b"", option::none(), ctx);
+        let (treasury_cap, metadata) = coin::create_currency<STAKED_SUI>(witness, 3, b"STAKED_SUI", b"sSUI", b"", option::none(), ctx);
     
         transfer::public_share_object(metadata);
         transfer::public_share_object(treasury_cap)
