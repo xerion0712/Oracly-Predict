@@ -1,9 +1,9 @@
 
 import { useWallet } from '@suiet/wallet-kit'
 import { useCallback } from 'react';
-import { PACKAGE_ID, TREASURY_CAP } from '@/constants';
+import { PACKAGE_ID, TREASURY_CAP, RESERVE } from '@/constants';
 import { Ed25519Keypair, JsonRpcProvider, testnetConnection, RawSigner, TransactionBlock } from '@mysten/sui.js';
-import { useEffect, useState } from 'react'; 
+import { useEffect, useState } from 'react';
 
 const useLegato = () => {
 
@@ -52,14 +52,76 @@ const useLegato = () => {
         });
 
         //FIXME : use bn
-        return `${(Number(coins.totalBalance)/ 100000000).toFixed(2)}`
-            
+        return `${(Number(coins.totalBalance) / 100000000).toFixed(2)}`
+
     }, [])
+
+    const getAllCoins = useCallback(async (address) => {
+
+        console.log("get all coins for :", address)
+
+        const packageObjectId = PACKAGE_ID
+
+        const coins = await provider.getCoins({
+            owner: address,
+            coinType: `${packageObjectId}::staked_sui::STAKED_SUI`
+        });
+
+        return coins.data.map(item => item.coinObjectId)
+    }, [])
+
+    const getAllVaultTokens = useCallback(async (address) => {
+
+        console.log("get all vault tokens for :", address)
+
+        const packageObjectId = PACKAGE_ID
+
+        const coins = await provider.getCoins({
+            owner: address,
+            coinType: `${packageObjectId}::vault::VAULT`
+        });
+        return coins.data.map(item => item.coinObjectId)
+
+    },[])
+
+    const getTotalSupply = useCallback(async () => {
+
+        
+
+        const txn = await provider.getObject({
+            id: '0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231',
+            // fetch the object content field
+            options: { showContent: true },
+        });
+
+    },[])
+
+    const stake = useCallback(async (coinId) => {
+        if (!connected) {
+            return
+        }
+
+        // define a programmable transaction
+        const tx = new TransactionBlock();
+        const packageObjectId = PACKAGE_ID
+        tx.moveCall({
+            target: `${packageObjectId}::vault::mint`,
+            arguments: [tx.pure(RESERVE), tx.pure(`${coinId}`)],
+        });
+
+        const resData = await wallet.signAndExecuteTransactionBlock({
+            transactionBlock: tx
+        });
+
+    }, [connected, wallet])
 
     return {
         faucet,
         correctedChain,
-        getMockBalance
+        getMockBalance,
+        getAllCoins,
+        getAllVaultTokens,
+        stake
     }
 }
 
