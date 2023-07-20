@@ -1,9 +1,10 @@
 import MainLayout from "@/layouts/mainLayout"
+import TradePage from "@/components/Trade"
 
 const Trade = () => {
     return (
         <MainLayout>
-            Trade
+            <TradePage/>
         </MainLayout>
     )
 }

@@ -1,5 +1,5 @@
 import useLegato from "@/hooks/useLegato"
-import { slugify } from "../helpers"
+// import { slugify } from "../helpers"
 import { useWallet } from "@suiet/wallet-kit"
 import { useState, useCallback, useEffect } from "react"
 import Spinner from "./Spinner"

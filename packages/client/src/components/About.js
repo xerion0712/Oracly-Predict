@@ -40,7 +40,7 @@ const About = () => {
                     </div>
                 </div>
             </section>
-            <div className='bg-black bg-opacity-10 backdrop-blur-lg  drop-shadow-lg p-4 border-2'>
+            {/* <div className='bg-black bg-opacity-10 backdrop-blur-lg  drop-shadow-lg p-4 border-2'>
                 <div class="grid grid-cols-3 gap-3">
                     <div className="col-span-2">
                         <p className="px-8 mt-8 mb-8 font-bold text-2xl">Follow us for updates </p>
@@ -52,9 +52,7 @@ const About = () => {
                     </div>
                     </div>
                 </div>
-
-
-            </div>
+            </div> */}
         </div>
     )
 }

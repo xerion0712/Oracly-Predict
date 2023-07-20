@@ -1,7 +1,7 @@
 
 import { useWallet } from '@suiet/wallet-kit'
 import { useCallback } from 'react';
-import { PACKAGE_ID, TREASURY_CAP, RESERVE } from '@/constants';
+import { PACKAGE_ID, TREASURY_CAP, RESERVE, MARKETPLACE } from '@/constants';
 import { Ed25519Keypair, JsonRpcProvider, testnetConnection, RawSigner, TransactionBlock } from '@mysten/sui.js';
 import { useEffect, useState } from 'react';
 
@@ -81,20 +81,43 @@ const useLegato = () => {
             coinType: `${packageObjectId}::vault::VAULT`
         });
         return coins.data.map(item => item.coinObjectId)
+    }, [])
 
-    },[])
+    const getAllOrders = useCallback(async () => {
 
-    const getTotalSupply = useCallback(async () => {
+        console.log("get all orders")
 
-        
+        const packageObjectId = PACKAGE_ID
 
-        const txn = await provider.getObject({
-            id: '0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231',
-            // fetch the object content field
-            options: { showContent: true },
+        const events = await provider.queryEvents({
+            query: { MoveModule: { package: packageObjectId, module: 'marketplace' } }
         });
 
-    },[])
+        const listing = events.data.reduce((arr, item) => {
+            if (item.type.indexOf("ListEvent") !== -1) {
+                arr.push(item.parsedJson)
+            }
+            return arr
+        }, [])
+
+        const buying = events.data.reduce((arr, item) => {
+            if (item.type.indexOf("BuyEvent") !== -1) {
+                arr.push(item.parsedJson['object_id'])
+            }
+            return arr
+        }, [])
+
+        return listing.filter(item => buying.indexOf(item['object_id']) === -1)
+    }, [])
+
+
+    // const getTotalSupply = useCallback(async () => {
+    //     const txn = await provider.getObject({
+    //         id: '0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231',
+    //         // fetch the object content field
+    //         options: { showContent: true },
+    //     });
+    // },[])
 
     const stake = useCallback(async (coinId) => {
         if (!connected) {
@@ -115,13 +138,61 @@ const useLegato = () => {
 
     }, [connected, wallet])
 
+    const createOrder = useCallback(async (tokenId, price) => {
+
+        if (!connected) {
+            return
+        }
+
+        const tx = new TransactionBlock();
+        // const [coin] = tx.splitCoins(tx.gas, [tx.pure(1000)]);
+
+        const packageObjectId = PACKAGE_ID
+        tx.moveCall({
+            target: `${packageObjectId}::marketplace::list`,
+            arguments: [tx.pure(MARKETPLACE), tx.pure(`${tokenId}`), tx.pure(`${price}`)],
+        });
+
+        const resData = await wallet.signAndExecuteTransactionBlock({
+            transactionBlock: tx
+        });
+
+    }, [connected, wallet])
+
+    const buy = useCallback(async (objectId, price) => {
+
+        if (!connected) {
+            return
+        }
+
+        console.log("buy", objectId, price)
+
+        const tx = new TransactionBlock();
+        const [coin] = tx.splitCoins(tx.gas, [tx.pure(Number(price))]);
+
+        const packageObjectId = PACKAGE_ID
+
+        tx.moveCall({
+            target: `${packageObjectId}::marketplace::buy_and_take`,
+            arguments: [tx.pure(MARKETPLACE), tx.pure(`${objectId}`), coin],
+        });
+
+        const resData = await wallet.signAndExecuteTransactionBlock({
+            transactionBlock: tx
+        });
+
+    }, [connected, wallet])
+
     return {
         faucet,
         correctedChain,
+        createOrder,
         getMockBalance,
         getAllCoins,
         getAllVaultTokens,
-        stake
+        getAllOrders,
+        stake,
+        buy
     }
 }
 

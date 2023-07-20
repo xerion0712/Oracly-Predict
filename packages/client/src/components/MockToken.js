@@ -35,7 +35,7 @@ const MockToken = () => {
         <div class=" border border-gray-400 text-gray-100 px-4 py-3 ml-7 mr-7 rounded relative">
             <div class="grid grid-cols-10 gap-3 px-2 mt-4 mb-4 ">
                 <div class="col-span-3 flex flex-col text-2xl font-bold">
-                    Staked Sui
+                    Staked SUI
                 </div>
                 <div class="col-span-2 flex flex-col text-md">
                     <div class="mt-auto mb-auto">
