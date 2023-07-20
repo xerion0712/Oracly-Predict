@@ -87,7 +87,7 @@ const Header = ({ landing }) => {
             {wallet && wallet.connected && !correctedChain && (
                 <div class=" border border-gray-400 text-gray-100 px-4 py-3 ml-7 mr-7 rounded relative" role="alert">
                     <strong class="font-bold">Incorrect chain!</strong>{` `}
-                    <span class="block sm:inline">Support Devnet only</span> 
+                    <span class="block sm:inline">Support Testnet only</span> 
                 </div>
             )}
         </>
