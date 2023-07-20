@@ -7,6 +7,7 @@ import Floor from '@/components/Floor';
 import MainLayout from '@/layouts/mainLayout';
 import Header from '@/components/Header';
 import Link from 'next/link';
+import About from '@/components/About';
 
 export default function Home() {
   return (
@@ -31,13 +32,17 @@ export default function Home() {
                   <Link href="/stake">
                     <button className="px-8 py-3 m-2 text-lg font-semibold rounded dark:bg-violet-400 dark:text-gray-900 hover:underline">Launch App</button>
                   </Link>
-                  <button className="px-8 py-3 m-2 text-lg border rounded dark:text-gray-50 dark:border-gray-700">Learn more</button>
-                </div> 
+                  <Link href="/#about">
+                    <button className="px-8 py-3 m-2 text-lg border rounded dark:text-gray-50 dark:border-gray-700">Learn more</button>
+                  </Link>
+
+                </div>
               </div>
             </div>
           </section>
         </div>
       </div>
+      <About />
       <Footer />
     </main>
   )
