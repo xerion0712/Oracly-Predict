@@ -1,6 +1,7 @@
 
 
-export const PACKAGE_ID = "0xcfb55873f480454fa34613c161319e1d6ecdf8450a53111db0c368ca3960b958"
-export const TREASURY_CAP = "0xa96ff9f1bcd91b9df71ca58ef00edbdc1c3b46b8c3de8fa6466c9dcb418239f0"
-export const RESERVE = "0x21cb430b8a3c9957b4f28ed97841cc75ca341b95cf7609a4dec97975a19a458f"
-export const MARKETPLACE = "0xe426548407da45191cdb7b64fc1b7d15230be4b845c370dbf7441bd45c427d6a"
+export const PACKAGE_ID = "0x049e0241831bd3ee71662fcfd1125f45fda84f8c892a36ae530fdc1c7f7d7884"
+export const TREASURY_CAP = "0xdd5e3d67f7ffba50d4b2ac08784ca9adc797dda53c27ede73a521aab3a2ebab5"
+export const RESERVE = "0xe755f1908f1c0e5b1c6ade71ee50bc023d8eb60bcfb1d8eb4d27878d45a1dfd1"
+export const MARKETPLACE = "0x517837b3d5f20675aec9bcc1c8f2789e523986bc5562b2e96fc177d055beb4ca"
+
