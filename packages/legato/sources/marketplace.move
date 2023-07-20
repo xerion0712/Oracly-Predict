@@ -6,6 +6,7 @@ module legato::marketplace {
     use sui::object::{Self, ID, UID};
     use sui::coin::{Self, Coin};
     use sui::transfer;
+    use sui::event;
     use sui::sui::SUI;
     use legato::vault::{VAULT};
 
@@ -22,6 +23,16 @@ module legato::marketplace {
         owner: address
     }
 
+    struct ListEvent has copy, drop {
+        object_id: ID,
+        ask: u64,
+        owner: address
+    }
+
+    struct BuyEvent has copy, drop {
+        object_id: ID
+    }
+
     #[allow(unused_function)]
     fun init(ctx: &mut TxContext) {
         transfer::share_object(Marketplace {
@@ -36,11 +47,18 @@ module legato::marketplace {
         ctx: &mut TxContext 
     ) {
         let item_id = object::id(&item);
+        let sender = tx_context::sender(ctx);
         let listing = Listing {
             ask,
             id: object::new(ctx),
-            owner: tx_context::sender(ctx),
+            owner: sender,
         };
+
+        event::emit(ListEvent {
+            object_id: item_id,
+            ask,
+            owner: sender,
+        });
 
         ofield::add(&mut listing.id, true, item);
         ofield::add(&mut marketplace.id, item_id, listing)
@@ -67,6 +85,10 @@ module legato::marketplace {
         } else {
             ofield::add(&mut marketplace.id, owner, paid)
         };
+
+        event::emit(BuyEvent {
+            object_id: item_id
+        });
 
         let item = ofield::remove(&mut id, true);
         object::delete(id);
