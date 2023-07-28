@@ -15,7 +15,7 @@ const About = () => {
                         </div>
                         <h5 class="mb-4 text-lg font-bold">Trade Future Yield</h5>
                         <p class="text-neutral-500 dark:text-neutral-300">
-                        Allowing users to lock SuiStaked objects as collateral for vault tokens, which can then be traded on Legato's DEX
+                            {`Allowing users to lock SuiStaked objects as collateral for vault tokens, which can then be traded on Legato's DEX`}
                         </p>
                     </div>
                     <div class="mb-12 md:mb-0">
@@ -24,7 +24,7 @@ const About = () => {
                         </div>
                         <h5 class="mb-4 text-lg font-bold">Fixed Maturity Date</h5>
                         <p class="text-neutral-500 dark:text-neutral-300">
-                        Vaults are designed with specific maturity dates, allowing for the redemption of StakedSui tokens at a 1:1 ratio
+                            Vaults are designed with specific maturity dates, allowing for the redemption of StakedSui tokens at a 1:1 ratio
                         </p>
                     </div>
 
