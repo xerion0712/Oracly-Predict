@@ -74,7 +74,7 @@ const Trade = () => {
     const [tokens, setTokens] = useState([])
     const [tick, setTick] = useState(0)
     const [modal, setModal] = useState()
-    const [price, setPrice] = useState(1.2)
+    const [price, setPrice] = useState(1)
     const [orders, setOrders] = useState([])
 
     useEffect(() => {

@@ -23,21 +23,21 @@ const ListingModal = ({
                 </button>
                 <div class="w-full mt-1 text-white">
                     <div className="grid grid-cols-8 p-2 gap-3">
-                        <div class="col-span-6">
+                        <div class="col-span-4">
                             <input disabled={true} value={"1"} type="number" class="mt-1 block w-full py-2 px-3 border border-gray-700 bg-gray-900 text-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base" />
                         </div>
-                        <div class="col-span-2 flex">
-                            <label class="block text-md text-md font-medium text-gray-300 mt-auto mb-auto mr-auto">VSS12-23</label>
+                        <div class="col-span-4 flex">
+                            <label class="block text-md text-md font-medium text-gray-300 mt-auto mb-auto mr-auto">vStaked Sui 12-23</label>
                         </div>
                     </div>
                     <div className="flex justify-center">
                         <ArrowDown />
                     </div>
                     <div className="grid grid-cols-8 p-2 gap-3">
-                        <div class="col-span-6">
+                        <div class="col-span-4">
                             <input onChange={(e) => setPrice(e.target.value)} value={price} type="number" class="mt-1 block w-full py-2 px-3 border border-gray-700 bg-gray-900 text-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-base" />
                         </div>
-                        <div class="col-span-1 flex">
+                        <div class="col-span-4 flex">
                             <label class="block text-md text-md font-medium text-gray-300 mt-auto mb-auto mr-auto">SUI</label>
                         </div>
                     </div>

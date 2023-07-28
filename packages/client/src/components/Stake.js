@@ -1,10 +1,25 @@
 import useLegato from "@/hooks/useLegato"
 // import { slugify } from "../helpers"
 import { useWallet } from "@suiet/wallet-kit"
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useMemo } from "react"
 import Spinner from "./Spinner"
+import { slugify } from "@/helpers"
 
 const Card = ({ matured = false, title, date, total, loading, onStake, balance }) => {
+
+    console.log("balance : ", balance)
+
+    const withAvailableYield = useMemo(() => {
+
+        const date1 = new Date('12/31/2023');
+        const date2 = new Date();
+        const diffTime = Math.abs(date2 - date1);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+        
+        const totalYield =  (balance * diffDays * 0.04) / 365
+        return Number(balance)+Number(totalYield)
+    },[balance])
+
     return (
         <div className="col-span-1 border-2 p-3">
             <div className="text-sm">
@@ -25,10 +40,10 @@ const Card = ({ matured = false, title, date, total, loading, onStake, balance }
                 </div>
                 {/* <div>
                     <div className="text-sm">
-                        Total Locked
+                        Symbol
                     </div>
                     <div>
-                        {total} sSUI
+                        v{slugify(title)}
                     </div>
                 </div> */}
                 <div>
@@ -36,7 +51,7 @@ const Card = ({ matured = false, title, date, total, loading, onStake, balance }
                         Balance
                     </div>
                     <div>
-                    {Number(balance).toFixed(2)}
+                    {Number(withAvailableYield).toFixed(3)}
                     </div>
                 </div> 
             </div>
