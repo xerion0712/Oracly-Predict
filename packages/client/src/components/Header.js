@@ -34,6 +34,9 @@ const Header = ({ landing }) => {
                             height={60}
                             alt="Logo"
                         />
+                        <div className='font-mono text-sm mt-auto mb-auto ml-3 tracking-widest'>
+                            Legato Finance
+                        </div> 
                     </div>
                 </div>
                 <div class="col-span-1 flex flex-col text-right">
@@ -52,7 +55,7 @@ const Header = ({ landing }) => {
         <>
             <div class="grid grid-cols-3 gap-3 px-2 m-4 ">
                 <div class="col-span-1 flex flex-col">
-                    <div class="text-3xl w-full text-white   flex flex-row">
+                    <div class="text-3xl w-full text-white flex flex-row">
                         <Link href="/">
                             <Image
                                 src="/logo.png"
@@ -60,7 +63,7 @@ const Header = ({ landing }) => {
                                 height={60}
                                 alt="Logo"
                             />
-                        </Link>
+                        </Link> 
                     </div>
                 </div>
                 <div class="col-span-1 flex">

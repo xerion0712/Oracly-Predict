@@ -8,6 +8,7 @@ import MainLayout from '@/layouts/mainLayout';
 import Header from '@/components/Header';
 import Link from 'next/link';
 import About from '@/components/About';
+import HowItWorks from '@/components/HowItWorks';
 
 export default function Home() {
   return (
@@ -22,12 +23,12 @@ export default function Home() {
         <div className="absolute font-mono top-40 w-full z-100 pointer-events-none">
           <section>
             <div className="container mx-auto flex flex-col items-center py-16 text-center max-w-4xl">
-              <div className='bg-black bg-opacity-10 backdrop-blur-lg   drop-shadow-lg p-16 border-2'>
+              <div className='bg-black bg-opacity-10 backdrop-blur-lg  m-5 md:m-0 drop-shadow-lg p-16 border-2'>
 
-                <h1 className="text-6xl font-bold leadi">
+                <h1 className="text-xl md:text-6xl font-bold leadi">
                   Permissionless Yield Trading Protocol
                 </h1>
-                <p className="px-8 mt-8 mb-12 text-lg">Legato Finance enables preemptive trading of your future yield on any liquid staked assets on Sui blockchain</p>
+                <p className="px-0 md:px-8 mt-8 mb-6 md:mb-12 text-sm md:text-lg">Legato Finance enables preemptive trading of your future yield on any liquid staked assets on Sui blockchain</p>
                 <div className="flex flex-wrap justify-center pointer-events-auto">
                   <Link href="/stake">
                     <button className="px-8 py-3 m-2 text-lg font-semibold rounded dark:bg-violet-400 dark:text-gray-900 hover:underline">Launch App</button>
@@ -43,6 +44,7 @@ export default function Home() {
         </div>
       </div>
       <About />
+      <HowItWorks/>
       <Footer />
     </main>
   )
