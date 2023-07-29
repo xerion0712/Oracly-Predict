@@ -41,7 +41,7 @@ npm run package:client
 
 Name | Address 
 --- | --- 
-Package | 0x049e0241831bd3ee71662fcfd1125f45fda84f8c892a36ae530fdc1c7f7d7884
-Mock StakedSui | 0xdd5e3d67f7ffba50d4b2ac08784ca9adc797dda53c27ede73a521aab3a2ebab5
-Vault | 0xe755f1908f1c0e5b1c6ade71ee50bc023d8eb60bcfb1d8eb4d27878d45a1dfd1
-Marketplace | 0x517837b3d5f20675aec9bcc1c8f2789e523986bc5562b2e96fc177d055beb4ca
+Package | 0xd9ed174e9a38820c02d0a333228f05b1d3a83079f596352b0b0da1bb8aca53c4
+Mock StakedSui | 0x4e25a93053a62304d0c3046d998c9e6edd28d031ab3b441dedfe5ca611a99abc
+Vault | 0xbbc843902b4267562a8038f3ce94bdd266bd9e635889ccefa17d002687ae478b
+Marketplace | 0xcb65377b43bca63a3ead11dacdb8fbc34da0cd15b4cd2388d36889cfd41d9501
