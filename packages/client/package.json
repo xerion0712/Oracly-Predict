@@ -9,11 +9,11 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@mysten/sui.js": "0.36.0",
-    "@suiet/wallet-kit": "0.2.15",
+    "@mysten/sui.js": "0.37.1",
+    "@suiet/wallet-kit": "0.2.16",
     "@pmndrs/assets": "1.5.4",
     "@react-three/drei": "9.74.15",
-    "@react-three/fiber": "8.13.3", 
+    "@react-three/fiber": "8.13.3",
     "autoprefixer": "10.4.14",
     "eslint": "8.44.0",
     "eslint-config-next": "13.4.9",
