@@ -80,7 +80,8 @@ const useLegato = () => {
             owner: address,
             coinType: `${packageObjectId}::vault::VAULT`
         });
-        return coins.data.map(item => item.coinObjectId)
+        
+        return coins.data.filter(item => Number(item.balance) !== 0).map(item => item.coinObjectId)
     }, [])
 
     const getAllOrders = useCallback(async () => {
