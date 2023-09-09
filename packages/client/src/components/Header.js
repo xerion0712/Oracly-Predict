@@ -66,12 +66,13 @@ const Header = () => {
     <span class="block rounded-md bg-slate-900 px-5 py-3 font-bold text-white"> algochurn.com </span>
   </button>
 </div> */}
-            {/* {wallet && wallet.connected && !correctedChain && (
-                <div class=" border border-gray-400 text-gray-100 px-4 py-3 ml-7 mr-7 rounded relative" role="alert">
+            {wallet && wallet.connected && !correctedChain && (
+                <div class="container ml-auto mr-auto max-w-4xl p-4 mb-4 text-sm text-yellow-800 rounded-lg bg-yellow-50 dark:bg-gray-800 dark:text-yellow-300" role="alert">
+
                     <strong class="font-bold">Incorrect chain!</strong>{` `}
-                    <span class="block sm:inline">Support Testnet only</span>
+                    <span class="block sm:inline ml-1">Support Testnet only</span>
                 </div>
-            )} */}
+            )}
         </>
     )
 }
