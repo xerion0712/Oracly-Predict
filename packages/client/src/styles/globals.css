@@ -19,15 +19,15 @@
 body {
   .wkit-button {
     background: transparent;
-    font-size: 14px;
-    border: 1px solid white;
-    border-radius: 0px;
+    font-size: 14px; 
+    border-radius: 8px;
     padding: 10px;
     margin-top: 7px;
+    background: #1d4ed8;
     margin-bottom: auto;
   }
   .wkit-button:hover {
-    background: transparent;
+    background: #1d4ed8;
     text-decoration: underline;
     
   }
@@ -46,9 +46,11 @@ body {
   .wkit-connected-button__balance {
     color: white;
     font-size: 14px;
+    display: none;
   }
   .wkit-connected-button__divider {
     background: white;
+    display: none;
   }
   .wkit-address-select__address {
     color: white;

@@ -11,14 +11,14 @@ const useLegato = () => {
 
     const provider = new JsonRpcProvider(testnetConnection);
 
-    const [correctedChain, setCorrectedChain] = useState(false)
-
     const { connected, account } = wallet
 
-    useEffect(() => {
-        if (!wallet.connected) return;
-        setCorrectedChain(wallet.chain.id === "sui:testnet" ? true : false)
-    }, [wallet.connected])
+    // useEffect(() => {
+    //     if (!wallet.connected) return;
+    //     setCorrectedChain(wallet.chain.id === "sui:testnet" ? true : false)
+    // }, [wallet.connected])
+
+    const correctedChain = wallet && wallet.connected && wallet.chain.id === "sui:testnet" ? true : false
 
     const faucet = useCallback(async () => {
 
