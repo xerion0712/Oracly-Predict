@@ -184,7 +184,7 @@ const Stake = () => {
 
             <div className="max-w-lg ml-auto mr-auto">
                 <p class="text-neutral-400 text-sm p-5 text-center">
-                    You're using a preview version of Legato Finance. Please note that some functions may not work as intended during this phase
+                    {`You're using a preview version of Legato Finance. Please note that some functions may not work as intended during this phase.`}
                 </p>
             </div>
         </div>
