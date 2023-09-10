@@ -1,146 +1,191 @@
-import useLegato from "@/hooks/useLegato"
-// import { slugify } from "../helpers"
-import { useWallet } from "@suiet/wallet-kit"
-import { useState, useCallback, useEffect, useMemo } from "react"
-import Spinner from "./Spinner"
-import { slugify } from "@/helpers"
 
-const Card = ({ matured = false, title, date, total, loading, onStake, balance }) => {
 
-    console.log("balance : ", balance)
+import { Listbox, Transition } from '@headlessui/react'
+import { CheckIcon, ChevronUpDownIcon, ChevronDownIcon, ArrowRightIcon } from "@heroicons/react/20/solid"
+import { Fragment, useState } from 'react'
+import MintPT from '@/panels/MintPT'
 
-    const withAvailableYield = useMemo(() => {
+const people = [
+    {
+        id: 1,
+        name: 'September 9, 2023',
+        avatar:
+            './sui-sui-logo.svg',
+    },
+    {
+        id: 2,
+        name: 'September 9, 2024',
+        avatar:
+            './sui-sui-logo.svg',
+    }
+]
 
-        const date1 = new Date('12/31/2023');
-        const date2 = new Date();
-        const diffTime = Math.abs(date2 - date1);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-        
-        const totalYield =  (balance * diffDays * 0.04) / 365
-        return Number(balance)+Number(totalYield)
-    },[balance])
-
-    return (
-        <div className="col-span-1 border-2 p-3">
-            <div className="text-sm">
-                {matured === true ? <span class="bg-yellow-100 text-yellow-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded dark:bg-yellow-900 dark:text-yellow-300">Matured</span> : <span class="bg-green-100 text-green-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded dark:bg-green-900 dark:text-green-300">Available</span>}
-
-            </div>
-            <h2 class="text-xl mb-2 mt-2 font-bold">
-                {title}
-            </h2>
-            <div class="grid grid-cols-2 gap-2 ml-4 mr-4 mt-2">
-                <div>
-                    <div className="text-sm">
-                        Maturity Date
-                    </div>
-                    <div>
-                        {date}
-                    </div>
-                </div>
-                {/* <div>
-                    <div className="text-sm">
-                        Symbol
-                    </div>
-                    <div>
-                        v{slugify(title)}
-                    </div>
-                </div> */}
-                <div>
-                    <div className="text-sm">
-                        Balance
-                    </div>
-                    <div>
-                    {Number(withAvailableYield).toFixed(3)}
-                    </div>
-                </div> 
-            </div>
-            <div className="flex flex-col p-4 mt-2">
-                {matured === true && <button className="p-2 pl-10 pr-10 text-sm border flex flex-row w-full justify-center">
-                    Redeem
-                </button>}
-                {matured === false && <button disabled={loading} onClick={onStake} className="p-2 pl-10 pr-10 text-sm border flex flex-row w-full justify-center">
-                    {loading && <Spinner />}
-                    Stake
-                </button>}
-                {/* <p className="mt-4 text-sm">Balance : {balance} {slugify(title)}</p> */}
-            </div>
-        </div>
-    )
+function classNames(...classes) {
+    return classes.filter(Boolean).join(' ')
 }
 
 const Stake = () => {
 
-    const { getAllCoins, getAllVaultTokens, stake } = useLegato()
+    const [mintPanelVisible, setMintPanelVisible] = useState(false)
 
-    const wallet = useWallet()
+    const [selected, setSelected] = useState(people[1])
 
-    const { account } = wallet
+    const [amount, setAmount] = useState(0)
 
-    const [loading, setLoading] = useState(false)
-    const [coins, setCoins] = useState([])
-    const [ balance, setBalance] = useState(0)
-    const [tick, setTick] = useState(0)
-
-    useEffect(() => {
-        account && account.address && getAllCoins(account.address).then(setCoins)
-        account && account.address && getAllVaultTokens(account.address).then(
-            (items) => { 
-                setBalance(items.length)
-            }
-        )
-    }, [account, tick])
-
-    const onStake = useCallback(async () => {
-
-        setLoading(true)
-
-        try {
-
-            if (coins.length === 0) {
-                alert("No available coins!") 
-            } else {
-                await stake(coins[0])
-                setTick(tick + 1)
-            }
-           
-        } catch (e) {
-            console.log(e)
-        }
-
-        setLoading(false)
-
-    }, [tick, stake, coins])
+    const onAmountChange = (e) => {
+        setAmount(e.target.value)
+    }
 
     return (
         <div>
-            <div className="text-center max-w-2xl ml-auto mr-auto">
-                <h2 class="text-3xl mb-2 font-bold">
-                    Staked SUI
-                </h2>
-                <p class="text-neutral-500">
-                    Lock your staked SUI and sell them at a future price inclusive of the yield or hold and redeem them after the maturity date
-                </p>
-            </div>
-            <div className="text-center mt-6 ml-auto mr-auto">
-                <div class="grid grid-cols-3 gap-2">
-                    <Card
-                        matured={true}
-                        title="Staked SUI 6-23"
-                        date="30/6/23"
-                        total="4"
-                        balance={0}
-                    />
-                    <Card
-                        matured={false}
-                        title="Staked SUI 12-23"
-                        date="31/12/23"
-                        total={balance.toLocaleString()}
-                        loading={loading}
-                        onStake={onStake}
-                        balance={balance.toLocaleString()}
-                    />
+            <MintPT
+                selected={selected}
+                visible={mintPanelVisible}
+                close={() => setMintPanelVisible(false)}
+                amount={amount}
+                onAmountChange={onAmountChange}
+
+            />
+            <div className="max-w-xl ml-auto mr-auto">
+                <div class="wrapper pt-10">
+                    <div class="rounded-3xl p-px bg-gradient-to-b  from-blue-800 to-purple-800 ">
+                        <div class="rounded-[calc(1.5rem-1px)] p-10 bg-gray-900">
+                            <div class="flex gap-10 items-center">
+                                <p class="text-gray-300">
+                                    Select Market
+                                </p>
+                                <div class="flex gap-4 items-center flex-1 p-2 hover:cursor-pointer ">
+                                    <img class="h-12 w-12 rounded-full" src="./sui-sui-logo.svg" alt="" />
+                                    <div>
+                                        <h3 class="text-2xl font-medium text-white">SUI</h3>
+                                        <span class="text-sm tracking-wide text-gray-400">Staked SUI</span>
+                                    </div>
+                                    <div class="ml-auto ">
+                                        <ChevronUpDownIcon className="h-6 w-6 text-gray-300" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <Listbox value={selected} onChange={setSelected}>
+                                {({ open }) => (
+                                    <>
+                                        <Listbox.Label className="block mt-6 text-sm font-medium leading-6 text-gray-300">Vault to stake into</Listbox.Label>
+                                        <div className="relative mt-2">
+                                            <Listbox.Button className="relative hover:cursor-pointer w-full cursor-default rounded-md  py-3 pl-3 pr-10 text-left  shadow-sm sm:text-sm sm:leading-6  bg-gray-700 placeholder-gray-400 text-white   ">
+                                                <span className="flex items-center">
+                                                    <span className="mr-3 block truncate">{selected.name}</span>
+                                                    <img src={selected.avatar} alt="" className="h-5 w-5 ml-auto flex-shrink-0 rounded-full" />
+                                                    <span className="ml-2 block font-medium w-5 text-right">0</span>
+                                                </span>
+                                                <span className="pointer-events-none absolute inset-y-0 right-0 ml-3 flex items-center pr-2">
+                                                    <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                                                </span>
+                                            </Listbox.Button>
+                                            <Transition
+                                                show={open}
+                                                as={Fragment}
+                                                leave="transition ease-in duration-100"
+                                                leaveFrom="opacity-100"
+                                                leaveTo="opacity-0"
+                                            >
+                                                <Listbox.Options className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md bg-gray-700 placeholder-gray-400 text-white py-2 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                                                    {people.map((person) => (
+                                                        <Listbox.Option
+                                                            key={person.id}
+                                                            className={({ active }) =>
+                                                                classNames(
+                                                                    active ? 'bg-blue-600 text-white' : 'text-gray-900',
+                                                                    'relative cursor-default select-none py-2 pl-3 pr-9'
+                                                                )
+                                                            }
+                                                            value={person}
+                                                        >
+                                                            {({ selected, active }) => (
+                                                                <>
+                                                                    <div className="flex items-center">
+                                                                        <span
+                                                                            className={classNames(selected ? 'font-semibold' : 'font-normal', 'ml-3 block text-white truncate')}
+                                                                        >
+                                                                            {person.name}
+                                                                        </span>
+                                                                        <img src={person.avatar} alt="" className="h-5 w-5 ml-auto flex-shrink-0 rounded-full" />
+                                                                        <span className="ml-2 block text-white font-medium w-5 text-right">0</span>
+                                                                    </div>
+                                                                    {/* 
+                                                                    {selected ? (
+                                                                        <span
+                                                                            className={classNames(
+                                                                                active ? 'text-white' : 'text-white',
+                                                                                'absolute inset-y-0 right-0 flex items-center pr-4'
+                                                                            )}
+                                                                        >
+                                                                            <CheckIcon className="h-5 w-5" aria-hidden="true" />
+                                                                        </span>
+                                                                    ) : null} */}
+                                                                </>
+                                                            )}
+                                                        </Listbox.Option>
+                                                    ))}
+                                                </Listbox.Options>
+                                            </Transition>
+                                        </div>
+                                    </>
+                                )}
+                            </Listbox>
+
+                            <div class="grid grid-cols-2 gap-2  mb-6 mt-6">
+                                <div>
+                                    <div className="block text-sm font-medium leading-6 text-gray-300">
+                                        Available to stake
+                                    </div>
+                                    <div className='flex flex-row text-lg'>
+                                        <img src={"./sui-sui-logo.svg"} alt="" className="h-5 w-5  mt-auto mb-auto  mr-2 flex-shrink-0 rounded-full" />
+                                        0
+                                    </div>
+                                </div>
+                                <div className='text-right'>
+                                    <div className="block text-sm font-medium leading-6 text-gray-300">
+                                        Total Staked
+                                    </div>
+                                    <div className="text-2xl">
+                                        $0
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2  mb-6 mt-6">
+                                <div>
+                                    <div className="block text-sm font-medium leading-6 text-gray-300">
+                                        Staked amount
+                                    </div>
+                                    <div className='flex flex-row text-lg'>
+                                        <img src={"./sui-sui-logo.svg"} alt="" className="h-5 w-5  mr-2  mt-auto mb-auto flex-shrink-0 rounded-full" />
+                                        0
+                                    </div>
+                                </div>
+                                <div className='text-right'>
+                                    <div className="block text-sm font-medium leading-6 text-gray-300">
+                                        APR
+                                    </div>
+                                    <div className="text-2xl">
+                                        4.35%
+                                    </div>
+                                </div>
+                            </div>
+                            <button onClick={() => setMintPanelVisible(true)} className=" py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
+                                Next
+                                <ArrowRightIcon className="h-5 w-5 ml-2" />
+                            </button>
+                        </div>
+                    </div>
+
                 </div>
+            </div>
+
+            <div className="max-w-lg ml-auto mr-auto">
+                <p class="text-neutral-400 text-sm p-5 text-center">
+                    You're using a preview version of Legato Finance. Please note that some functions may not work as intended during this phase
+                </p>
             </div>
         </div>
     )

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@headlessui/react": "^1.7.17",
+    "@heroicons/react": "^2.0.18",
     "@mysten/sui.js": "0.37.1",
     "@pmndrs/assets": "1.5.4",
     "@suiet/wallet-kit": "0.2.16",
