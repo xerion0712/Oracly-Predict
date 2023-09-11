@@ -15,7 +15,7 @@ function classNames(...classes) {
 const Stake = () => {
 
     const [mintPanelVisible, setMintPanelVisible] = useState(false)
-    const [selected, setSelected] = useState(vault[1])
+    const [selected, setSelected] = useState(vault[0])
     const [amount, setAmount] = useState(0)
 
     const onAmountChange = (e) => {

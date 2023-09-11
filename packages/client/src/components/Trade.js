@@ -3,6 +3,7 @@ import { Fragment, useState } from 'react'
 import { PlusIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid"
 import { VAULT } from "../constants"
 import { Listbox, Transition } from '@headlessui/react'
+import YT from "./YT"
 
 function classNames(...classes) {
     return classes.filter(Boolean).join(' ')
@@ -27,7 +28,7 @@ function classNames(...classes) {
 
 const Sell = () => {
 
-    const [selected, setSelected] = useState(VAULT[1])
+    const [selected, setSelected] = useState(VAULT[0])
 
     return (
         <div>
@@ -127,18 +128,18 @@ const Sell = () => {
                 </div>
             </div>
 
-            <div className="block mt-4 text-sm font-medium leading-6 text-gray-300">
+            {/* <div className="block mt-4 text-sm font-medium leading-6 text-gray-300">
                 <div class="grid grid-cols-2 gap-3">
                     <div class="col-span-1 flex flex-row">
-                        APR 
+                        APR
                     </div>
-                    <div class="col-span-1 flex flex-row"> 
+                    <div class="col-span-1 flex flex-row">
                         <span class="ml-auto">
                             4.35%
                         </span>
                     </div>
                 </div>
-            </div>
+            </div> */}
 
             <hr class="my-5 h-[1px] border-t-0 bg-neutral-100  opacity-50" />
             <button onClick={() => alert(true)} className="  py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
@@ -152,7 +153,7 @@ const Sell = () => {
 
 const Buy = () => {
 
-    const [selected, setSelected] = useState(VAULT[1])
+    const [selected, setSelected] = useState(VAULT[0])
 
     return (
         <div>
@@ -278,7 +279,7 @@ const Buy = () => {
 
 const Trade = () => {
 
-    const [tab, setTab] = useState(1)
+    const [tab, setTab] = useState(2)
 
     return (
         <div>
@@ -323,6 +324,7 @@ const Trade = () => {
                         </div>
                         <div class="col-span-8">
                             {tab === 1 && <PT />}
+                            {tab === 2 && <YT />}
                         </div>
 
                     </div>
@@ -343,19 +345,6 @@ const PT = () => {
         <div class="border p-5 m-1 bg-gray-900 border-gray-600">
             <div class="grid grid-cols-12 gap-3 px-2">
                 <div class="col-span-5 flex flex-col border-r pr-3 border-gray-600">
-                    {/* <p class="text-gray-300">
-                                    Select Market
-                                </p>
-                                <div class="flex gap-4 items-center flex-1 p-2 mt-1 hover:cursor-pointer ">
-                                    <img class="h-12 w-12 rounded-full" src="./sui-sui-logo.svg" alt="" />
-                                    <div>
-                                        <h3 class="text-2xl font-medium text-white">SUI</h3>
-                                        <span class="text-sm tracking-wide text-gray-400">Staked SUI</span>
-                                    </div>
-                                    <div class="ml-auto mr-4">
-                                        <ChevronUpDownIcon className="h-6 w-6 text-gray-300" />
-                                    </div>
-                                </div> */}
                     <div class="font-medium text-center  border-b  text-gray-400 border-gray-700 mb-4 ">
                         <ul class="flex flex-wrap -mb-px">
                             <li class="  w-1/2">
@@ -372,7 +361,6 @@ const PT = () => {
                     </div>
                     {tab === 1 && <Buy />}
                     {tab === 2 && <Sell />}
-                    {/* <AmountInput /> */}
                 </div>
                 <div class="col-span-7 flex flex-col text-md">
 
