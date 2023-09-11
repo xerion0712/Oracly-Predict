@@ -42,7 +42,7 @@ const Header = () => {
                 </div>
                 <div class="menu w-full  flex-grow lg:flex lg:items-center lg:w-auto lg:px-3 px-8">
                     <div class="text-md font-bold text-blue-700 lg:flex-grow">
-                        <div class="container flex items-center justify-center p-6 mx-auto text-gray-600 capitalize dark:text-gray-300">
+                        <div class="container flex items-center justify-center p-6 mx-auto  capitalize  text-gray-300">
                             <Link className={`border-b-2 ${pathname === ("/") ? "text-gray-200 border-blue-700" : "border-transparent hover:text-gray-200 hover:border-blue-700"} mx-1.5 sm:mx-6`} href="/">
                                 Stake
                             </Link>

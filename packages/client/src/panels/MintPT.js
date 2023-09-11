@@ -42,7 +42,7 @@ const MintPT = ({ visible, close, selected, onAmountChange, amount }) => {
                 <div className="block leading-6 mb-2 text-gray-300">Amount to convert into PTs</div>
                 <div class="flex mb-2">
                     <div class="relative w-full">
-                        <input type="number" value={amount} onChange={onAmountChange} id="large-input" class="block w-full p-4 border rounded-l-lg sm:text-md  bg-gray-700 border-gray-600 placeholder-gray-400 text-white focus:outline-none focus:border-blue-500" />
+                        <input type="number" value={amount} onChange={onAmountChange} id="large-input" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none block w-full p-4 border rounded-l-lg sm:text-md  bg-gray-700 border-gray-600 placeholder-gray-400 text-white focus:outline-none focus:border-blue-500" />
                     </div>
                     <div class="flex-shrink-0 cursor-default z-10 inline-flex items-center py-2.5 px-4 text-sm font-medium text-center border rounded-r-lg border-gray-700 text-white  focus:ring-4 focus:outline-none   bg-gray-600   focus:ring-gray-800" type="button">
                         <div className='flex flex-row'>

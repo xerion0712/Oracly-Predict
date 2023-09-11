@@ -8,7 +8,7 @@ const Footer = () => {
                 <span class="text-sm">© 2023 Legato Finance
                 </span>
                 <span class=" text-sm   ">
-                    Made with ❤️ during Sui Liquid Staking Hackathon 
+                    Made with ❤️ during Liquid Staking Hackathon 
                 </span>
             </div>
         </footer> 

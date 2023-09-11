@@ -4,21 +4,9 @@ import { Listbox, Transition } from '@headlessui/react'
 import { CheckIcon, ChevronUpDownIcon, ChevronDownIcon, ArrowRightIcon } from "@heroicons/react/20/solid"
 import { Fragment, useState } from 'react'
 import MintPT from '@/panels/MintPT'
+import { VAULT } from "../constants"
 
-const people = [
-    {
-        id: 1,
-        name: 'September 9, 2023',
-        avatar:
-            './sui-sui-logo.svg',
-    },
-    {
-        id: 2,
-        name: 'September 9, 2024',
-        avatar:
-            './sui-sui-logo.svg',
-    }
-]
+const vault = VAULT
 
 function classNames(...classes) {
     return classes.filter(Boolean).join(' ')
@@ -27,9 +15,7 @@ function classNames(...classes) {
 const Stake = () => {
 
     const [mintPanelVisible, setMintPanelVisible] = useState(false)
-
-    const [selected, setSelected] = useState(people[1])
-
+    const [selected, setSelected] = useState(vault[1])
     const [amount, setAmount] = useState(0)
 
     const onAmountChange = (e) => {
@@ -89,7 +75,7 @@ const Stake = () => {
                                                 leaveTo="opacity-0"
                                             >
                                                 <Listbox.Options className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md bg-gray-700 placeholder-gray-400 text-white py-2 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-                                                    {people.map((person) => (
+                                                    {vault.map((person) => (
                                                         <Listbox.Option
                                                             key={person.id}
                                                             className={({ active }) =>
