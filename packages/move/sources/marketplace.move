@@ -8,10 +8,12 @@ module legato::marketplace {
     use sui::transfer;
     use sui::event;
     use sui::sui::SUI;
-    use legato::vault::{VAULT};
+    use legato::vault::{PT};
+    use legato::staked_sui::STAKED_SUI;
 
     const EAmountIncorrect: u64 = 0;
     const ENotOwner : u64 = 1;
+    // const EUnexpectedError: u64 = 2;
 
     struct Marketplace has key {
         id: UID
@@ -24,13 +26,15 @@ module legato::marketplace {
     }
 
     struct ListEvent has copy, drop {
-        object_id: ID,
+        item_id: ID,
         ask: u64,
-        owner: address
+        owner: address,
+        timestamp: u64
     }
 
     struct BuyEvent has copy, drop {
-        object_id: ID
+        item_id: ID,
+        timestamp: u64
     }
 
     #[allow(unused_function)]
@@ -42,7 +46,7 @@ module legato::marketplace {
 
     public entry fun list(
         marketplace: &mut Marketplace,
-        item: Coin<VAULT>,
+        item: Coin<PT<STAKED_SUI>>,
         ask: u64,
         ctx: &mut TxContext 
     ) {
@@ -55,9 +59,10 @@ module legato::marketplace {
         };
 
         event::emit(ListEvent {
-            object_id: item_id,
+            item_id: item_id,
             ask,
             owner: sender,
+            timestamp : tx_context::epoch_timestamp_ms(ctx)
         });
 
         ofield::add(&mut listing.id, true, item);
@@ -68,13 +73,14 @@ module legato::marketplace {
         marketplace: &mut Marketplace,
         item_id: ID,
         paid: Coin<SUI>,
-    ) : Coin<VAULT> {
+    ) : Coin<PT<STAKED_SUI>> {
+
         let Listing {
             id,
             ask,
             owner
         } = ofield::remove(&mut marketplace.id, item_id);
-
+        
         assert!(ask == coin::value(&paid), EAmountIncorrect);
 
         if (ofield::exists_<address>(&marketplace.id, owner)) {
@@ -85,10 +91,6 @@ module legato::marketplace {
         } else {
             ofield::add(&mut marketplace.id, owner, paid)
         };
-
-        event::emit(BuyEvent {
-            object_id: item_id
-        });
 
         let item = ofield::remove(&mut id, true);
         object::delete(id);
@@ -104,7 +106,13 @@ module legato::marketplace {
         transfer::public_transfer(
             buy(marketplace, item_id, paid),
             tx_context::sender(ctx)
-        )
+        );
+
+        event::emit(BuyEvent {
+            item_id: item_id,
+            timestamp : tx_context::epoch_timestamp_ms(ctx)
+        });
+
     }
 
     #[test_only]
