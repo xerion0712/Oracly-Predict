@@ -279,7 +279,7 @@ const Buy = () => {
 
 const Trade = () => {
 
-    const [tab, setTab] = useState(2)
+    const [tab, setTab] = useState(1)
 
     return (
         <div>

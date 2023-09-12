@@ -1,6 +1,6 @@
 
 import Image from 'next/image'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ExternalLink } from 'react-feather'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
@@ -13,6 +13,7 @@ import {
     formatSUI
 } from "@suiet/wallet-kit";
 import useLegato from '@/hooks/useLegato'
+import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/20/solid'
 
 
 const Header = () => {
@@ -58,6 +59,14 @@ const Header = () => {
                         <ConnectButton>
                             Connect Wallet
                         </ConnectButton>
+                        {/* {wallet && wallet.connected && (
+                            <div className="fixed top-[30px] right-[240px]">
+                                <div class="flex flex-row top-[10px]">
+                                    <ChevronLeftIcon onClick={() => onBack(wallet.address)} className="h-6 w-6 cursor-pointer text-gray-300" />
+                                    <ChevronRightIcon onClick={() => onNext(wallet.address)} className="h-6 w-6 cursor-pointer text-gray-300" />
+                                </div>
+                            </div>
+                        )} */}
                     </div>
                 </div>
             </nav>

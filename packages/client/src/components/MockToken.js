@@ -51,7 +51,7 @@ const MockToken = () => {
                     </div>
                     <div class="col-span-3 flex flex-col text-md">
                         <div class="mt-auto mb-auto">
-                            APR : 4%
+                            APR : 4.35%
                         </div>
                     </div>
                     <div class="col-span-3 flex flex-col text-xl font-bold">
