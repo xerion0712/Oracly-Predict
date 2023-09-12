@@ -2,9 +2,10 @@ module legato::vault {
 
     use sui::tx_context::{Self, TxContext};
     use sui::balance::{ Self, Supply, Balance};
-    use sui::object::{Self, UID};
+    use sui::object::{Self, UID, ID};
     use sui::transfer;
     use sui::coin::{Self, Coin};
+    use sui::event;
     use legato::epoch_time_lock::{Self, EpochTimeLock};
     use legato::oracle::{Self, Feed};
 
@@ -27,6 +28,24 @@ module legato::vault {
         yt: Supply<YT<TOKEN>>,
         feed : Feed,
         locked_until_epoch: EpochTimeLock
+    }
+
+    struct LockEvent has copy, drop {
+        object_id: ID,
+        collateral: u128,
+        pt_amount: u64,
+        owner: address
+    }
+
+    struct DepositEvent has copy, drop {
+        object_id: ID,
+        collateral: u64
+    }
+
+    struct UnlockEvent has copy, drop {
+        object_id: ID,
+        collateral: u64,
+        owner: address
     }
 
     fun init(ctx: &mut TxContext) {
@@ -111,6 +130,12 @@ module legato::vault {
         transfer::public_transfer(coin::from_balance(minted_balance, ctx), user);
     
         // emit event
+        event::emit(LockEvent {
+            object_id: object::id(reserve),
+            collateral : amount,
+            pt_amount: add_pt_amount,
+            owner : tx_context::sender(ctx)
+        });
     }
 
     // deposit collateral
@@ -125,6 +150,10 @@ module legato::vault {
         coin::put(&mut reserve.collateral, collateral);
 
         // emit event
+         event::emit(DepositEvent {
+            object_id: object::id(reserve),
+            collateral : amount
+        });
     }
 
     public entry fun unlock<TOKEN>(
@@ -140,6 +169,11 @@ module legato::vault {
         transfer::public_transfer(coin::take(&mut reserve.collateral, burned_balance, ctx), user);
 
         // emit event
+        event::emit(UnlockEvent {
+            object_id: object::id(reserve),
+            collateral : burned_balance,
+            owner : tx_context::sender(ctx)
+        });
     }
 
     public entry fun total_yt_supply<TOKEN>(reserve: &Reserve<TOKEN>): u64 {
