@@ -1,85 +1,167 @@
-
-
 module legato::vault {
 
-    use sui::object::{Self, UID};
-    use sui::balance::{ Self, Supply, Balance};
-    use sui::coin::{Self, Coin};
-    use sui::transfer;
     use sui::tx_context::{Self, TxContext};
-    use legato::staked_sui::STAKED_SUI;
+    use sui::balance::{ Self, Supply, Balance};
+    use sui::object::{Self, UID};
+    use sui::transfer;
+    use sui::coin::{Self, Coin};
     use legato::epoch_time_lock::{Self, EpochTimeLock};
-    
+    use legato::oracle::{Self, Feed};
+
+    const YT_TOTAL_SUPPLY: u64 = 1000000000;
+
     const EZeroAmount: u64 = 0;
+    const EVaultExpired: u64 = 1;
 
-    // manually change here
-    const LOCK_FOR_EPOCH: u64 = 3;
-
-    struct VAULT has drop { }
-
-    struct Reserve has key {
+    struct ManagerCap has key {
         id: UID,
-        collateral: Balance<STAKED_SUI>,
-        outstanding: Supply<VAULT>,
+    }
+
+    struct PT<phantom TOKEN> has drop {}
+    struct YT<phantom TOKEN> has drop {}
+
+    struct Reserve<phantom TOKEN> has key {
+        id: UID,
+        collateral: Balance<TOKEN>,
+        pt: Supply<PT<TOKEN>>,
+        yt: Supply<YT<TOKEN>>,
+        feed : Feed,
         locked_until_epoch: EpochTimeLock
     }
 
-    #[allow(unused_function)]
-    fun init(witness: VAULT, ctx: &mut TxContext) {
-        let total_supply = balance::create_supply<VAULT>(witness);
+    fun init(ctx: &mut TxContext) {
+        transfer::transfer(
+            ManagerCap {id: object::new(ctx)},
+            tx_context::sender(ctx)
+        );
+    }
+
+    #[test_only]
+    public fun test_init(ctx: &mut TxContext) {
+        init(ctx);
+    }
+
+    public entry fun new_vault<TOKEN>(
+        _manager_cap: &ManagerCap, 
+        lockForEpoch : u64,
+        ctx: &mut TxContext
+    ) {
+        let pt = balance::create_supply(PT<TOKEN> {});
+        let yt = balance::create_supply(YT<TOKEN> {});
+
+         // give 1 mil. of YT tokens to the sender
+        let minted_balance = balance::increase_supply(&mut yt, YT_TOTAL_SUPPLY);
+        transfer::public_transfer(coin::from_balance(minted_balance, ctx), tx_context::sender(ctx));
 
         transfer::share_object(Reserve {
             id: object::new(ctx),
-            outstanding : total_supply,
-            collateral: balance::zero<STAKED_SUI>(),
-            locked_until_epoch : epoch_time_lock::new(tx_context::epoch(ctx) + LOCK_FOR_EPOCH, ctx)
-        })
+            pt : pt,
+            yt: yt, 
+            collateral: balance::zero<TOKEN>(),
+            feed : oracle::new_feed(3,ctx), // ex. 4.123%
+            locked_until_epoch : epoch_time_lock::new(tx_context::epoch(ctx) + lockForEpoch, ctx)
+        });
+
     }
 
-    // staked_sui_decimal = 3
-    public entry fun mint(
-        reserve: &mut Reserve,
-        collateral: Coin<STAKED_SUI>,
+    public entry fun update_feed_value<TOKEN>(
+        _manager_cap: &ManagerCap,
+        reserve: &mut Reserve<TOKEN>,
+        value: u64,
+        ctx: &mut TxContext
+    ) {
+        oracle::update(&mut reserve.feed, value, ctx)
+    }
+
+    public entry fun lock<TOKEN>(
+        reserve: &mut Reserve<TOKEN>,
+        collateral: Coin<TOKEN>,
         ctx: &mut TxContext
     ) {
         let amount = coin::value(&collateral);
+        let until_epoch = epoch_time_lock::epoch(&reserve.locked_until_epoch);
 
         assert!(amount >= 0, EZeroAmount);
+        assert!(until_epoch > tx_context::epoch(ctx), EVaultExpired );
 
         let user = tx_context::sender(ctx);
 
         coin::put(&mut reserve.collateral, collateral);
 
-        let minted_balance = balance::increase_supply(&mut reserve.outstanding, amount / 1000);
+        let diff = until_epoch-tx_context::epoch(ctx);
+
+        let (val, _ ) = oracle::get_value(&reserve.feed);
+
+        let (
+            diff,
+            val,
+            amount
+        ) = (
+            (diff as u128),
+            (val as u128),
+            (amount as u128)
+        );
+
+        let add_pt_amount = diff*val*amount / 36500000;
+        add_pt_amount = add_pt_amount+amount;
+        let add_pt_amount = (add_pt_amount as u64);
+
+        let minted_balance = balance::increase_supply(&mut reserve.pt,add_pt_amount);
 
         transfer::public_transfer(coin::from_balance(minted_balance, ctx), user);
+    
+        // emit event
     }
 
-    public entry fun redeem(
-        reserve: &mut Reserve,
-        vault: Coin<VAULT>,
+    // deposit collateral
+    public entry fun deposit<TOKEN>(
+        reserve: &mut Reserve<TOKEN>,
+        collateral: Coin<TOKEN>
+    ) {
+        let amount = coin::value(&collateral);
+
+        assert!(amount >= 0, EZeroAmount);
+
+        coin::put(&mut reserve.collateral, collateral);
+
+        // emit event
+    }
+
+    public entry fun unlock<TOKEN>(
+        reserve: &mut Reserve<TOKEN>,
+        pt: Coin<PT<TOKEN>>,
         ctx: &mut TxContext
     ) {
         epoch_time_lock::destroy(reserve.locked_until_epoch, ctx);
-
-        let burned_balance = balance::decrease_supply(&mut reserve.outstanding, coin::into_balance(vault));
+        let burned_balance = balance::decrease_supply(&mut reserve.pt, coin::into_balance(pt));
 
         let user = tx_context::sender(ctx);
 
-        transfer::public_transfer(coin::take(&mut reserve.collateral, burned_balance * 1000, ctx), user);
+        transfer::public_transfer(coin::take(&mut reserve.collateral, burned_balance, ctx), user);
+
+        // emit event
     }
 
-    public entry fun total_supply(reserve: &Reserve): u64 {
-        balance::supply_value(&reserve.outstanding)
+    public entry fun total_yt_supply<TOKEN>(reserve: &Reserve<TOKEN>): u64 {
+        balance::supply_value(&reserve.yt)
     }
 
-    public entry fun total_collateral(reserve: &Reserve): u64 {
+    public entry fun total_pt_supply<TOKEN>(reserve: &Reserve<TOKEN>): u64 {
+        balance::supply_value(&reserve.pt)
+    }
+
+    public entry fun total_collateral<TOKEN>(reserve: &Reserve<TOKEN>): u64 {
         balance::value(&reserve.collateral)
     }
 
-    #[test_only]
-    public fun init_for_testing(ctx: &mut TxContext) {
-        init(VAULT {}, ctx)
+    public entry fun feed_value<TOKEN>(reserve: &Reserve<TOKEN>) : (u64) {
+        let (val, _ ) = oracle::get_value(&reserve.feed);
+        val
+    }
+
+    public entry fun feed_decimal<TOKEN>(reserve: &Reserve<TOKEN>) : (u64) {
+        let (_, dec ) = oracle::get_value(&reserve.feed);
+        dec
     }
 
 }
