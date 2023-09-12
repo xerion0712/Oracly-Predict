@@ -6,7 +6,8 @@ module legato::marketplace_tests {
     use sui::sui::SUI;
     use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
     use legato::marketplace::{Self, Marketplace};
-    use legato::vault::{VAULT};
+    use legato::vault::{PT};
+    use legato::staked_sui::{STAKED_SUI};
     use sui::object;
 
     #[test]
@@ -20,7 +21,7 @@ module legato::marketplace_tests {
     fun test_list_and_buy_(test: &mut Scenario) {
         let (admin, _, buyer) = users();
 
-        let vault_token = coin::mint_for_testing<VAULT>(1, ctx(test));
+        let vault_token = coin::mint_for_testing<PT<STAKED_SUI>>(1, ctx(test));
         let vault_token_id = object::id(&vault_token);
 
         next_tx(test, admin);
