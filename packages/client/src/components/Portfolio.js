@@ -1,9 +1,28 @@
-import { useState } from "react"
-
+import { Fragment, useEffect, useState } from 'react'
+import { useWallet } from "@suiet/wallet-kit"
+import useLegato from '@/hooks/useLegato'
+import { VAULT } from "../constants"
 
 const Portfolio = () => {
 
+    const activeVault = VAULT[0]
+
     const [tab, setTab] = useState(1)
+
+    const { getPTBalance } = useLegato()
+
+    const wallet = useWallet()
+    const { account } = wallet
+
+    const [pt, setPT] = useState(0)
+
+    useEffect(() => {
+        account && account.address && getPTBalance(account.address).then(
+            (output) => {
+                setPT(output)
+            }
+        )
+    }, [account])
 
     return (
         <div>
@@ -30,9 +49,32 @@ const Portfolio = () => {
                             </div>
 
                             <div class="h-[200px] flex">
-                                <div class="mx-auto font-medium mt-auto mb-auto">
+                                {pt === 0 && <div class="mx-auto font-medium mt-auto mb-auto">
                                     No active positions
                                 </div>
+                                }
+                                {pt > 0 && <>
+                                    <div class=" mt-4 mb-4 text-gray-100 py-3 w-full">
+                                        <div class="grid grid-cols-7 gap-3 px-2 mt-4 mb-4 ">
+                                            <div class="col-span-3 flex flex-col text-md">
+                                                <div class="mt-auto mb-auto">
+                                                    {activeVault.symbol}
+                                                </div>
+                                            </div>
+                                            <div class="col-span-2 flex flex-col text-md">
+                                                <div class="mt-auto mb-auto">
+                                                Vault {activeVault.name}
+                                                </div>
+                                            </div>
+                                            <div class="col-span-2 flex flex-col text-md">
+                                                <div class="mt-auto ml-auto">
+                                                    Balance: {pt.toLocaleString()}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>}
+
 
                             </div>
 

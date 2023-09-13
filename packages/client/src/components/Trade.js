@@ -1,9 +1,11 @@
 
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { PlusIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid"
-import { VAULT } from "../constants"
 import { Listbox, Transition } from '@headlessui/react'
+import { useWallet } from "@suiet/wallet-kit"
+import { VAULT } from "../constants"
 import YT from "./YT"
+import useLegato from '@/hooks/useLegato'
 
 function classNames(...classes) {
     return classes.filter(Boolean).join(' ')
@@ -30,8 +32,35 @@ const Sell = () => {
 
     const [selected, setSelected] = useState(VAULT[0])
 
+    const { getPTBalance } = useLegato()
+
+    const wallet = useWallet()
+    const { account } = wallet
+
+    const [bal, setBal] = useState(0)
+
+    useEffect(() => {
+        account && account.address && getPTBalance(account.address).then(
+            (output) => {
+                setBal(output)
+            }
+        )
+    }, [account])
+
     return (
         <div>
+            <div className="block mt-4 text-sm font-medium leading-6 text-gray-300">
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="col-span-1 flex flex-row">
+                        Balance
+                    </div>
+                    <div class="col-span-1 flex flex-row">
+                        <span class="ml-auto">
+                            {bal.toLocaleString()}{` ${selected.symbol}`}
+                        </span>
+                    </div>
+                </div>
+            </div>
             <div className="block mt-4 text-sm font-medium leading-6 text-gray-300">
                 PT token to sell
             </div>
@@ -160,7 +189,7 @@ const Buy = () => {
             <div className="block mt-4 text-sm font-medium leading-6 text-gray-300">
                 <div class="grid grid-cols-2 gap-3">
                     <div class="col-span-1 flex flex-row">
-                        <img class="h-6 w-6 rounded-full  mr-2" src="./sui-sui-logo.svg" alt="" />
+                        
                         Balance
                     </div>
                     <div class="col-span-1 flex flex-row">
@@ -339,7 +368,7 @@ const Trade = () => {
 
 const PT = () => {
 
-    const [tab, setTab] = useState(1)
+    const [tab, setTab] = useState(2)
 
     return (
         <div class="border p-5 m-1 bg-gray-900 border-gray-600">

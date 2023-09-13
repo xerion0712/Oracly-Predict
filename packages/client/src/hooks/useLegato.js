@@ -1,7 +1,7 @@
 
 import { useWallet } from '@suiet/wallet-kit'
 import { useCallback } from 'react';
-import { PACKAGE_ID, TREASURY_CAP, RESERVE, MARKETPLACE } from '@/constants';
+import { PACKAGE_ID, TREASURY_CAP, RESERVE, MARKETPLACE, TYPE } from '@/constants';
 import { Ed25519Keypair, JsonRpcProvider, testnetConnection, RawSigner, TransactionBlock } from '@mysten/sui.js';
 import { useEffect, useState } from 'react';
 
@@ -76,11 +76,12 @@ const useLegato = () => {
 
         const packageObjectId = PACKAGE_ID
 
+        // coin::Coin<0x89b77424c9514f64537f83ae5e260286ee08f03bbc723cf1cc15c601cea9fb8d::vault::PT<0x89b77424c9514f64537f83ae5e260286ee08f03bbc723cf1cc15c601cea9fb8d::staked_sui::STAKED_SUI>>
+
         const coins = await provider.getCoins({
             owner: address,
-            coinType: `${packageObjectId}::vault::VAULT`
+            coinType: `${packageObjectId}::vault::PT<0x89b77424c9514f64537f83ae5e260286ee08f03bbc723cf1cc15c601cea9fb8d::staked_sui::STAKED_SUI>`
         });
-        
         return coins.data.filter(item => Number(item.balance) !== 0).map(item => item.coinObjectId)
     }, [])
 
@@ -111,25 +112,81 @@ const useLegato = () => {
         return listing.filter(item => buying.indexOf(item['object_id']) === -1)
     }, [])
 
+    const getApr = useCallback(async () => {
 
-    // const getTotalSupply = useCallback(async () => {
-    //     const txn = await provider.getObject({
-    //         id: '0xcc2bd176a478baea9a0de7a24cd927661cc6e860d5bacecb9a138ef20dbab231',
-    //         // fetch the object content field
-    //         options: { showContent: true },
-    //     });
-    // },[])
+        console.log("getApr...")
+
+        const packageObjectId = PACKAGE_ID
+
+        const events = await provider.queryEvents({
+            query: { MoveModule: { package: packageObjectId, module: 'vault' } }
+        });
+
+        const listing = events.data.reduce((arr, item) => {
+            if (item.type.indexOf("PriceEvent") !== -1) {
+                arr.push(item.parsedJson)
+            }
+            return arr
+        }, [])
+
+        return (Number(listing[listing.length - 1].value) / 1000)
+    }, [])
+
+
+    const getTotalSupply = useCallback(async () => {
+        console.log("getTotalSupply...")
+
+        const packageObjectId = PACKAGE_ID
+
+        const events = await provider.queryEvents({
+            query: { MoveModule: { package: packageObjectId, module: 'vault' } }
+        });
+
+        const result = events.data.reduce((r, item) => {
+            if (item.type.indexOf("LockEvent") !== -1) {
+                console.log(item.parsedJson)
+                r += Number(item.parsedJson.collateral)
+            }
+            return r
+        }, 0)
+        return result/100000000
+    },[])
+
+    const getPTBalance = useCallback(async (address) => {
+
+        console.log("get all vault tokens for :", address)
+
+        const packageObjectId = PACKAGE_ID
+
+        // coin::Coin<0x89b77424c9514f64537f83ae5e260286ee08f03bbc723cf1cc15c601cea9fb8d::vault::PT<0x89b77424c9514f64537f83ae5e260286ee08f03bbc723cf1cc15c601cea9fb8d::staked_sui::STAKED_SUI>>
+
+        const coins = await provider.getCoins({
+            owner: address,
+            coinType: `${packageObjectId}::vault::PT<0x89b77424c9514f64537f83ae5e260286ee08f03bbc723cf1cc15c601cea9fb8d::staked_sui::STAKED_SUI>`
+        });
+        
+        const result = coins.data.reduce((r, item) => {
+            if (Number(item.balance) !== 0) {
+                r += Number(item.balance)
+            }
+            return r
+        }, 0)
+        return result/100000000
+    }, [])
 
     const stake = useCallback(async (coinId) => {
         if (!connected) {
             return
         }
 
+        console.log("coinId : ", coinId)
+
         // define a programmable transaction
         const tx = new TransactionBlock();
         const packageObjectId = PACKAGE_ID
         tx.moveCall({
-            target: `${packageObjectId}::vault::mint`,
+            typeArguments: [TYPE],
+            target: `${packageObjectId}::vault::lock`,
             arguments: [tx.pure(RESERVE), tx.pure(`${coinId}`)],
         });
 
@@ -193,7 +250,10 @@ const useLegato = () => {
         getAllVaultTokens,
         getAllOrders,
         stake,
-        buy
+        getApr,
+        getTotalSupply,
+        buy,
+        getPTBalance
     }
 }
 

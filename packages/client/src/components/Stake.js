@@ -2,9 +2,11 @@
 
 import { Listbox, Transition } from '@headlessui/react'
 import { CheckIcon, ChevronUpDownIcon, ChevronDownIcon, ArrowRightIcon } from "@heroicons/react/20/solid"
-import { Fragment, useState } from 'react'
+import { Fragment, useState, useEffect, useCallback } from 'react'
 import MintPT from '@/panels/MintPT'
 import { VAULT } from "../constants"
+import useLegato from "@/hooks/useLegato"
+import { useWallet } from "@suiet/wallet-kit"
 
 const vault = VAULT
 
@@ -14,13 +16,54 @@ function classNames(...classes) {
 
 const Stake = () => {
 
+    const { getAllCoins, getMockBalance, getApr, stake, getTotalSupply } = useLegato()
+
+    const wallet = useWallet()
+    const { account } = wallet
+
+    const [loading, setLoading] = useState(false)
     const [mintPanelVisible, setMintPanelVisible] = useState(false)
     const [selected, setSelected] = useState(vault[0])
-    const [amount, setAmount] = useState(0)
+    const [balance, setBalance] = useState("0")
+    const [apr, setApr] = useState(0)
+    const [totalSupply, setTotalSupply] = useState(0)
+    const [coins, setCoins] = useState([])
 
-    const onAmountChange = (e) => {
-        setAmount(e.target.value)
-    }
+    const [tick, setTick] = useState(0)
+
+    useEffect(() => {
+        getTotalSupply().then(setTotalSupply)
+        account && account.address && getMockBalance(account.address).then(setBalance)
+    }, [account, tick])
+
+    useEffect(() => {
+        getApr().then(setApr) 
+    },[])
+
+    useEffect(() => {
+        account && account.address && getAllCoins(account.address).then(setCoins)
+        // account && account.address && getAllVaultTokens(account.address).then(
+        //     (items) => { 
+        //         setBalance(items.length)
+        //     }
+        // )
+    }, [account, tick])
+
+    const onStake = useCallback(async () => {
+        setLoading(true)
+        try {
+            if (coins.length === 0) {
+                alert("No available coins!") 
+            } else {
+                await stake(coins[0])
+                setTick(tick + 1)
+                setMintPanelVisible(false)
+            }
+        } catch (e) {
+            console.log(e)
+        }
+        setLoading(false)
+    }, [tick, stake, coins])
 
     return (
         <div>
@@ -28,9 +71,9 @@ const Stake = () => {
                 selected={selected}
                 visible={mintPanelVisible}
                 close={() => setMintPanelVisible(false)}
-                amount={amount}
-                onAmountChange={onAmountChange}
-
+                apr={apr}
+                loading={loading}
+                onStake={onStake}
             />
             <div className="max-w-xl ml-auto mr-auto">
                 <div class="wrapper pt-10">
@@ -61,7 +104,9 @@ const Stake = () => {
                                                 <span className="flex items-center">
                                                     <span className="mr-3 block truncate">{selected.name}</span>
                                                     <img src={selected.avatar} alt="" className="h-5 w-5 ml-auto flex-shrink-0 rounded-full" />
-                                                    <span className="ml-2 block font-medium w-5 text-right">0</span>
+                                                    <span className="ml-2 block font-medium w-5 text-right">
+                                                        {totalSupply.toLocaleString()}
+                                                    </span>
                                                 </span>
                                                 <span className="pointer-events-none absolute inset-y-0 right-0 ml-3 flex items-center pr-2">
                                                     <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
@@ -95,19 +140,8 @@ const Stake = () => {
                                                                             {person.name}
                                                                         </span>
                                                                         <img src={person.avatar} alt="" className="h-5 w-5 ml-auto flex-shrink-0 rounded-full" />
-                                                                        <span className="ml-2 block text-white font-medium w-5 text-right">0</span>
-                                                                    </div>
-                                                                    {/* 
-                                                                    {selected ? (
-                                                                        <span
-                                                                            className={classNames(
-                                                                                active ? 'text-white' : 'text-white',
-                                                                                'absolute inset-y-0 right-0 flex items-center pr-4'
-                                                                            )}
-                                                                        >
-                                                                            <CheckIcon className="h-5 w-5" aria-hidden="true" />
-                                                                        </span>
-                                                                    ) : null} */}
+                                                                        <span className="ml-2 block text-white font-medium w-5 text-right">{totalSupply.toLocaleString()}</span>
+                                                                    </div> 
                                                                 </>
                                                             )}
                                                         </Listbox.Option>
@@ -126,7 +160,7 @@ const Stake = () => {
                                     </div>
                                     <div className='flex flex-row text-lg'>
                                         <img src={"./sui-sui-logo.svg"} alt="" className="h-5 w-5  mt-auto mb-auto  mr-2 flex-shrink-0 rounded-full" />
-                                        0
+                                        {balance}
                                     </div>
                                 </div>
                                 <div className='text-right'>
@@ -134,7 +168,7 @@ const Stake = () => {
                                         Total Staked
                                     </div>
                                     <div className="text-2xl">
-                                        $0
+                                        ${(totalSupply*0.45).toLocaleString()}
                                     </div>
                                 </div>
                             </div>
@@ -146,7 +180,7 @@ const Stake = () => {
                                     </div>
                                     <div className='flex flex-row text-lg'>
                                         <img src={"./sui-sui-logo.svg"} alt="" className="h-5 w-5  mr-2  mt-auto mb-auto flex-shrink-0 rounded-full" />
-                                        0
+                                        {totalSupply.toLocaleString()}
                                     </div>
                                 </div>
                                 <div className='text-right'>
@@ -154,7 +188,7 @@ const Stake = () => {
                                         APR
                                     </div>
                                     <div className="text-2xl">
-                                        4.35%
+                                        {apr.toLocaleString()}%
                                     </div>
                                 </div>
                             </div>

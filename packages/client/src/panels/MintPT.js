@@ -1,4 +1,6 @@
 import BasePanel from "./Base"
+import { useEffect, useState } from "react"
+import Spinner from "../components/Spinner"
 
 const InfoRow = ({ name, value }) => {
     return (
@@ -13,7 +15,22 @@ const InfoRow = ({ name, value }) => {
     )
 }
 
-const MintPT = ({ visible, close, selected, onAmountChange, amount }) => {
+const MintPT = ({ visible, close, selected, apr, loading, onStake }) => {
+
+    const [profit, setProfit] = useState(0)
+
+    useEffect(() => {
+
+        if (apr > 0) {
+            const date1 = new Date('7/9/2024');
+            const date2 = new Date();
+            const diffTime = Math.abs(date2 - date1);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const profit = (diffDays * (apr / 100)) / 365
+            setProfit(profit)
+        }
+
+    }, [apr])
 
     return (
         <BasePanel
@@ -42,7 +59,7 @@ const MintPT = ({ visible, close, selected, onAmountChange, amount }) => {
                 <div className="block leading-6 mb-2 text-gray-300">Amount to convert into PTs</div>
                 <div class="flex mb-2">
                     <div class="relative w-full">
-                        <input type="number" value={amount} onChange={onAmountChange} id="large-input" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none block w-full p-4 border rounded-l-lg sm:text-md  bg-gray-700 border-gray-600 placeholder-gray-400 text-white focus:outline-none focus:border-blue-500" />
+                        <input type="number" value={1} id="large-input" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none block w-full p-4 border rounded-l-lg sm:text-md  bg-gray-700 border-gray-600 placeholder-gray-400 text-white focus:outline-none focus:border-blue-500" />
                     </div>
                     <div class="flex-shrink-0 cursor-default z-10 inline-flex items-center py-2.5 px-4 text-sm font-medium text-center border rounded-r-lg border-gray-700 text-white  focus:ring-4 focus:outline-none   bg-gray-600   focus:ring-gray-800" type="button">
                         <div className='flex flex-row'>
@@ -59,7 +76,7 @@ const MintPT = ({ visible, close, selected, onAmountChange, amount }) => {
                 <div class="mt-2 flex flex-row">
                     <div class="text-gray-300 text-sm font-medium">You will receive at least</div>
                     <span class="ml-auto bg-blue-100 text-blue-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
-                        1 Staked SUI = 1.0234 PT
+                        1 Staked SUI = {(1 + profit).toLocaleString()} PT
                     </span>
                 </div>
 
@@ -75,24 +92,25 @@ const MintPT = ({ visible, close, selected, onAmountChange, amount }) => {
                     </div>
                     <div className="flex">
                         <div className="text-3xl font-medium mx-auto mt-3 mb-auto mr-2">
-                            1.2033
+                            {(1 + profit).toLocaleString()}
                         </div>
                     </div>
                 </div>
                 <InfoRow
                     name={"Est. Profit at Maturity"}
-                    value={"0.1123"}
+                    value={profit.toLocaleString()}
                 />
-                <InfoRow
+                {/* <InfoRow
                     name={"Price impact"}
                     value={"0.01%"}
-                />
+                /> */}
                 <InfoRow
                     name={"Fixed APR"}
-                    value={"4.35%"}
+                    value={`${apr}%`}
                 />
                 <hr class="h-px my-4 border-0 bg-gray-600" />
-                <button onClick={() => alert(true)} className=" py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
+                <button disabled={loading} onClick={onStake} className=" py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
+                    {loading && <Spinner />}
                     Mint
                 </button>
             </div>

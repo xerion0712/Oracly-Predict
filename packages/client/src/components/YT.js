@@ -169,7 +169,7 @@ const Buy = () => {
                 <div class="mt-4 flex flex-row">
                     <div class="text-gray-300 text-sm font-medium">You will receive at least</div>
                     <span class="ml-auto bg-blue-100 text-blue-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
-                        1 Staked SUI = 1.0234 YT
+                        1 Staked SUI = N/A YT
                     </span>
                 </div>
 
@@ -185,7 +185,7 @@ const Buy = () => {
                     </div>
                     <div className="flex">
                         <div className="text-3xl font-medium mx-auto mt-3 mb-auto mr-2">
-                            1.2033
+                            -
                         </div>
                     </div>
                 </div>
@@ -199,10 +199,10 @@ const Buy = () => {
                     /> */}
                 <InfoRow
                     name={"Implied APR"}
-                    value={"4.35%"}
+                    value={"N/A"}
                 />
                 <hr class="h-px my-4 border-0 bg-gray-600" />
-                <button onClick={() => alert(true)} className=" py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
+                <button onClick={() => alert("Not available yet")} className=" py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
                     Buy Now
                 </button>
             </div>
@@ -291,7 +291,7 @@ const Sell = () => {
                 <div class="mt-4 flex flex-row">
                     <div class="text-gray-300 text-sm font-medium">You will receive at least</div>
                     <span class="ml-auto bg-blue-100 text-blue-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
-                        1 YT = 1.0234 Staked SUI
+                        1 YT = N/A Staked SUI
                     </span>
                 </div>
 
@@ -307,16 +307,16 @@ const Sell = () => {
                     </div>
                     <div className="flex">
                         <div className="text-3xl font-medium mx-auto mt-3 mb-auto mr-2">
-                            1.2033
+                            -
                         </div>
                     </div>
                 </div>
                 <InfoRow
                     name={"Implied APR"}
-                    value={"4.35%"}
+                    value={"N/A"}
                 />
                 <hr class="h-px my-4 border-0 bg-gray-600" />
-                <button onClick={() => alert(true)} className=" py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
+                <button onClick={() => alert("Not available yet")} className=" py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
                     Sell Now
                 </button>
             </div>
