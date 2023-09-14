@@ -2,6 +2,9 @@
 
 Legato is a permissionless yield tokenization protocol for liquid staking assets on Sui blockchain that enables new strategies for staking and provides additional tools for users to capitalize on market volatility. Stakers can hedge their risk by selling their yield in advance and lock in today's APR rate. Non-stakers can perform arbitrage on the APYs by trading these future yield tokens through our exchange platform.
 
+![legato-lsd-hacks drawio](https://github.com/pisuthd/legato-finance/assets/18402217/557e9f25-4494-4dd3-ba1f-f4b07a3124a6)
+
+
 The system has two types of derivative tokens created by the timelock vault. The first type is for stakers who want to lock in their yield. They must deposit liquid staking assets and will receive principal tokens, which include future yield. They can then either wait until the vault matures to redeem their deposit or sell it on the marketplace, possibly at a discount to attract other buyers.
 
 The second type is the yield token, which allows anyone to speculate on APR volatility. Holders of yield tokens will be able to claim yield from surplus collateral when the APR is on the rise.
