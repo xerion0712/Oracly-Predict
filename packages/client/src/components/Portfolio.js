@@ -47,7 +47,6 @@ const Portfolio = () => {
                                     </li>
                                 </ul>
                             </div>
-
                             <div class="h-[200px] flex">
                                 {pt === 0 && <div class="mx-auto font-medium mt-auto mb-auto">
                                     No active positions

@@ -1,11 +1,14 @@
 
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useState, useCallback } from 'react'
 import { PlusIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid"
 import { Listbox, Transition } from '@headlessui/react'
 import { useWallet } from "@suiet/wallet-kit"
 import { VAULT } from "../constants"
 import YT from "./YT"
 import useLegato from '@/hooks/useLegato'
+import Spinner from './Spinner'
+
+import { shortAddress } from "@/helpers"
 
 function classNames(...classes) {
     return classes.filter(Boolean).join(' ')
@@ -28,16 +31,27 @@ function classNames(...classes) {
 //     )
 // }
 
-const Sell = () => {
+const Sell = ({ tick, setTick }) => {
 
     const [selected, setSelected] = useState(VAULT[0])
 
-    const { getPTBalance } = useLegato()
+    const { getPTBalance, getAllVaultTokens, createOrder } = useLegato()
 
     const wallet = useWallet()
     const { account } = wallet
 
     const [bal, setBal] = useState(0)
+    const [coins, setCoins] = useState([])
+    const [price, setPrice] = useState(1)
+
+
+    const [discount, setDiscount] = useState(0)
+    const [loading, setLoading] = useState(false)
+
+
+    // const increaseTick = useCallback(() => {
+    //     setTick(tick+1)
+    // },[tick])
 
     useEffect(() => {
         account && account.address && getPTBalance(account.address).then(
@@ -45,7 +59,40 @@ const Sell = () => {
                 setBal(output)
             }
         )
-    }, [account])
+        account && account.address && getAllVaultTokens(account.address).then(setCoins)
+    }, [account, tick])
+
+
+
+    useEffect(() => {
+        if (Number(price) > 0 && coins[0] && Number(coins[0].balance) > 0) {
+            const base = Number(price) * 100000000
+            const out = 100 - (base * 100) / Number(coins[0].balance)
+            setDiscount(out)
+        }
+    }, [price, coins])
+
+    const onCreateOrder = useCallback(async () => {
+
+        if (coins.length === 0) {
+            alert("No any vault token!")
+            return
+        }
+
+        setLoading(true)
+
+        try {
+            await createOrder(coins[0], Number(price * 1000000))
+            setTick(tick + 1)
+        } catch (e) {
+            console.log(e)
+        }
+
+        setLoading(false)
+
+    }, [coins, price, createOrder, tick])
+
+
 
     return (
         <div>
@@ -127,7 +174,7 @@ const Sell = () => {
                         {selected.symbol}
                     </span>
                 </div>
-                <input value={0} type="number" id="amount" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none block w-full py-3  text-sm pl-[120px] border rounded-lg      bg-gray-700  border-gray-600  placeholder-gray-400  text-white  focus:ring-blue-500  focus:border-blue-500" />
+                <input value={(coins[0] && Number(coins[0].balance) > 0) ? Number(coins[0].balance) / 100000000 : 0} type="number" id="amount" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none block w-full py-3  text-sm pl-[120px] border rounded-lg      bg-gray-700  border-gray-600  placeholder-gray-400  text-white  focus:ring-blue-500  focus:border-blue-500" />
                 <button class="text-white absolute right-1.5 bottom-1.5  font-medium rounded-lg text-sm px-4 py-2  bg-blue-600  hover:bg-blue-700  focus:ring-blue-800">Max</button>
             </div>
             <div class="grid grid-cols-2 gap-3 mt-1   ">
@@ -139,7 +186,10 @@ const Sell = () => {
                         <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                             <img class="h-5 w-5 rounded-full" src="./sui-sui-logo.svg" alt="" />
                         </div>
-                        <input value={0} type="number" id="price" class=" block w-full py-3  text-sm pl-[45px] border rounded-lg bg-gray-700  border-gray-600  placeholder-gray-400  text-white  focus:ring-blue-500  focus:border-blue-500" />
+                        <input value={price} onChange={(e) => {
+                            let val = e.target.value
+                            setPrice(e.target.value)
+                        }} type="number" id="price" class=" block w-full py-3  text-sm pl-[45px] border rounded-lg bg-gray-700  border-gray-600  placeholder-gray-400  text-white  focus:ring-blue-500  focus:border-blue-500" />
                     </div>
                 </div>
                 <div class="col-span-1 flex flex-col">
@@ -147,7 +197,7 @@ const Sell = () => {
                         Discount
                     </div>
                     <div class="relative mt-1">
-                        <input value={0} type="number" id="price" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none block w-full py-3  text-sm pl-[20px] border rounded-lg bg-gray-700  border-gray-600  placeholder-gray-400  text-white  focus:ring-blue-500  focus:border-blue-500" />
+                        <input value={discount.toLocaleString()} type="number" id="price" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none block w-full py-3  text-sm pl-[20px] border rounded-lg bg-gray-700  border-gray-600  placeholder-gray-400  text-white  focus:ring-blue-500  focus:border-blue-500" />
                         <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                             <span class=" text-sm text-gray-300" >
                                 %
@@ -171,7 +221,8 @@ const Sell = () => {
             </div> */}
 
             <hr class="my-5 h-[1px] border-t-0 bg-neutral-100  opacity-50" />
-            <button onClick={() => alert(true)} className="  py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
+            <button onClick={onCreateOrder} disabled={loading} className="  py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
+                {loading && <Spinner />}
                 Create Order
                 <PlusIcon className="h-5 w-5 ml-2" />
             </button>
@@ -189,7 +240,7 @@ const Buy = () => {
             <div className="block mt-4 text-sm font-medium leading-6 text-gray-300">
                 <div class="grid grid-cols-2 gap-3">
                     <div class="col-span-1 flex flex-row">
-                        
+
                         Balance
                     </div>
                     <div class="col-span-1 flex flex-row">
@@ -366,9 +417,82 @@ const Trade = () => {
 }
 
 
+
+const Order = ({
+    owner,
+    item,
+    price,
+    buy,
+    increaseTick
+}) => {
+
+    const [loading, setLoading] = useState(false)
+
+    const onBuy = useCallback(async () => {
+
+        setLoading(true)
+
+        try { 
+            const {item_id  } = item
+            await buy(item_id, price)
+            increaseTick()
+
+        } catch (e) {
+            console.log(e)
+        }
+
+        setLoading(false)
+
+    }, [item, buy, price])
+
+
+    return (
+        <div class="text-sm border-b  border-gray-400 text-gray-100   py-3  rounded relative">
+            <div class="grid grid-cols-10 gap-3 px-2   ">
+                <div class="col-span-4 flex flex-col text-md">
+                    <div class="mt-auto mb-auto">
+                         N/A {VAULT[0].symbol}
+                    </div>
+                </div>
+                {/* <div class="col-span-2 flex flex-col text-md">
+                    <div class="mt-auto mb-auto ">
+                        By : {shortAddress(owner)}
+                    </div>
+                </div> */}
+                <div class="col-span-3 flex flex-col text-md">
+                    <div class="mt-auto mb-auto">
+                        Price : {(Number(price) / 1000000).toLocaleString()} SUI
+                    </div>
+                </div>
+                <div class="col-span-3 flex flex-col text-xl font-bold">
+                    <button disabled={loading} onClick={onBuy} className="p-2 pl-10 pr-10 text-sm border flex flex-row rounded mt-auto mb-auto justify-center">
+                        {loading && <Spinner />}
+                        Fill
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 const PT = () => {
 
     const [tab, setTab] = useState(2)
+
+    const { getPTBalance, getAllVaultTokens, createOrder, buy , getAllOrders } = useLegato()
+
+    const [orders, setOrders] = useState([])
+
+    const [tick, setTick] = useState(0)
+
+    const increaseTick = useCallback(() => {
+        setTick(tick+1)
+    },[tick])
+
+    useEffect(() => {
+        getAllOrders().then(setOrders)
+    }, [tick])
+ 
 
     return (
         <div class="border p-5 m-1 bg-gray-900 border-gray-600">
@@ -389,10 +513,28 @@ const PT = () => {
                         </ul>
                     </div>
                     {tab === 1 && <Buy />}
-                    {tab === 2 && <Sell />}
+                    {tab === 2 && <Sell tick={tick} setTick={setTick} />}
                 </div>
                 <div class="col-span-7 flex flex-col text-md">
+                <p class="text-gray-300 text-sm text-center mt-2 mb-2">
+                                   Orderbook 
+                                </p>
+                    {orders.map((item, index) => { 
+                        return (
+                            <div key={index}>
+                                <Order
+                                    owner={item.owner}
+                                    price={item.ask}
+                                    item={item}
+                                    // objectId={item['object_id']}
+                                    buy={buy}
+                                    increaseTick={increaseTick}
+                                />
+                            </div>
+                        )
+                    })
 
+                    }
                 </div>
             </div>
         </div>

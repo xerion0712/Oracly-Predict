@@ -82,7 +82,7 @@ const useLegato = () => {
             owner: address,
             coinType: `${packageObjectId}::vault::PT<0x89b77424c9514f64537f83ae5e260286ee08f03bbc723cf1cc15c601cea9fb8d::staked_sui::STAKED_SUI>`
         });
-        return coins.data.filter(item => Number(item.balance) !== 0).map(item => item.coinObjectId)
+        return coins.data.filter(item => Number(item.balance) !== 0)
     }, [])
 
     const getAllOrders = useCallback(async () => {
@@ -104,12 +104,12 @@ const useLegato = () => {
 
         const buying = events.data.reduce((arr, item) => {
             if (item.type.indexOf("BuyEvent") !== -1) {
-                arr.push(item.parsedJson['object_id'])
+                arr.push(item.parsedJson['item_id'])
             }
             return arr
         }, [])
 
-        return listing.filter(item => buying.indexOf(item['object_id']) === -1)
+        return listing.filter(item => buying.indexOf(item['item_id']) === -1)
     }, [])
 
     const getApr = useCallback(async () => {
@@ -196,19 +196,21 @@ const useLegato = () => {
 
     }, [connected, wallet])
 
-    const createOrder = useCallback(async (tokenId, price) => {
+    const createOrder = useCallback(async (coin, price) => {
 
         if (!connected) {
             return
         }
 
+        const { coinObjectId} = coin
+
         const tx = new TransactionBlock();
         // const [coin] = tx.splitCoins(tx.gas, [tx.pure(1000)]);
 
         const packageObjectId = PACKAGE_ID
-        tx.moveCall({
+        tx.moveCall({ 
             target: `${packageObjectId}::marketplace::list`,
-            arguments: [tx.pure(MARKETPLACE), tx.pure(`${tokenId}`), tx.pure(`${price}`)],
+            arguments: [tx.pure(MARKETPLACE), tx.pure(`${coinObjectId}`), tx.pure(`${price}`)],
         });
 
         const resData = await wallet.signAndExecuteTransactionBlock({
