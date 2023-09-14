@@ -13,7 +13,7 @@ The second type is the yield token, which allows anyone to speculate on APR vola
 
 
 
-- [Live URL](https://legato.finance)
+- [Live URL](https://app.legato.finance)
 - [YouTube](https://youtu.be/INN8mz4Qzws)
 - [Akindo](https://app.akindo.io/communities/xKao6wZaqu6XPWv6/products/d8RoedOEZtVDx7N2)
 
