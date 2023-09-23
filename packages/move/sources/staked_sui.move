@@ -1,32 +1,45 @@
 
 module legato::staked_sui {
 
-    use std::option;
+    use sui::coin::{Self, Coin};
     use sui::transfer;
+    use sui::object::{ Self, UID, ID};
+    use sui::balance::{ Balance};
     use sui::tx_context::{Self, TxContext};
-    use sui::coin::{Self, TreasuryCap};
+    use sui::sui::SUI;
 
-    struct STAKED_SUI has drop {}
+    const FAKE_POOL: address = @0x123;
 
-    fun init(witness: STAKED_SUI, ctx: &mut TxContext) {
-        let (treasury_cap, metadata) = coin::create_currency<STAKED_SUI>(witness, 3, b"STAKED_SUI", b"sSUI", b"", option::none(), ctx);
-    
-        transfer::public_share_object(metadata);
-        transfer::public_share_object(treasury_cap)
+    struct StakedSui has key {
+        id: UID,
+        pool_id: ID,
+        stake_activation_epoch: u64,
+        principal: Balance<SUI>
     }
 
-    public entry fun mint(
-        treasury_cap: &mut TreasuryCap<STAKED_SUI>,
-        amount: u64,
+    public entry fun wrap(
+        stake: Coin<SUI>,
         ctx: &mut TxContext
     ) {
-        coin::mint_and_transfer(treasury_cap, amount, tx_context::sender(ctx), ctx)
+
+        let staker = tx_context::sender(ctx);
+
+        let staked_sui = StakedSui {
+            id: object::new(ctx),
+            pool_id: object::id_from_address(FAKE_POOL),
+            stake_activation_epoch : tx_context::epoch(ctx),
+            principal: coin::into_balance(stake),
+        };
+        transfer::transfer(staked_sui, staker);
     }
 
-    #[test_only]
-    /// Wrapper of module initializer for testing
-    public fun test_init(ctx: &mut TxContext) {
-        init(STAKED_SUI {}, ctx)
+    public entry fun unwrap(
+        staked_sui: StakedSui,
+        ctx: &mut TxContext
+    ) {
+        let StakedSui { id , pool_id : _, stake_activation_epoch : _, principal } = staked_sui;
+        object::delete(id);
+        transfer::public_transfer(coin::from_balance(principal, ctx), tx_context::sender(ctx));
     }
 
 }
