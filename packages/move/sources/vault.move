@@ -3,16 +3,18 @@ module legato::vault {
     // use std::option;
     use sui::table::{Self, Table};
     use sui::tx_context::{Self, TxContext};
-    use sui::coin::{Self, Coin };
+    use sui::coin::{Self, Coin};
     use sui::balance::{ Self, Supply };
     use sui::object::{Self, UID, ID };
     use sui::transfer; 
     use sui::event;
+    use sui::sui::SUI;
     // use sui::dynamic_object_field as ofield;
     use legato::epoch_time_lock::{ Self, EpochTimeLock};
     use legato::oracle::{Self, Feed};
     use legato::staked_sui::{ Self, StakedSui }; // clones of staking_pool.move
-    
+    use legato::marketplace::{Self, Marketplace };
+
     const YT_TOTAL_SUPPLY: u64 = 1000000000;
 
     const FEED_DECIMAL_PLACE: u64 = 3;
@@ -40,6 +42,7 @@ module legato::vault {
         pt: Supply<TOKEN<PT>>,
         yt: Supply<TOKEN<YT>>,
         feed : Feed,
+        marketplace: Marketplace<TOKEN<PT>>,
         locked_until_epoch: EpochTimeLock
     }
 
@@ -94,6 +97,7 @@ module legato::vault {
             pt,
             yt,
             balance: 0,
+            marketplace: marketplace::new_marketplace<TOKEN<PT>>(ctx),
             feed : oracle::new_feed(FEED_DECIMAL_PLACE,ctx), // ex. 4.123%
             locked_until_epoch : epoch_time_lock::new(tx_context::epoch(ctx) + lockForEpoch, ctx)
         };
@@ -111,7 +115,7 @@ module legato::vault {
         let amount = staked_sui::staked_sui_amount(&input);
         let until_epoch = epoch_time_lock::epoch(&reserve.locked_until_epoch);
 
-        assert!(amount >= 0, EZeroAmount);
+        assert!(amount > 0, EZeroAmount);
         assert!(until_epoch > tx_context::epoch(ctx), EVaultExpired );
         assert!(until_epoch > staked_sui::stake_activation_epoch(&input), EInvalidStakeActivationEpoch );
 
@@ -195,11 +199,11 @@ module legato::vault {
 
     // TODO: unlock before mature using YT
 
-    public fun total_yt_supply(reserve: &Reserve): u64 {
+    public entry fun total_yt_supply(reserve: &Reserve): u64 {
         balance::supply_value(&reserve.yt)
     }
 
-    public fun total_pt_supply(reserve: &Reserve): u64 {
+    public entry fun total_pt_supply(reserve: &Reserve): u64 {
         balance::supply_value(&reserve.pt)
     }
 
@@ -215,6 +219,44 @@ module legato::vault {
     public entry fun feed_decimal(reserve: &Reserve) : (u64) {
         let (_, dec ) = oracle::get_value(&reserve.feed);
         dec
+    }
+
+    // MARKETPLACE
+
+    public entry fun list(
+        reserve: &mut Reserve,
+        item: &mut Coin<TOKEN<PT>>,
+        amount: u64,
+        price: u64,
+        ctx: &mut TxContext
+    ) {
+        marketplace::list<TOKEN<PT>>(&mut reserve.marketplace, item, amount, price, ctx);
+    }
+
+    public entry fun delist(
+        reserve: &mut Reserve,
+        order_id: u64,
+        ctx: &mut TxContext
+    ) {
+        marketplace::delist<TOKEN<PT>>(&mut reserve.marketplace, order_id, ctx);
+    }
+
+    public entry fun buy(
+        reserve: &mut Reserve,
+        order_id: u64,
+        base_amount: u64,
+        payment: &mut Coin<SUI>,
+        ctx: &mut TxContext
+    ) {
+        marketplace::buy<TOKEN<PT>>(&mut reserve.marketplace, order_id, base_amount, payment, ctx);
+    }
+
+    public entry fun order_price(reserve: &mut Reserve, order_id: u64): u64 {
+        marketplace::order_price<TOKEN<PT>>(&mut reserve.marketplace, order_id)
+    }
+
+    public entry fun order_amount(reserve: &mut Reserve, order_id: u64): u64 {
+        marketplace::order_amount<TOKEN<PT>>(&mut reserve.marketplace, order_id)
     }
 
     // transfer manager cap to someone else
