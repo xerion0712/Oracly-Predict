@@ -4,13 +4,13 @@ module legato::staked_sui {
     use sui::coin::{Self, Coin};
     use sui::transfer;
     use sui::object::{ Self, UID, ID};
-    use sui::balance::{ Balance};
+    use sui::balance::{ Self, Balance};
     use sui::tx_context::{Self, TxContext};
     use sui::sui::SUI;
 
     const FAKE_POOL: address = @0x123;
 
-    struct StakedSui has key {
+    struct StakedSui has key, store {
         id: UID,
         pool_id: ID,
         stake_activation_epoch: u64,
@@ -42,4 +42,10 @@ module legato::staked_sui {
         transfer::public_transfer(coin::from_balance(principal, ctx), tx_context::sender(ctx));
     }
 
+    public fun staked_sui_amount(staked_sui: &StakedSui): u64 { balance::value(&staked_sui.principal) }
+
+    public fun stake_activation_epoch(staked_sui: &StakedSui): u64 {
+        staked_sui.stake_activation_epoch
+    }
+    
 }
