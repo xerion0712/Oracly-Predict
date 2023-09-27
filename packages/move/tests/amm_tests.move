@@ -1,6 +1,7 @@
 #[test_only]
 module legato::amm_tests {
 
+    // use std::debug;
     use sui::coin::{Self};  
     use sui::sui::SUI; 
     use legato::vault::{Self, Reserve, ManagerCap, TOKEN, YT  };
@@ -31,7 +32,8 @@ module legato::amm_tests {
         {
             let managercap = test::take_from_sender<ManagerCap>(test);
             let sui_token = coin::mint_for_testing<SUI>(INITIAL_LIQUIDITY, ctx(test));
-            vault::new_vault(&mut managercap,  10, sui_token, ctx(test));
+            vault::new_vault(&mut managercap,  10, INITIAL_LIQUIDITY  , &mut sui_token, ctx(test));
+            coin::burn_for_testing(sui_token);
             test::return_to_sender(test, managercap);
         };
 
@@ -42,7 +44,7 @@ module legato::amm_tests {
             let sui_token = coin::mint_for_testing<SUI>(ONE, ctx(test));
 
             // check token price that 1 SUI -> 9,900 YT from (1 SUI x 1 Mil. YT / 100 SUI + 1 SUI)
-            assert!(vault::token_price(&reserve, ONE) > (9900 * ONE), 1);
+            assert!(vault::token_price(&reserve, ONE) == 9900990099009, 1);
 
             vault::swap_sui(&mut reserve, ONE, &mut sui_token, ctx(test));
 

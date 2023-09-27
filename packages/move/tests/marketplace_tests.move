@@ -38,7 +38,9 @@ module legato::marketplace_tests {
         next_tx(test, seller);
         {
             let managercap = test::take_from_sender<ManagerCap>(test);
-            vault::new_vault(&mut managercap,  10, coin::mint_for_testing<SUI>(MINT_AMOUNT, ctx(test)), ctx(test));
+            let sui_token = coin::mint_for_testing<SUI>(MINT_AMOUNT, ctx(test));
+            vault::new_vault(&mut managercap,  10, MINT_AMOUNT, &mut sui_token, ctx(test));
+            coin::burn_for_testing(sui_token);
             test::return_to_sender(test, managercap);
         };
 
@@ -88,7 +90,9 @@ module legato::marketplace_tests {
         next_tx(test, seller);
         {
             let managercap = test::take_from_sender<ManagerCap>(test);
-            vault::new_vault(&mut managercap,  10, coin::mint_for_testing<SUI>(MINT_AMOUNT, ctx(test)) , ctx(test));
+            let sui_token = coin::mint_for_testing<SUI>(MINT_AMOUNT, ctx(test));
+            vault::new_vault(&mut managercap,  10, MINT_AMOUNT, &mut sui_token , ctx(test));
+            coin::burn_for_testing(sui_token);
             test::return_to_sender(test, managercap);
         };
 

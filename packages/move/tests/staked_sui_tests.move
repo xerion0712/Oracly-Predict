@@ -20,7 +20,8 @@ module legato::staked_sui_tests {
         next_tx(test, addr1);
         {
             let sui_token = coin::mint_for_testing<SUI>(100, ctx(test));
-            staked_sui::wrap(sui_token, ctx(test));
+            staked_sui::wrap(100,&mut sui_token, ctx(test));
+            coin::burn_for_testing(sui_token);
         };
 
         next_tx(test, addr1);

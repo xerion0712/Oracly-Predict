@@ -36,7 +36,9 @@ module legato::vault_tests {
         next_tx(test, admin);
         {
             let managercap = test::take_from_sender<ManagerCap>(test);
-            vault::new_vault(&mut managercap,  10,coin::mint_for_testing<SUI>(LOCK_AMOUNT, ctx(test)), ctx(test));
+            let sui_token = coin::mint_for_testing<SUI>(LOCK_AMOUNT, ctx(test));
+            vault::new_vault(&mut managercap,  10, LOCK_AMOUNT  ,&mut sui_token, ctx(test));
+            coin::burn_for_testing(sui_token);
             test::return_to_sender(test, managercap);
         };
 
@@ -58,7 +60,8 @@ module legato::vault_tests {
         next_tx(test, admin);
         {
             let sui_token = coin::mint_for_testing<SUI>(LOCK_AMOUNT, ctx(test));
-            staked_sui::wrap(sui_token, ctx(test));
+            staked_sui::wrap(LOCK_AMOUNT, &mut sui_token , ctx(test));
+            coin::burn_for_testing(sui_token);
         };
         
         // Locks Staked SUI into the vault
@@ -123,7 +126,9 @@ module legato::vault_tests {
         next_tx(test, admin);
         {
             let managercap = test::take_from_sender<ManagerCap>(test);
-            vault::new_vault(&mut managercap,  120,coin::mint_for_testing<SUI>(100000000000, ctx(test)), ctx(test));
+            let sui_token = coin::mint_for_testing<SUI>(100000000000, ctx(test));
+            vault::new_vault(&mut managercap,  120, 100000000000 , &mut sui_token , ctx(test));
+            coin::burn_for_testing(sui_token);
             test::return_to_sender(test, managercap);
         };
 
@@ -168,7 +173,7 @@ module legato::vault_tests {
 
             // top up reward
             let sui_token = coin::mint_for_testing<SUI>(LOCK_AMOUNT, ctx(test));
-            vault::update_reward_pool(&mut reserve, &mut sui_token, ctx(test));
+            vault::update_reward_pool(&mut reserve, LOCK_AMOUNT , &mut sui_token, ctx(test));
 
             // claim rewards
             vault::claim(&mut reserve, ctx(test));

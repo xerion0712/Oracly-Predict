@@ -80,10 +80,11 @@ module legato::vault {
     public entry fun new_vault(
         _manager_cap: &mut ManagerCap,
         lockForEpoch : u64,
-        initialL : Coin<SUI>, // initial liquidity for YT's AMM
+        initialL: u64, // initial liquidity for YT's AMM
+        sui : &mut Coin<SUI>, // initial liquidity for YT's AMM
         ctx: &mut TxContext
     ) {
-
+        let to_new_pool = coin::split(sui, initialL, ctx);
         let deposits = table::new(ctx);
 
         // setup PT
@@ -93,7 +94,7 @@ module legato::vault {
 
         //  give 1 mil. of YT tokens to the AMM
         let minted_yt = balance::increase_supply(&mut yt,YT_TOTAL_SUPPLY);
-        let amm_for_yt = amm::new_pool<TOKEN<YT>>(coin::from_balance(minted_yt, ctx), initialL, ctx);
+        let amm_for_yt = amm::new_pool<TOKEN<YT>>(coin::from_balance(minted_yt, ctx), to_new_pool, ctx);
 
         let reserve = Reserve {
             id: object::new(ctx),
@@ -206,7 +207,9 @@ module legato::vault {
 
     // Unwrap and re-wrap Staked SUI objects in the reserve, collect rewards and deposit them into the reward pool
     // NOTE : for the hackathon, this function simply tops up the reward pool according to the APR stated in the Oracle. 
-    public entry fun update_reward_pool(reserve: &mut Reserve, sui: &mut Coin<SUI>, ctx: &mut TxContext) {
+    public entry fun update_reward_pool(reserve: &mut Reserve, amount: u64, sui: &mut Coin<SUI>, ctx: &mut TxContext) {
+
+        let my_sui = coin::split(sui, amount, ctx);
 
         let total_deposit = reserve.deposit_count;
         let count = 0;
@@ -234,10 +237,11 @@ module legato::vault {
 
         if (topup_amount > balance::value(&reserve.reward_pool)) {
             let diff = topup_amount-balance::value(&reserve.reward_pool);
-            let topup_sui = coin::split(sui, diff, ctx);
+            let topup_sui = coin::split(&mut my_sui, diff, ctx);
             balance::join(&mut reserve.reward_pool, coin::into_balance(topup_sui));
-        }
+        };
 
+        transfer::public_transfer(my_sui, tx_context::sender(ctx));
     }
 
     // claim exceeded reward from the pool 

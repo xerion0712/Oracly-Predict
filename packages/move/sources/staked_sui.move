@@ -27,9 +27,12 @@ module legato::staked_sui {
     }
 
     public entry fun wrap(
-        stake: Coin<SUI>,
+        amount: u64,
+        sui: &mut Coin<SUI>,
         ctx: &mut TxContext
     ) {
+
+        let to_wrap = coin::split(sui, amount, ctx);
 
         let staker = tx_context::sender(ctx);
 
@@ -37,7 +40,7 @@ module legato::staked_sui {
             id: object::new(ctx),
             pool_id: object::id_from_address(FAKE_POOL),
             stake_activation_epoch : tx_context::epoch(ctx),
-            principal: coin::into_balance(stake),
+            principal: coin::into_balance(to_wrap),
         };
         transfer::transfer(staked_sui, staker);
     }
