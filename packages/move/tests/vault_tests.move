@@ -28,8 +28,7 @@ module legato::vault_tests {
         next_tx(test, admin);
         {
             let managercap = test::take_from_sender<ManagerCap>(test);
-            let sui_token = coin::mint_for_testing<SUI>(LOCK_AMOUNT, ctx(test));
-            vault::new_vault(&mut managercap,  10,sui_token, ctx(test));
+            vault::new_vault(&mut managercap,  10,coin::mint_for_testing<SUI>(LOCK_AMOUNT, ctx(test)), staked_sui::wrap_for_new_vault(coin::mint_for_testing<SUI>(LOCK_AMOUNT, ctx(test)), ctx(test)), ctx(test));
             test::return_to_sender(test, managercap);
         };
 

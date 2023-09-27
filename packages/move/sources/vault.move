@@ -1,6 +1,5 @@
 module legato::vault {
     
-    // use std::option;
     use sui::table::{Self, Table};
     use sui::tx_context::{Self, TxContext};
     use sui::coin::{Self, Coin};
@@ -9,6 +8,7 @@ module legato::vault {
     use sui::transfer; 
     use sui::event;
     use sui::sui::SUI;
+    // use std::option::{Self, Option};
     // use sui::dynamic_object_field as ofield;
     use legato::epoch_time_lock::{ Self, EpochTimeLock};
     use legato::oracle::{Self, Feed};
@@ -45,7 +45,8 @@ module legato::vault {
         feed : Feed,
         marketplace: Marketplace<TOKEN<PT>>,
         amm: Pool<TOKEN<YT>>,
-        locked_until_epoch: EpochTimeLock
+        locked_until_epoch: EpochTimeLock,
+        reward_pool: StakedSui
     }
 
     struct LockEvent has copy, drop {
@@ -80,6 +81,7 @@ module legato::vault {
         _manager_cap: &mut ManagerCap,
         lockForEpoch : u64,
         initialL : Coin<SUI>, // initial liquidity for YT's AMM
+        initialR: StakedSui, // initial Staked SUI for the reward pool, must exceed 1 SUI, unless it cannot be joined or split
         ctx: &mut TxContext
     ) {
 
@@ -104,7 +106,8 @@ module legato::vault {
             marketplace: marketplace::new_marketplace<TOKEN<PT>>(ctx),
             feed : oracle::new_feed(FEED_DECIMAL_PLACE,ctx), // ex. 4.123%
             amm : amm_for_yt,
-            locked_until_epoch : epoch_time_lock::new(tx_context::epoch(ctx) + lockForEpoch, ctx)
+            locked_until_epoch : epoch_time_lock::new(tx_context::epoch(ctx) + lockForEpoch, ctx),
+            reward_pool : initialR
         };
 
         transfer::share_object(reserve);
@@ -201,6 +204,11 @@ module legato::vault {
             owner : tx_context::sender(ctx)
         });
     }
+
+    // Unwrap and re-wrap Staked SUI objects in the reserve, collect rewards and deposit them into the reward pool
+    // public entry fun update_reward_pool(reserve: &Reserve) {
+
+    // }
 
     // TODO: unlock before mature using YT
 
