@@ -2,8 +2,7 @@
 module legato::marketplace_tests {
  
     use sui::coin::{Self};  
-    use sui::sui::SUI;
-    use legato::staked_sui::{Self};
+    use sui::sui::SUI; 
     use legato::vault::{Self, Reserve, ManagerCap, TOKEN, PT  };
     use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
 
@@ -39,7 +38,7 @@ module legato::marketplace_tests {
         next_tx(test, seller);
         {
             let managercap = test::take_from_sender<ManagerCap>(test);
-            vault::new_vault(&mut managercap,  10, coin::mint_for_testing<SUI>(MINT_AMOUNT, ctx(test)), staked_sui::wrap_for_new_vault(coin::mint_for_testing<SUI>(MINT_AMOUNT, ctx(test)), ctx(test)) , ctx(test));
+            vault::new_vault(&mut managercap,  10, coin::mint_for_testing<SUI>(MINT_AMOUNT, ctx(test)), ctx(test));
             test::return_to_sender(test, managercap);
         };
 
@@ -89,7 +88,7 @@ module legato::marketplace_tests {
         next_tx(test, seller);
         {
             let managercap = test::take_from_sender<ManagerCap>(test);
-            vault::new_vault(&mut managercap,  10, coin::mint_for_testing<SUI>(MINT_AMOUNT, ctx(test)), staked_sui::wrap_for_new_vault(coin::mint_for_testing<SUI>(MINT_AMOUNT, ctx(test)), ctx(test))  , ctx(test));
+            vault::new_vault(&mut managercap,  10, coin::mint_for_testing<SUI>(MINT_AMOUNT, ctx(test)) , ctx(test));
             test::return_to_sender(test, managercap);
         };
 

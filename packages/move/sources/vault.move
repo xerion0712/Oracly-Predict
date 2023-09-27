@@ -3,7 +3,7 @@ module legato::vault {
     use sui::table::{Self, Table};
     use sui::tx_context::{Self, TxContext};
     use sui::coin::{Self, Coin};
-    use sui::balance::{ Self, Supply };
+    use sui::balance::{ Self, Supply, Balance };
     use sui::object::{Self, UID, ID };
     use sui::transfer; 
     use sui::event;
@@ -46,7 +46,7 @@ module legato::vault {
         marketplace: Marketplace<TOKEN<PT>>,
         amm: Pool<TOKEN<YT>>,
         locked_until_epoch: EpochTimeLock,
-        reward_pool: StakedSui
+        reward_pool: Balance<SUI>
     }
 
     struct LockEvent has copy, drop {
@@ -81,7 +81,6 @@ module legato::vault {
         _manager_cap: &mut ManagerCap,
         lockForEpoch : u64,
         initialL : Coin<SUI>, // initial liquidity for YT's AMM
-        initialR: StakedSui, // initial Staked SUI for the reward pool, must exceed 1 SUI, unless it cannot be joined or split
         ctx: &mut TxContext
     ) {
 
@@ -107,7 +106,7 @@ module legato::vault {
             feed : oracle::new_feed(FEED_DECIMAL_PLACE,ctx), // ex. 4.123%
             amm : amm_for_yt,
             locked_until_epoch : epoch_time_lock::new(tx_context::epoch(ctx) + lockForEpoch, ctx),
-            reward_pool : initialR
+            reward_pool : balance::zero<SUI>()
         };
 
         transfer::share_object(reserve);
@@ -206,10 +205,49 @@ module legato::vault {
     }
 
     // Unwrap and re-wrap Staked SUI objects in the reserve, collect rewards and deposit them into the reward pool
-    // public entry fun update_reward_pool(reserve: &Reserve) {
+    // NOTE : for the hackathon, this function simply tops up the reward pool according to the APR stated in the Oracle. 
+    public entry fun update_reward_pool(reserve: &mut Reserve, sui: &mut Coin<SUI>, ctx: &mut TxContext) {
 
-    // }
+        let total_deposit = reserve.deposit_count;
+        let count = 0;
+        let topup_amount = 0;
+        let (val, _ ) = oracle::get_value(&reserve.feed);
+        let val = (val as u128);
+        while (count < total_deposit) {
+            if (table::contains(&mut reserve.deposits, count))  {
+                let deposit_item = table::borrow_mut(&mut reserve.deposits, count);
+                let total_epoch_staking = epoch_time_lock::epoch(&reserve.locked_until_epoch) - staked_sui::stake_activation_epoch(deposit_item);
+                let deposit_amount = staked_sui::staked_sui_amount(deposit_item);
+                let (
+                    total_epoch_staking,
+                    deposit_amount
+                ) = (
+                    (total_epoch_staking as u128), 
+                    (deposit_amount as u128)
+                );
+                let final_amount = total_epoch_staking*val*deposit_amount / 36500000;
+                let final_amount = (final_amount as u64);
+                topup_amount = topup_amount+final_amount;
+            };
+            count = count + 1;
+        };
 
+        if (topup_amount > balance::value(&reserve.reward_pool)) {
+            let diff = topup_amount-balance::value(&reserve.reward_pool);
+            let topup_sui = coin::split(sui, diff, ctx);
+            balance::join(&mut reserve.reward_pool, coin::into_balance(topup_sui));
+        }
+
+    }
+
+    // claim exceeded reward from the pool 
+    // NOTE : for the hackathon, we just send 10% from the reward pool to the sender
+    public entry fun claim(reserve: &mut Reserve, ctx: &mut TxContext) {
+        let ten_percent = balance::value(&reserve.reward_pool)*10/100;
+        let to_sender = balance::split(&mut reserve.reward_pool, ten_percent);
+        transfer::public_transfer(coin::from_balance(to_sender, ctx), tx_context::sender(ctx));
+    }
+    
     // TODO: unlock before mature using YT
 
     public entry fun total_yt_supply(reserve: &Reserve): u64 {
@@ -233,6 +271,33 @@ module legato::vault {
         let (_, dec ) = oracle::get_value(&reserve.feed);
         dec
     }
+
+    // the ratio of the future value / projectile value at the current epoch
+    // public entry fun collateral_ratio(reserve: &mut Reserve, ctx: &mut TxContext) : (u64) {
+    //     let total_deposit = reserve.deposit_count;
+    //     let count = 0;
+    //     let topup_amount = 0;
+    //     let (val, _ ) = oracle::get_value(&reserve.feed);
+    //     let val = (val as u128);
+
+    //     while (count < total_deposit) {
+    //         if (table::contains(&mut reserve.deposits, count))  {
+    //             let deposit_item = table::borrow_mut(&mut reserve.deposits, count);
+    //             let total_epoch_staking = tx_context::epoch(ctx) - staked_sui::stake_activation_epoch(deposit_item);
+    //             let deposit_amount = staked_sui::staked_sui_amount(deposit_item);
+    //             let (
+    //                 total_epoch_staking,
+    //                 deposit_amount
+    //             ) = (
+    //                 (total_epoch_staking as u128), 
+    //                 (deposit_amount as u128)
+    //             );
+                
+    //         };
+    //         count = count + 1;
+    //     };
+    //     123
+    // }
 
     // MARKETPLACE
 

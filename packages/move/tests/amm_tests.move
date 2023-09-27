@@ -2,7 +2,7 @@
 module legato::amm_tests {
 
     use sui::coin::{Self};  
-    use sui::sui::SUI;
+    use sui::sui::SUI; 
     use legato::vault::{Self, Reserve, ManagerCap, TOKEN, YT  };
     use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
 

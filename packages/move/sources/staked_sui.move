@@ -1,6 +1,7 @@
 
 module legato::staked_sui {
 
+    // use sui::dynamic_object_field as ofield;
     use sui::coin::{Self, Coin};
     use sui::transfer;
     use sui::object::{ Self, UID, ID};
@@ -10,7 +11,8 @@ module legato::staked_sui {
 
     const FAKE_POOL: address = @0x123;
 
-    const MIN_STAKING_THRESHOLD: u64 = 1_000_000_000; // 1 SUI
+    // const MIN_STAKING_THRESHOLD: u64 = 1_000_000_000; // 1 SUI
+    const MIN_STAKING_THRESHOLD: u64 = 1000;
 
     const EInvalidPoolID: u64 = 0;
     const EIncompatibleStakedSui: u64 = 1;
