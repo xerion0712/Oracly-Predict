@@ -130,7 +130,7 @@ module legato::marketplace {
     }
     
     // buy
-    public entry fun buy<T>(
+    public fun buy<T>(
         marketplace: &mut Marketplace<T>,
         order_id: u64,
         base_amount: u64,

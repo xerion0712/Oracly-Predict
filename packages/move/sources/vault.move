@@ -14,8 +14,9 @@ module legato::vault {
     use legato::oracle::{Self, Feed};
     use legato::staked_sui::{ Self, StakedSui }; // clones of staking_pool.move
     use legato::marketplace::{Self, Marketplace };
+    use legato::amm::{Self, Pool };
 
-    const YT_TOTAL_SUPPLY: u64 = 1000000000;
+    const YT_TOTAL_SUPPLY: u64 = 1000000*1000000000; // 1 Mil.
 
     const FEED_DECIMAL_PLACE: u64 = 3;
 
@@ -43,6 +44,7 @@ module legato::vault {
         yt: Supply<TOKEN<YT>>,
         feed : Feed,
         marketplace: Marketplace<TOKEN<PT>>,
+        amm: Pool<TOKEN<YT>>,
         locked_until_epoch: EpochTimeLock
     }
 
@@ -77,6 +79,7 @@ module legato::vault {
     public entry fun new_vault(
         _manager_cap: &mut ManagerCap,
         lockForEpoch : u64,
+        initialL : Coin<SUI>, // initial liquidity for YT's AMM
         ctx: &mut TxContext
     ) {
 
@@ -87,8 +90,9 @@ module legato::vault {
         // setup YT
         let yt = balance::create_supply(TOKEN<YT> {});
 
-        // // give 1 mil. of YT tokens to the sender
-        // // coin::mint_and_transfer<YT>(&mut yt_treasury_cap, YT_TOTAL_SUPPLY, tx_context::sender(ctx), ctx);
+        //  give 1 mil. of YT tokens to the AMM
+        let minted_yt = balance::increase_supply(&mut yt,YT_TOTAL_SUPPLY);
+        let amm_for_yt = amm::new_pool<TOKEN<YT>>(coin::from_balance(minted_yt, ctx), initialL, ctx);
 
         let reserve = Reserve {
             id: object::new(ctx),
@@ -99,6 +103,7 @@ module legato::vault {
             balance: 0,
             marketplace: marketplace::new_marketplace<TOKEN<PT>>(ctx),
             feed : oracle::new_feed(FEED_DECIMAL_PLACE,ctx), // ex. 4.123%
+            amm : amm_for_yt,
             locked_until_epoch : epoch_time_lock::new(tx_context::epoch(ctx) + lockForEpoch, ctx)
         };
 
@@ -251,13 +256,40 @@ module legato::vault {
         marketplace::buy<TOKEN<PT>>(&mut reserve.marketplace, order_id, base_amount, payment, ctx);
     }
 
-    public entry fun order_price(reserve: &mut Reserve, order_id: u64): u64 {
-        marketplace::order_price<TOKEN<PT>>(&mut reserve.marketplace, order_id)
+    public entry fun order_price(reserve: &Reserve, order_id: u64): u64 {
+        marketplace::order_price<TOKEN<PT>>(&reserve.marketplace, order_id)
     }
 
-    public entry fun order_amount(reserve: &mut Reserve, order_id: u64): u64 {
-        marketplace::order_amount<TOKEN<PT>>(&mut reserve.marketplace, order_id)
+    public entry fun order_amount(reserve: &Reserve, order_id: u64): u64 {
+        marketplace::order_amount<TOKEN<PT>>(&reserve.marketplace, order_id)
     }
+
+    // AMM
+    public entry fun swap_sui(reserve: &mut Reserve, amount: u64, sui: &mut Coin<SUI>,  ctx: &mut TxContext) {
+        amm::swap_sui<TOKEN<YT>>(&mut reserve.amm, amount, sui, ctx)
+    }
+
+    public entry fun swap_token(reserve: &mut Reserve, amount: u64, token: &mut Coin<TOKEN<YT>>,  ctx: &mut TxContext) {
+        amm::swap_token<TOKEN<YT>>(&mut reserve.amm, amount, token, ctx)
+    }
+
+    public entry fun add_liquidity(reserve: &mut Reserve, sui_add_amount: u64, token_add_amount:u64, sui: &mut Coin<SUI>, token: &mut Coin<TOKEN<YT>> , ctx: &mut TxContext) {
+        amm::add_liquidity<TOKEN<YT>>(&mut reserve.amm, sui_add_amount, token_add_amount, sui, token, ctx)
+    }
+
+    // public entry fun remove_liquidity<P>(reserve: &mut Reserve, lp: Coin<P>, ctx: &mut TxContext ) {
+    //     amm::remove_liquidity<TOKEN<YT>>(&mut reserve.amm, lp, ctx)
+    // }
+
+    public entry fun sui_price(reserve: &Reserve, to_sell: u64):u64 {
+        amm::sui_price<TOKEN<YT>>(&reserve.amm, to_sell)
+    }
+
+    public entry fun token_price(reserve: &Reserve, to_sell: u64):u64 {
+        amm::token_price<TOKEN<YT>>(&reserve.amm, to_sell)
+    }
+
+    // ADMIN STUFFS
 
     // transfer manager cap to someone else
     public entry fun transfer_manager_cap(
