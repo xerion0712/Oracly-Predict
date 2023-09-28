@@ -197,8 +197,7 @@ export const Sell = ({ tick, setTick }) => {
             <hr class="my-5 h-[1px] border-t-0 bg-neutral-100  opacity-50" />
             <button onClick={onCreateOrder} disabled={loading} className="  py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
                 {loading && <Spinner />}
-                Create Order
-                <PlusIcon className="h-5 w-5 ml-2" />
+                Add Now
             </button>
         </div>
     )
@@ -431,7 +430,7 @@ const Order = ({
                 </div> */}
                 <div class="col-span-3 flex flex-col text-md">
                     <div class="mt-auto mb-auto">
-                        Price : {(Number(item.price) / 1000000000).toLocaleString()} PT/SUI
+                        Price : {0.1 / (Number(item.price) / 1000000000).toLocaleString()} SUI
                     </div>
                 </div>
                 <div class="col-span-3 flex flex-col text-xl font-bold">
@@ -445,71 +444,6 @@ const Order = ({
     )
 }
 
-const PT_OLD = () => {
-
-    const [tab, setTab] = useState(2)
-
-    const { getPTBalance, getAllVaultTokens, createOrder, buy, getAllOrders } = useLegato()
-
-    const [orders, setOrders] = useState([])
-
-    const [tick, setTick] = useState(0)
-
-    const increaseTick = useCallback(() => {
-        setTick(tick + 1)
-    }, [tick])
-
-    useEffect(() => {
-        getAllOrders().then(setOrders)
-    }, [tick])
-
-    return (
-        <div class="border p-5 m-1 bg-gray-900 border-gray-600">
-            <div class="grid grid-cols-12 gap-3 px-2">
-                <div class="col-span-5 flex flex-col border-r pr-3 border-gray-600">
-                    <div class="font-medium text-center  border-b  text-gray-400 border-gray-700 mb-4 ">
-                        <ul class="flex flex-wrap -mb-px">
-                            <li class="  w-1/2">
-                                <span onClick={() => setTab(1)} class={`w-full inline-block cursor-pointer p-4 border-b-2 rounded-t-lg ${tab === 1 ? "active text-white  border-blue-700" : "border-transparent  hover:border-gray-300  hover:text-gray-300"} `}>
-                                    Buy
-                                </span>
-                            </li>
-                            <li class="  w-1/2">
-                                <span onClick={() => setTab(2)} class={`w-full inline-block  cursor-pointer p-4  border-b-2  rounded-t-lg ${tab === 2 ? "active  text-white  border-blue-700" : "border-transparent  hover:border-gray-300  hover:text-gray-300"}`} aria-current="page">
-                                    Sell
-                                </span>
-                            </li>
-                        </ul>
-                    </div>
-                    {tab === 1 && <Buy />}
-                    {tab === 2 && <Sell tick={tick} setTick={setTick} />}
-                </div>
-                <div class="col-span-7 flex flex-col text-md">
-                    <p class="text-gray-300 text-sm text-center mt-2 mb-2">
-                        Orderbook
-                    </p>
-                    {orders.map((item, index) => {
-                        return (
-                            <div key={index}>
-                                <Order
-                                    owner={item.owner}
-                                    price={item.ask}
-                                    item={item}
-                                    buy={buy}
-                                    increaseTick={increaseTick}
-                                />
-                            </div>
-                        )
-                    })
-
-                    }
-                </div>
-            </div>
-        </div>
-    )
-}
-
-
 const PT = () => {
 
     const { getAllOrders, buy } = useLegato()
@@ -517,7 +451,6 @@ const PT = () => {
     const [orders, setOrders] = useState([])
     const [tick, setTick] = useState(0)
     const [createOrderPanel, setCreateOrderPanel] = useState(false)
-
 
     const increaseTick = useCallback(() => {
         setTick(tick + 1)

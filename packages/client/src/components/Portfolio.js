@@ -9,12 +9,13 @@ const Portfolio = () => {
 
     const [tab, setTab] = useState(1)
 
-    const { getPTBalance } = useLegato()
+    const { getPTBalance, getYTBalance } = useLegato()
 
     const wallet = useWallet()
     const { account } = wallet
 
     const [pt, setPT] = useState(0)
+    const [yt, setYT] = useState(0)
 
     useEffect(() => {
         account && account.address && getPTBalance(account.address).then(
@@ -22,7 +23,9 @@ const Portfolio = () => {
                 setPT(output)
             }
         )
+        account && account.address && getYTBalance(account.address).then(setYT)
     }, [account])
+
 
     return (
         <div>
@@ -55,14 +58,14 @@ const Portfolio = () => {
                                 {pt > 0 && <>
                                     <div class=" mt-4 mb-4 text-gray-100 py-3 w-full">
                                         <div class="grid grid-cols-7 gap-3 px-2 mt-4 mb-4 ">
-                                            <div class="col-span-3 flex flex-col text-md">
+                                            <div class="col-span-2 flex flex-col text-md">
                                                 <div class="mt-auto mb-auto">
                                                     {activeVault.symbol}
                                                 </div>
                                             </div>
                                             <div class="col-span-2 flex flex-col text-md">
                                                 <div class="mt-auto mb-auto">
-                                                Vault {activeVault.name}
+                                                    Vault {activeVault.name}
                                                 </div>
                                             </div>
                                             <div class="col-span-2 flex flex-col text-md">
@@ -70,11 +73,42 @@ const Portfolio = () => {
                                                     Balance: {pt.toLocaleString()}
                                                 </div>
                                             </div>
+                                            <div class="col-span-1 flex flex-col text-md">
+                                                <button className=" py-1 rounded-lg pl-5 pr-5 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
+                                                    Unstake
+                                                </button>
+                                            </div>
                                         </div>
+                                        {yt > 0 && <>
+                                            <div class=" mt-0 mb-4 text-gray-100 py-3 w-full">
+                                                <div class="grid grid-cols-7 gap-3 px-2 mt-0 mb-4 ">
+                                                    <div class="col-span-2 flex flex-col text-md">
+                                                        <div class="mt-auto mb-auto">
+                                                            {activeVault.ytSymbol}
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-span-2 flex flex-col text-md">
+                                                        <div class="mt-auto mb-auto">
+                                                            Vault {activeVault.name}
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-span-2 flex flex-col text-md">
+                                                        <div class="mt-auto ml-auto">
+                                                            Balance: {yt.toLocaleString()}
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-span-1 flex flex-col text-md">
+                                                        <div class="mt-auto mb-auto">
+                                                            <button className=" py-1 rounded-lg pl-5 pr-5 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
+                                                                Claim
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>}
                                     </div>
                                 </>}
-
-
                             </div>
 
                         </div>

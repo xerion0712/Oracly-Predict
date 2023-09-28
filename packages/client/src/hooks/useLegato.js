@@ -114,6 +114,28 @@ const useLegato = () => {
         return listing.filter(item => buying.indexOf(item['order_id']) === -1)
     }, [])
 
+    const getRates = useCallback(async () => {
+
+        console.log("get AMM rates")
+
+        const packageObjectId = PACKAGE_ID
+
+        const events = await provider.queryEvents({
+            query: { MoveModule: { package: packageObjectId, module: 'vault' } }
+        });
+
+        const priceEvents = events.data.reduce((arr, item) => {
+            if (item.type.indexOf("PriceUpdatedEvent") !== -1) {
+                arr.push(item.parsedJson)
+            }
+            return arr
+        }, [])
+
+        return priceEvents.sort(function(a, b) {
+            return Number(a.timestamp) > Number(b.timestamp);
+         })[0]
+    }, [])
+
     const getApr = useCallback(async () => {
 
         console.log("getApr...")
@@ -175,6 +197,26 @@ const useLegato = () => {
         return result / 1000000000
     }, [])
 
+    const getYTBalance = useCallback(async (address) => {
+
+        console.log("get all vault tokens for :", address)
+
+        const packageObjectId = PACKAGE_ID
+
+        const coins = await provider.getCoins({
+            owner: address,
+            coinType: `${packageObjectId}::vault::TOKEN<0x9c22e4ec6439f67b4bd1c84c9fe7154969e4c88fe1b414602c1a4d56a54209f6::vault::YT>`
+        });
+
+        const result = coins.data.reduce((r, item) => {
+            if (Number(item.balance) !== 0) {
+                r += Number(item.balance)
+            }
+            return r
+        }, 0)
+        return result / 1000000000
+    }, [])
+
     const stake = useCallback(async (objectId) => {
         if (!connected) {
             return
@@ -220,6 +262,10 @@ const useLegato = () => {
 
             // FIXME: Merge coin
 
+            let sorted = coins.data.sort(function(a, b) {
+                return Number(a.balance) > Number(b.balance);
+             });
+
             const pricePerUnit = Number(amount) / Number(price)
 
             let bpricePerUnit = (pricePerUnit * 1000000000).toFixed(0)
@@ -227,7 +273,7 @@ const useLegato = () => {
 
             tx.moveCall({
                 target: `${packageObjectId}::vault::list`,
-                arguments: [tx.pure(RESERVE), tx.pure(`${coinIds[coinIds.length - 1]}`), tx.pure(bamount), tx.pure(bpricePerUnit)]
+                arguments: [tx.pure(RESERVE), tx.pure(`${sorted[0].coinObjectId}`), tx.pure(bamount), tx.pure(bpricePerUnit)]
             });
 
             const resData = await wallet.signAndExecuteTransactionBlock({
@@ -257,14 +303,43 @@ const useLegato = () => {
             return
         }
 
+        const balance = await getSuiBalance(wallet.address)
+
         const tx = new TransactionBlock();
-        const [coin] = tx.splitCoins(tx.gas, [tx.pure(Number(10000000))]);
-0
+        const [coin] = tx.splitCoins(tx.gas, [tx.pure((balance * 0.9)*1000000000)]);
+
         const packageObjectId = PACKAGE_ID
 
         tx.moveCall({
             target: `${packageObjectId}::vault::buy`,
-            arguments: [tx.pure(RESERVE), tx.pure(`${orderId}`), tx.pure(Number(9000000)), coin],
+            arguments: [tx.pure(RESERVE), tx.pure(`${orderId}`), tx.pure(Number(100000000)), coin],
+        });
+
+        tx.transferObjects([coin], tx.pure(wallet.address));
+
+        const resData = await wallet.signAndExecuteTransactionBlock({
+            transactionBlock: tx
+        });
+
+    }, [connected, wallet])
+
+    const swapSui = useCallback(async (amount) => {
+
+        if (!connected) {
+            return
+        }
+
+        const balance = await getSuiBalance(wallet.address)
+
+        const tx = new TransactionBlock();
+        // const [coin] = tx.splitCoins(tx.gas, [tx.pure((balance * 0.9)*1000000000)]);
+        const [coin] = tx.splitCoins(tx.gas, [tx.pure((amount)*1000000000)]);
+
+        const packageObjectId = PACKAGE_ID
+
+        tx.moveCall({
+            target: `${packageObjectId}::vault::swap_sui`,
+            arguments: [tx.pure(RESERVE), tx.pure(amount * 1000000000), coin],
         });
 
         tx.transferObjects([coin], tx.pure(wallet.address));
@@ -287,7 +362,10 @@ const useLegato = () => {
         getApr,
         getTotalSupply,
         buy,
-        getPTBalance
+        swapSui,
+        getPTBalance,
+        getYTBalance,
+        getRates
     }
 }
 

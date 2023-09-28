@@ -1,8 +1,9 @@
 
-import { Fragment, useState } from 'react'
+import { Fragment, useState, useCallback, useEffect, useMemo } from 'react'
 import { VAULT } from "../constants"
 import { Listbox, Transition } from '@headlessui/react'
 import { PlusIcon, ChevronUpDownIcon } from "@heroicons/react/20/solid"
+import useLegato from '@/hooks/useLegato'
 
 function classNames(...classes) {
     return classes.filter(Boolean).join(' ')
@@ -23,13 +24,28 @@ const InfoRow = ({ name, value }) => {
 
 const YT = () => {
 
+    const { getRates } = useLegato()
+
     const [tab, setTab] = useState(1)
 
+    const [rate, setRate] = useState()
     const [amount, setAmount] = useState(0)
 
     const onAmountChange = (e) => {
         setAmount(e.target.value)
     }
+
+    const [tick, setTick] = useState(0)
+
+    const increaseTick = useCallback(() => {
+        setTick(tick + 1)
+    }, [tick])
+
+    useEffect(() => {
+        getRates().then(setRate)
+    }, [tick])
+
+    console.log("rate : ", rate)
 
     return (
         <div class="max-w-xl border p-6 pt-4 m-1 bg-gray-900 border-gray-600">
@@ -47,8 +63,8 @@ const YT = () => {
                     </li>
                 </ul>
             </div>
-            {tab === 1 && <Buy />}
-            {tab === 2 && <Sell />}
+            {tab === 1 && <Buy rate={rate} increaseTick={increaseTick} />}
+            {tab === 2 && <Sell rate={rate} increaseTick={increaseTick} />}
 
 
         </div>
@@ -56,9 +72,30 @@ const YT = () => {
 }
 
 
-const Buy = () => {
+const Buy = ({ rate, increaseTick }) => {
+
+    const { swapSui } = useLegato()
 
     const [selected, setSelected] = useState(VAULT[0])
+
+    const [amount, setAmount] = useState(0.1)
+
+    const estimated = useMemo(() => {
+        if (rate) {
+            return (Number(rate.token_price) / 1000000000) * amount
+        }
+        return 1
+    }, [amount, rate])
+
+    const onSwap = useCallback(async () => {
+        try {
+            await swapSui(Number(amount))
+            await increaseTick()
+        } catch (e) {
+
+        }
+
+    }, [amount])
 
     return (
         <div>
@@ -84,7 +121,7 @@ const Buy = () => {
                         </div>
                     </div>
                 </div> */}
-                <div class="grid grid-cols-2 gap-3">
+                {/* <div class="grid grid-cols-2 gap-3">
                     <div class="col-span-1 flex flex-row">
                         <img class="h-6 w-6 rounded-full  mr-2" src="./sui-sui-logo.svg" alt="" />
                         Balance
@@ -94,7 +131,7 @@ const Buy = () => {
                             0{` Staked SUI`}
                         </span>
                     </div>
-                </div>
+                </div> */}
                 <div className="block mt-4 text-sm font-medium leading-6 text-gray-300">
                     YT token to buy
                 </div>
@@ -157,19 +194,19 @@ const Buy = () => {
                 </div>
                 <div class="flex mt-1 mb-2">
                     <div class="relative w-full">
-                        <input type="number" value={0} id="large-input" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none block w-full p-4 border rounded-l-lg sm:text-md  bg-gray-700 border-gray-600 placeholder-gray-400 text-white focus:outline-none focus:border-blue-500" />
+                        <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} id="large-input" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none block w-full p-4 border rounded-l-lg sm:text-md  bg-gray-700 border-gray-600 placeholder-gray-400 text-white focus:outline-none focus:border-blue-500" />
                     </div>
                     <div class="flex-shrink-0 cursor-default z-8 inline-flex items-center py-2.5 px-4 text-sm font-medium text-center border rounded-r-lg border-gray-700 text-white  focus:ring-4 focus:outline-none   bg-gray-600   focus:ring-gray-800" type="button">
                         <div className='flex flex-row'>
                             <img src={"./sui-sui-logo.svg"} alt="" className="h-5 w-5  mt-auto mb-auto  mr-2 flex-shrink-0 rounded-full" />
-                            Staked SUI
+                            SUI
                         </div>
                     </div>
                 </div>
                 <div class="mt-4 flex flex-row">
                     <div class="text-gray-300 text-sm font-medium">You will receive at least</div>
                     <span class="ml-auto bg-blue-100 text-blue-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
-                        1 Staked SUI = N/A YT
+                        1 SUI = {rate ? (Number(rate.token_price) / 1000000000).toLocaleString() : "N/A"} YT
                     </span>
                 </div>
 
@@ -185,7 +222,7 @@ const Buy = () => {
                     </div>
                     <div className="flex">
                         <div className="text-3xl font-medium mx-auto mt-3 mb-auto mr-2">
-                            -
+                            {estimated.toLocaleString()}
                         </div>
                     </div>
                 </div>
@@ -197,12 +234,12 @@ const Buy = () => {
                         name={"Price impact"}
                         value={"0.01%"}
                     /> */}
-                <InfoRow
+                {/* <InfoRow
                     name={"Implied APR"}
                     value={"N/A"}
-                />
+                /> */}
                 <hr class="h-px my-4 border-0 bg-gray-600" />
-                <button onClick={() => alert("Not available yet")} className=" py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
+                <button onClick={onSwap} className=" py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
                     Buy Now
                 </button>
             </div>
@@ -210,8 +247,17 @@ const Buy = () => {
     )
 }
 
-const Sell = () => {
+const Sell = ({ rate }) => {
     const [selected, setSelected] = useState(VAULT[0])
+
+    const [amount, setAmount] = useState(1000)
+
+    const estimated = useMemo(() => {
+        if (rate) {
+            return (Number(rate.sui_price) / 1000000000) * amount
+        }
+        return 1
+    }, [amount, rate])
 
     return (
         <div>
@@ -280,18 +326,18 @@ const Sell = () => {
                 </div>
                 <div class="flex mt-1 mb-2">
                     <div class="relative w-full">
-                        <input type="number" value={0} id="large-input" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none block w-full p-4 border rounded-l-lg sm:text-md  bg-gray-700 border-gray-600 placeholder-gray-400 text-white focus:outline-none focus:border-blue-500" />
+                        <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} id="large-input" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none block w-full p-4 border rounded-l-lg sm:text-md  bg-gray-700 border-gray-600 placeholder-gray-400 text-white focus:outline-none focus:border-blue-500" />
                     </div>
                     <div class="flex-shrink-0 cursor-default z-8 inline-flex items-center py-2.5 px-4 text-sm font-medium text-center border rounded-r-lg border-gray-700 text-white  focus:ring-4 focus:outline-none   bg-gray-600   focus:ring-gray-800" type="button">
-                        <div className='flex flex-row'> 
-                           {selected.ytSymbol}
+                        <div className='flex flex-row'>
+                            {selected.ytSymbol}
                         </div>
                     </div>
                 </div>
                 <div class="mt-4 flex flex-row">
                     <div class="text-gray-300 text-sm font-medium">You will receive at least</div>
                     <span class="ml-auto bg-blue-100 text-blue-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
-                        1 YT = N/A Staked SUI
+                        1 YT = {rate ? (Number(rate.sui_price) / 1000000000).toFixed(8) : "N/A"} SUI
                     </span>
                 </div>
 
@@ -299,22 +345,22 @@ const Sell = () => {
                 <div class="grid grid-cols-2 gap-2 mt-2 mb-2">
                     <div>
                         <h2 className="text-3xl font-medium">
-                        <img src={"./sui-sui-logo.svg"} alt="" className="h-8 w-8 mb-1 flex-shrink-0 rounded-full" />
+                            <img src={"./sui-sui-logo.svg"} alt="" className="h-8 w-8 mb-1 flex-shrink-0 rounded-full" />
                         </h2>
                         <div class="text-gray-300 text-sm font-medium">
-                            Staked SUI
+                            SUI
                         </div>
                     </div>
                     <div className="flex">
                         <div className="text-3xl font-medium mx-auto mt-3 mb-auto mr-2">
-                            -
+                            {estimated.toFixed(6)}
                         </div>
                     </div>
                 </div>
-                <InfoRow
+                {/* <InfoRow
                     name={"Implied APR"}
                     value={"N/A"}
-                />
+                /> */}
                 <hr class="h-px my-4 border-0 bg-gray-600" />
                 <button onClick={() => alert("Not available yet")} className=" py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
                     Sell Now
