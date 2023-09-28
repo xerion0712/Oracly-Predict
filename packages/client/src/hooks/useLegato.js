@@ -310,7 +310,7 @@ const useLegato = () => {
         const balance = await getSuiBalance(wallet.address)
 
         const tx = new TransactionBlock();
-        const [coin] = tx.splitCoins(tx.gas, [tx.pure((balance * 0.9) * 1000000000)]);
+        const [coin] = tx.splitCoins(tx.gas, [tx.pure(((balance * 0.9) * 1000000000).toFixed(0) )]);
 
         const packageObjectId = PACKAGE_ID
 
