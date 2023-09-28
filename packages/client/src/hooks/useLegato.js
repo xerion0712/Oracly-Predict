@@ -131,9 +131,9 @@ const useLegato = () => {
             return arr
         }, [])
 
-        return priceEvents.sort(function(a, b) {
+        return priceEvents.sort(function (a, b) {
             return Number(a.timestamp) > Number(b.timestamp);
-         })[0]
+        })[0]
     }, [])
 
     const getApr = useCallback(async () => {
@@ -249,7 +249,7 @@ const useLegato = () => {
 
         const packageObjectId = PACKAGE_ID
 
-        const coins = await provider.getCoins({
+        let coins = await provider.getCoins({
             owner: wallet.address,
             coinType: `${packageObjectId}::vault::TOKEN<0x9c22e4ec6439f67b4bd1c84c9fe7154969e4c88fe1b414602c1a4d56a54209f6::vault::PT>`
         });
@@ -262,9 +262,11 @@ const useLegato = () => {
 
             // FIXME: Merge coin
 
-            let sorted = coins.data.sort(function(a, b) {
-                return Number(a.balance) > Number(b.balance);
-             });
+            let sorted = coins.data.sort((a, b) => {
+                if (Number(b.balance) < Number(a.balance)) {
+                    return -1;
+                }
+            });
 
             const pricePerUnit = Number(amount) / Number(price)
 
@@ -275,6 +277,8 @@ const useLegato = () => {
                 target: `${packageObjectId}::vault::list`,
                 arguments: [tx.pure(RESERVE), tx.pure(`${sorted[0].coinObjectId}`), tx.pure(bamount), tx.pure(bpricePerUnit)]
             });
+
+
 
             const resData = await wallet.signAndExecuteTransactionBlock({
                 transactionBlock: tx
@@ -306,7 +310,7 @@ const useLegato = () => {
         const balance = await getSuiBalance(wallet.address)
 
         const tx = new TransactionBlock();
-        const [coin] = tx.splitCoins(tx.gas, [tx.pure((balance * 0.9)*1000000000)]);
+        const [coin] = tx.splitCoins(tx.gas, [tx.pure((balance * 0.9) * 1000000000)]);
 
         const packageObjectId = PACKAGE_ID
 
@@ -333,7 +337,7 @@ const useLegato = () => {
 
         const tx = new TransactionBlock();
         // const [coin] = tx.splitCoins(tx.gas, [tx.pure((balance * 0.9)*1000000000)]);
-        const [coin] = tx.splitCoins(tx.gas, [tx.pure((amount)*1000000000)]);
+        const [coin] = tx.splitCoins(tx.gas, [tx.pure((amount) * 1000000000)]);
 
         const packageObjectId = PACKAGE_ID
 
