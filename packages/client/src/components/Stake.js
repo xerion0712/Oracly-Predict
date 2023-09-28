@@ -7,6 +7,7 @@ import MintPT from '@/panels/MintPT'
 import { VAULT } from "../constants"
 import useLegato from "@/hooks/useLegato"
 import { useWallet } from "@suiet/wallet-kit"
+import Link from 'next/link'
 
 const vault = VAULT
 
@@ -16,57 +17,47 @@ function classNames(...classes) {
 
 const Stake = () => {
 
-    const { getAllCoins, getMockBalance, getApr, stake, getTotalSupply } = useLegato()
-
     const wallet = useWallet()
     const { account } = wallet
 
+    const { getApr, getStakedSui, getTotalSupply, stake } = useLegato()
     const [loading, setLoading] = useState(false)
-    const [mintPanelVisible, setMintPanelVisible] = useState(false)
     const [selected, setSelected] = useState(vault[0])
-    const [balance, setBalance] = useState("0")
-    const [apr, setApr] = useState(0)
-    const [totalSupply, setTotalSupply] = useState(0)
-    const [coins, setCoins] = useState([])
+    const [mintPanelVisible, setMintPanelVisible] = useState(false)
 
+    const [totalSupply, setTotalSupply] = useState(0)
+    const [apr, setApr] = useState(0)
     const [tick, setTick] = useState(0)
+    const [items, setItems] = useState([])
+
+    useEffect(() => {
+        getApr().then(setApr)
+    }, [])
 
     useEffect(() => {
         getTotalSupply().then(setTotalSupply)
-        account && account.address && getMockBalance(account.address).then(setBalance)
+        account && getStakedSui(account.address).then(setItems)
     }, [account, tick])
 
-    useEffect(() => {
-        getApr().then(setApr) 
-    },[])
+    let myBalance = items && items.length > 0 ? items.reduce((out, item) => {
+        return out + Number(item.data.content.fields.principal) / 1000000000
+    }, 0) : []
 
-    useEffect(() => {
-        account && account.address && getAllCoins(account.address).then(setCoins)
-        // account && account.address && getAllVaultTokens(account.address).then(
-        //     (items) => { 
-        //         setBalance(items.length)
-        //     }
-        // )
-    }, [account, tick])
-
-    const onStake = useCallback(async () => {
+    const onStake = useCallback(async (objectId) => {
         setLoading(true)
         try {
-            if (coins.length === 0) {
-                alert("No available coins!") 
-            } else {
-                await stake(coins[0])
-                setTick(tick + 1)
-                setMintPanelVisible(false)
-            }
+            await stake(objectId)
+            setTick(tick + 1)
+            setMintPanelVisible(false)
         } catch (e) {
             console.log(e)
         }
         setLoading(false)
-    }, [tick, stake, coins])
+    }, [tick, stake, items])
 
     return (
         <div>
+
             <MintPT
                 selected={selected}
                 visible={mintPanelVisible}
@@ -74,6 +65,7 @@ const Stake = () => {
                 apr={apr}
                 loading={loading}
                 onStake={onStake}
+                items={items}
             />
             <div className="max-w-xl ml-auto mr-auto">
                 <div class="wrapper pt-10">
@@ -141,7 +133,7 @@ const Stake = () => {
                                                                         </span>
                                                                         <img src={person.avatar} alt="" className="h-5 w-5 ml-auto flex-shrink-0 rounded-full" />
                                                                         <span className="ml-2 block text-white font-medium w-5 text-right">{totalSupply.toLocaleString()}</span>
-                                                                    </div> 
+                                                                    </div>
                                                                 </>
                                                             )}
                                                         </Listbox.Option>
@@ -160,7 +152,7 @@ const Stake = () => {
                                     </div>
                                     <div className='flex flex-row text-lg'>
                                         <img src={"./sui-sui-logo.svg"} alt="" className="h-5 w-5  mt-auto mb-auto  mr-2 flex-shrink-0 rounded-full" />
-                                        {balance}
+                                        {items.length} (~{myBalance.toLocaleString()} Sui)
                                     </div>
                                 </div>
                                 <div className='text-right'>
@@ -168,7 +160,7 @@ const Stake = () => {
                                         Total Staked
                                     </div>
                                     <div className="text-2xl">
-                                        ${(totalSupply*0.45).toLocaleString()}
+                                        ${(totalSupply * 0.45).toLocaleString()}
                                     </div>
                                 </div>
                             </div>
@@ -205,6 +197,11 @@ const Stake = () => {
             <div className="max-w-lg ml-auto mr-auto">
                 <p class="text-neutral-400 text-sm p-5 text-center">
                     {`You're using a preview version of Legato Finance. Please note that some functions may not work as intended during this phase.`}
+                </p>
+                <p class="text-neutral-400 underline text-sm p-5 pt-0 text-center">
+                    <Link href="/portfolio">
+                        Wrap your Testnet SUI to Staked SUI object{` >>`}
+                    </Link>
                 </p>
             </div>
         </div>

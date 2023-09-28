@@ -1,6 +1,7 @@
 import BasePanel from "./Base"
 import { useEffect, useState } from "react"
 import Spinner from "../components/Spinner"
+import { shortAddress } from "@/helpers"
 
 const InfoRow = ({ name, value }) => {
     return (
@@ -15,22 +16,36 @@ const InfoRow = ({ name, value }) => {
     )
 }
 
-const MintPT = ({ visible, close, selected, apr, loading, onStake }) => {
+const MintPT = ({ visible, close, selected, apr, loading, onStake, items }) => {
 
-    const [profit, setProfit] = useState(0)
+    const [profit, setProfit] = useState([0,0])
+    const [ss, setSS] = useState()
+    const [info, setInfo ] = useState()
 
     useEffect(() => {
-
-        if (apr > 0) {
-            const date1 = new Date('7/9/2024');
+        if (info && apr > 0) {
+            const date1 = new Date('9/23/2024');
             const date2 = new Date();
             const diffTime = Math.abs(date2 - date1);
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            const profit = (diffDays * (apr / 100)) / 365
-            setProfit(profit)
+            const profit = (diffDays * (apr / 100)) / 400 
+            setProfit([profit, profit * (info.fields['principal']/1000000000)])
         }
+    }, [apr, info])
 
-    }, [apr])
+    useEffect(() => {
+        items && items[0] && setSS(items[0].data.objectId)
+    }, [items])
+
+    useEffect(() => {
+        items.map(item => {
+            if (item.data.objectId === ss) {
+                setInfo(item.data.content)
+            }
+        })
+    },[items, ss])
+
+    let base_amount = info && info.fields ? (info.fields['principal']/1000000000) : 1
 
     return (
         <BasePanel
@@ -54,29 +69,27 @@ const MintPT = ({ visible, close, selected, apr, loading, onStake }) => {
                         {selected.name}
                     </div>
                 </div>
-            </div>
+            </div> 
             <div className="border rounded-lg mt-4 p-4 border-gray-400">
-                <div className="block leading-6 mb-2 text-gray-300">Amount to convert into PTs</div>
+                <div className="block leading-6 mb-2 text-gray-300">Object to convert into PTs</div>
                 <div class="flex mb-2">
-                    <div class="relative w-full">
-                        <input type="number" value={1} id="large-input" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none block w-full p-4 border rounded-l-lg sm:text-md  bg-gray-700 border-gray-600 placeholder-gray-400 text-white focus:outline-none focus:border-blue-500" />
-                    </div>
-                    <div class="flex-shrink-0 cursor-default z-10 inline-flex items-center py-2.5 px-4 text-sm font-medium text-center border rounded-r-lg border-gray-700 text-white  focus:ring-4 focus:outline-none   bg-gray-600   focus:ring-gray-800" type="button">
-                        <div className='flex flex-row'>
-                            <img src={"./sui-sui-logo.svg"} alt="" className="h-5 w-5  mt-auto mb-auto  mr-2 flex-shrink-0 rounded-full" />
-                            Staked SUI
-                        </div>
-                        <svg class="w-2.5 h-2.5 ml-2.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
-                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 4 4 4-4" />
-                        </svg>
-                    </div>
+                    <select id="large" value={ss} onChange={(e) => setSS(e.target.value)} class="block w-full px-4 py-3 text-base text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                        {items.map((item, index) => {
+                            return (
+                                <option key={index} value={item.data.objectId}>
+                                    [{shortAddress(item.data.objectId)}]{` `}{Number(item.data.content.fields.principal)/1000000000}{` `}Sui
+                                </option>
+                            )
+                        })
+                        }
+                    </select>
                 </div>
             </div>
             <div className="border rounded-lg mt-4 p-4 border-gray-400">
                 <div class="mt-2 flex flex-row">
                     <div class="text-gray-300 text-sm font-medium">You will receive at least</div>
                     <span class="ml-auto bg-blue-100 text-blue-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
-                        1 Staked SUI = {(1 + profit).toLocaleString()} PT
+                        1 Staked SUI = {(1 + profit[0]).toLocaleString()} PT
                     </span>
                 </div>
 
@@ -92,13 +105,13 @@ const MintPT = ({ visible, close, selected, apr, loading, onStake }) => {
                     </div>
                     <div className="flex">
                         <div className="text-3xl font-medium mx-auto mt-3 mb-auto mr-2">
-                            {(1 + profit).toLocaleString()}
+                            {(base_amount + profit[1]).toLocaleString()}
                         </div>
                     </div>
                 </div>
                 <InfoRow
                     name={"Est. Profit at Maturity"}
-                    value={profit.toLocaleString()}
+                    value={profit[1].toLocaleString()}
                 />
                 {/* <InfoRow
                     name={"Price impact"}
@@ -109,7 +122,7 @@ const MintPT = ({ visible, close, selected, apr, loading, onStake }) => {
                     value={`${apr}%`}
                 />
                 <hr class="h-px my-4 border-0 bg-gray-600" />
-                <button disabled={loading} onClick={onStake} className=" py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
+                <button disabled={loading} onClick={() => onStake(ss)} className=" py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
                     {loading && <Spinner />}
                     Mint
                 </button>

@@ -7,6 +7,7 @@ import { VAULT } from "../constants"
 import YT from "./YT"
 import useLegato from '@/hooks/useLegato'
 import Spinner from './Spinner'
+import CreateOrder from '@/panels/CreateOrder'
 
 import { shortAddress } from "@/helpers"
 
@@ -31,7 +32,7 @@ function classNames(...classes) {
 //     )
 // }
 
-const Sell = ({ tick, setTick }) => {
+export const Sell = ({ tick, setTick }) => {
 
     const [selected, setSelected] = useState(VAULT[0])
 
@@ -42,16 +43,11 @@ const Sell = ({ tick, setTick }) => {
 
     const [bal, setBal] = useState(0)
     const [coins, setCoins] = useState([])
-    const [price, setPrice] = useState(1)
-
+    const [price, setPrice] = useState(0.095)
 
     const [discount, setDiscount] = useState(0)
     const [loading, setLoading] = useState(false)
-
-
-    // const increaseTick = useCallback(() => {
-    //     setTick(tick+1)
-    // },[tick])
+    const [amount, setAmount] = useState(0.1)
 
     useEffect(() => {
         account && account.address && getPTBalance(account.address).then(
@@ -62,27 +58,20 @@ const Sell = ({ tick, setTick }) => {
         account && account.address && getAllVaultTokens(account.address).then(setCoins)
     }, [account, tick])
 
-
-
     useEffect(() => {
-        if (Number(price) > 0 && coins[0] && Number(coins[0].balance) > 0) {
-            const base = Number(price) * 100000000
-            const out = 100 - (base * 100) / Number(coins[0].balance)
+        if (Number(price) > 0 && amount > 0) {
+            const base = Number(price)
+            const out = 100 - (base * 100) / Number(amount)
             setDiscount(out)
         }
-    }, [price, coins])
+    }, [price, amount])
 
     const onCreateOrder = useCallback(async () => {
-
-        if (coins.length === 0) {
-            alert("No any vault token!")
-            return
-        }
 
         setLoading(true)
 
         try {
-            await createOrder(coins[0], Number(price * 1000000))
+            await createOrder(Number(amount), Number(price))
             setTick(tick + 1)
         } catch (e) {
             console.log(e)
@@ -90,9 +79,7 @@ const Sell = ({ tick, setTick }) => {
 
         setLoading(false)
 
-    }, [coins, price, createOrder, tick])
-
-
+    }, [amount, price, createOrder, tick])
 
     return (
         <div>
@@ -174,8 +161,8 @@ const Sell = ({ tick, setTick }) => {
                         {selected.symbol}
                     </span>
                 </div>
-                <input value={(coins[0] && Number(coins[0].balance) > 0) ? Number(coins[0].balance) / 100000000 : 0} type="number" id="amount" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none block w-full py-3  text-sm pl-[120px] border rounded-lg      bg-gray-700  border-gray-600  placeholder-gray-400  text-white  focus:ring-blue-500  focus:border-blue-500" />
-                <button class="text-white absolute right-1.5 bottom-1.5  font-medium rounded-lg text-sm px-4 py-2  bg-blue-600  hover:bg-blue-700  focus:ring-blue-800">Max</button>
+                <input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" id="amount" class="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none block w-full py-3  text-sm pl-[120px] border rounded-lg      bg-gray-700  border-gray-600  placeholder-gray-400  text-white  focus:ring-blue-500  focus:border-blue-500" />
+                <button onClick={() => setAmount(Number(bal))} class="text-white absolute right-1.5 bottom-1.5  font-medium rounded-lg text-sm px-4 py-2  bg-blue-600  hover:bg-blue-700  focus:ring-blue-800">Max</button>
             </div>
             <div class="grid grid-cols-2 gap-3 mt-1   ">
                 <div class="col-span-1 flex flex-col">
@@ -207,19 +194,6 @@ const Sell = ({ tick, setTick }) => {
                 </div>
             </div>
 
-            {/* <div className="block mt-4 text-sm font-medium leading-6 text-gray-300">
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="col-span-1 flex flex-row">
-                        APR
-                    </div>
-                    <div class="col-span-1 flex flex-row">
-                        <span class="ml-auto">
-                            4.35%
-                        </span>
-                    </div>
-                </div>
-            </div> */}
-
             <hr class="my-5 h-[1px] border-t-0 bg-neutral-100  opacity-50" />
             <button onClick={onCreateOrder} disabled={loading} className="  py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
                 {loading && <Spinner />}
@@ -231,7 +205,7 @@ const Sell = ({ tick, setTick }) => {
 }
 
 
-const Buy = () => {
+export const Buy = () => {
 
     const [selected, setSelected] = useState(VAULT[0])
 
@@ -349,13 +323,11 @@ const Buy = () => {
 
             <hr class="my-5 h-[1px] border-t-0 bg-neutral-100  opacity-50" />
             <button onClick={() => alert("Creating a buy order is not available")} className="  py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
-                Create Order
-                <PlusIcon className="h-5 w-5 ml-2" />
+                Add Now
             </button>
         </div>
     )
 }
-
 
 const Trade = () => {
 
@@ -419,9 +391,7 @@ const Trade = () => {
 
 
 const Order = ({
-    owner,
     item,
-    price,
     buy,
     increaseTick
 }) => {
@@ -432,9 +402,9 @@ const Order = ({
 
         setLoading(true)
 
-        try { 
-            const {item_id  } = item
-            await buy(item_id, price)
+        try {
+            const { order_id } = item
+            await buy(order_id)
             increaseTick()
 
         } catch (e) {
@@ -443,7 +413,7 @@ const Order = ({
 
         setLoading(false)
 
-    }, [item, buy, price])
+    }, [item])
 
 
     return (
@@ -451,7 +421,7 @@ const Order = ({
             <div class="grid grid-cols-10 gap-3 px-2   ">
                 <div class="col-span-4 flex flex-col text-md">
                     <div class="mt-auto mb-auto">
-                         N/A {VAULT[0].symbol}
+                        0.1 {VAULT[0].symbol}
                     </div>
                 </div>
                 {/* <div class="col-span-2 flex flex-col text-md">
@@ -461,7 +431,7 @@ const Order = ({
                 </div> */}
                 <div class="col-span-3 flex flex-col text-md">
                     <div class="mt-auto mb-auto">
-                        Price : {(Number(price) / 1000000).toLocaleString()} SUI
+                        Price : {(Number(item.price) / 1000000000).toLocaleString()} PT/SUI
                     </div>
                 </div>
                 <div class="col-span-3 flex flex-col text-xl font-bold">
@@ -475,24 +445,23 @@ const Order = ({
     )
 }
 
-const PT = () => {
+const PT_OLD = () => {
 
     const [tab, setTab] = useState(2)
 
-    const { getPTBalance, getAllVaultTokens, createOrder, buy , getAllOrders } = useLegato()
+    const { getPTBalance, getAllVaultTokens, createOrder, buy, getAllOrders } = useLegato()
 
     const [orders, setOrders] = useState([])
 
     const [tick, setTick] = useState(0)
 
     const increaseTick = useCallback(() => {
-        setTick(tick+1)
-    },[tick])
+        setTick(tick + 1)
+    }, [tick])
 
     useEffect(() => {
         getAllOrders().then(setOrders)
     }, [tick])
- 
 
     return (
         <div class="border p-5 m-1 bg-gray-900 border-gray-600">
@@ -516,17 +485,16 @@ const PT = () => {
                     {tab === 2 && <Sell tick={tick} setTick={setTick} />}
                 </div>
                 <div class="col-span-7 flex flex-col text-md">
-                <p class="text-gray-300 text-sm text-center mt-2 mb-2">
-                                   Orderbook 
-                                </p>
-                    {orders.map((item, index) => { 
+                    <p class="text-gray-300 text-sm text-center mt-2 mb-2">
+                        Orderbook
+                    </p>
+                    {orders.map((item, index) => {
                         return (
                             <div key={index}>
                                 <Order
                                     owner={item.owner}
                                     price={item.ask}
                                     item={item}
-                                    // objectId={item['object_id']}
                                     buy={buy}
                                     increaseTick={increaseTick}
                                 />
@@ -538,6 +506,60 @@ const PT = () => {
                 </div>
             </div>
         </div>
+    )
+}
+
+
+const PT = () => {
+
+    const { getAllOrders, buy } = useLegato()
+
+    const [orders, setOrders] = useState([])
+    const [tick, setTick] = useState(0)
+    const [createOrderPanel, setCreateOrderPanel] = useState(false)
+
+
+    const increaseTick = useCallback(() => {
+        setTick(tick + 1)
+    }, [tick])
+
+    useEffect(() => {
+        getAllOrders().then(setOrders)
+    }, [tick])
+
+    return (
+        <div>
+            <CreateOrder
+                visible={createOrderPanel}
+                close={() => setCreateOrderPanel(false)}
+                tick={tick}
+                setTick={setTick}
+            />
+            <div class="max-w-xl border p-5 m-1 bg-gray-900 border-gray-600">
+                <p class="text-gray-300  text-center mt-2 mb-2">
+                    Orderbook
+                </p>
+                {orders.map((item, index) => {
+                    return (
+                        <div key={index}>
+                            <Order
+                                item={item}
+                                buy={buy}
+                                increaseTick={increaseTick}
+                            />
+                        </div>
+                    )
+                })}
+                <div class="max-w-xl ml-auto mr-auto">
+                    <hr class="my-5 h-[1px] border-t-0 bg-neutral-100  opacity-50" />
+                    <button onClick={() => setCreateOrderPanel(true)} className="  py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700">
+                        Create Order
+                        <PlusIcon className="h-5 w-5 ml-2" />
+                    </button>
+                </div>
+            </div>
+        </div>
+
     )
 }
 

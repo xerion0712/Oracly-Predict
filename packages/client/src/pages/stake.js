@@ -7,6 +7,7 @@ const Stake = () => {
             <div class="w-full mx-auto max-w-screen-xl p-4">
                 <StakeComponent/>
             </div>
+            
         </MainLayout>
     )
 }

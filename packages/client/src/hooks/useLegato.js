@@ -20,54 +20,56 @@ const useLegato = () => {
 
     const correctedChain = wallet && wallet.connected && wallet.chain.id === "sui:testnet" ? true : false
 
-    const faucet = useCallback(async () => {
+    const faucet = useCallback(async (amount) => {
 
         if (!connected) {
             return
         }
 
-        // define a programmable transaction
         const tx = new TransactionBlock();
         const packageObjectId = PACKAGE_ID
+
+        const [coin] = tx.splitCoins(tx.gas, [tx.pure(Number(amount) * 1000000000)]);
         tx.moveCall({
-            target: `${packageObjectId}::staked_sui::mint`,
-            arguments: [tx.pure(TREASURY_CAP), tx.pure("100000000")],
+            target: `${packageObjectId}::staked_sui::wrap`,
+            arguments: [tx.pure(Number(amount) * 1000000000), coin],
         });
+        tx.transferObjects([coin], tx.pure(account.address));
 
         const resData = await wallet.signAndExecuteTransactionBlock({
             transactionBlock: tx
         });
 
-    }, [connected, wallet])
+    }, [connected, wallet, account, provider])
 
-    const getMockBalance = useCallback(async (address) => {
+    const getSuiBalance = useCallback(async (address) => {
 
-        console.log("get mock balance for :", address)
-
-        const packageObjectId = PACKAGE_ID
-
+        // const packageObjectId = PACKAGE_ID
         const coins = await provider.getBalance({
             owner: address,
-            coinType: `${packageObjectId}::staked_sui::STAKED_SUI`,
+            coinType: `0x2::sui::SUI`,
         });
 
         //FIXME : use bn
-        return `${(Number(coins.totalBalance) / 100000000).toFixed(2)}`
+        return `${(Number(coins.totalBalance) / 1000000000).toFixed(2)}`
 
     }, [])
 
-    const getAllCoins = useCallback(async (address) => {
+    const getStakedSui = useCallback(async (address) => {
 
-        console.log("get all coins for :", address)
+        console.log("get all staked SUI for :", address)
 
-        const packageObjectId = PACKAGE_ID
-
-        const coins = await provider.getCoins({
-            owner: address,
-            coinType: `${packageObjectId}::staked_sui::STAKED_SUI`
+        const coins = await provider.getOwnedObjects({
+            owner: address
         });
 
-        return coins.data.map(item => item.coinObjectId)
+        const objects = await provider.multiGetObjects({
+            ids: coins && coins.data ? coins.data.map(item => item.data.objectId) : [],
+            // only fetch the object type
+            options: { showType: true, showContent: true },
+        });
+
+        return objects.filter(item => item.data.type && item.data.type.includes("staked_sui::StakedSui"))
     }, [])
 
     const getAllVaultTokens = useCallback(async (address) => {
@@ -92,7 +94,7 @@ const useLegato = () => {
         const packageObjectId = PACKAGE_ID
 
         const events = await provider.queryEvents({
-            query: { MoveModule: { package: packageObjectId, module: 'marketplace' } }
+            query: { MoveModule: { package: packageObjectId, module: 'vault' } }
         });
 
         const listing = events.data.reduce((arr, item) => {
@@ -104,12 +106,12 @@ const useLegato = () => {
 
         const buying = events.data.reduce((arr, item) => {
             if (item.type.indexOf("BuyEvent") !== -1) {
-                arr.push(item.parsedJson['item_id'])
+                arr.push(item.parsedJson['order_id'])
             }
             return arr
         }, [])
 
-        return listing.filter(item => buying.indexOf(item['item_id']) === -1)
+        return listing.filter(item => buying.indexOf(item['order_id']) === -1)
     }, [])
 
     const getApr = useCallback(async () => {
@@ -145,12 +147,13 @@ const useLegato = () => {
         const result = events.data.reduce((r, item) => {
             if (item.type.indexOf("LockEvent") !== -1) {
                 console.log(item.parsedJson)
-                r += Number(item.parsedJson.collateral)
+                r += Number(item.parsedJson.deposit_amount)
             }
             return r
         }, 0)
-        return result/100000000
-    },[])
+
+        return result / 1000000000
+    }, [])
 
     const getPTBalance = useCallback(async (address) => {
 
@@ -158,36 +161,34 @@ const useLegato = () => {
 
         const packageObjectId = PACKAGE_ID
 
-        // coin::Coin<0x89b77424c9514f64537f83ae5e260286ee08f03bbc723cf1cc15c601cea9fb8d::vault::PT<0x89b77424c9514f64537f83ae5e260286ee08f03bbc723cf1cc15c601cea9fb8d::staked_sui::STAKED_SUI>>
-
         const coins = await provider.getCoins({
             owner: address,
-            coinType: `${packageObjectId}::vault::PT<0x89b77424c9514f64537f83ae5e260286ee08f03bbc723cf1cc15c601cea9fb8d::staked_sui::STAKED_SUI>`
+            coinType: `${packageObjectId}::vault::TOKEN<0x9c22e4ec6439f67b4bd1c84c9fe7154969e4c88fe1b414602c1a4d56a54209f6::vault::PT>`
         });
-        
+
         const result = coins.data.reduce((r, item) => {
             if (Number(item.balance) !== 0) {
                 r += Number(item.balance)
             }
             return r
         }, 0)
-        return result/100000000
+        return result / 1000000000
     }, [])
 
-    const stake = useCallback(async (coinId) => {
+    const stake = useCallback(async (objectId) => {
         if (!connected) {
             return
         }
 
-        console.log("coinId : ", coinId)
+        console.log("objectId : ", objectId)
 
         // define a programmable transaction
         const tx = new TransactionBlock();
         const packageObjectId = PACKAGE_ID
         tx.moveCall({
-            typeArguments: [TYPE],
+            // typeArguments: [TYPE],
             target: `${packageObjectId}::vault::lock`,
-            arguments: [tx.pure(RESERVE), tx.pure(`${coinId}`)],
+            arguments: [tx.pure(RESERVE), tx.pure(`${objectId}`)],
         });
 
         const resData = await wallet.signAndExecuteTransactionBlock({
@@ -196,46 +197,77 @@ const useLegato = () => {
 
     }, [connected, wallet])
 
-    const createOrder = useCallback(async (coin, price) => {
+    const createOrder = useCallback(async (amount, price) => {
 
         if (!connected) {
             return
         }
 
-        const { coinObjectId} = coin
-
-        const tx = new TransactionBlock();
-        // const [coin] = tx.splitCoins(tx.gas, [tx.pure(1000)]);
+        console.log("create order : ", amount, price)
 
         const packageObjectId = PACKAGE_ID
-        tx.moveCall({ 
-            target: `${packageObjectId}::marketplace::list`,
-            arguments: [tx.pure(MARKETPLACE), tx.pure(`${coinObjectId}`), tx.pure(`${price}`)],
+
+        const coins = await provider.getCoins({
+            owner: wallet.address,
+            coinType: `${packageObjectId}::vault::TOKEN<0x9c22e4ec6439f67b4bd1c84c9fe7154969e4c88fe1b414602c1a4d56a54209f6::vault::PT>`
         });
 
-        const resData = await wallet.signAndExecuteTransactionBlock({
-            transactionBlock: tx
-        });
+        const coinIds = coins.data.map(item => item.coinObjectId)
+
+        const tx = new TransactionBlock();
+
+        if (coinIds.length > 1) {
+
+            // FIXME: Merge coin
+
+            const pricePerUnit = Number(amount) / Number(price)
+
+            let bpricePerUnit = (pricePerUnit * 1000000000).toFixed(0)
+            let bamount = (amount * 1000000000).toFixed(0)
+
+            tx.moveCall({
+                target: `${packageObjectId}::vault::list`,
+                arguments: [tx.pure(RESERVE), tx.pure(`${coinIds[coinIds.length - 1]}`), tx.pure(bamount), tx.pure(bpricePerUnit)]
+            });
+
+            const resData = await wallet.signAndExecuteTransactionBlock({
+                transactionBlock: tx
+            });
+        } else if (coinIds.length === 1) {
+            const pricePerUnit = Number(amount) / Number(price)
+
+            let bpricePerUnit = (pricePerUnit * 1000000000).toFixed(0)
+            let bamount = (amount * 1000000000).toFixed(0)
+
+            tx.moveCall({
+                target: `${packageObjectId}::vault::list`,
+                arguments: [tx.pure(RESERVE), tx.pure(`${coinIds[0]}`), tx.pure(bamount), tx.pure(bpricePerUnit)]
+            });
+
+            const resData = await wallet.signAndExecuteTransactionBlock({
+                transactionBlock: tx
+            });
+        }
 
     }, [connected, wallet])
 
-    const buy = useCallback(async (objectId, price) => {
+    const buy = useCallback(async (orderId, price) => {
 
         if (!connected) {
             return
         }
 
-        console.log("buy", objectId, price)
-
         const tx = new TransactionBlock();
-        const [coin] = tx.splitCoins(tx.gas, [tx.pure(Number(price))]);
-
+        const [coin] = tx.splitCoins(tx.gas, [tx.pure(Number(10000000))]);
+0
         const packageObjectId = PACKAGE_ID
 
         tx.moveCall({
-            target: `${packageObjectId}::marketplace::buy_and_take`,
-            arguments: [tx.pure(MARKETPLACE), tx.pure(`${objectId}`), coin],
+            target: `${packageObjectId}::vault::buy`,
+            arguments: [tx.pure(RESERVE), tx.pure(`${orderId}`), tx.pure(Number(9000000)), coin],
         });
+
+        tx.transferObjects([coin], tx.pure(wallet.address));
 
         const resData = await wallet.signAndExecuteTransactionBlock({
             transactionBlock: tx
@@ -247,8 +279,8 @@ const useLegato = () => {
         faucet,
         correctedChain,
         createOrder,
-        getMockBalance,
-        getAllCoins,
+        getSuiBalance,
+        getStakedSui,
         getAllVaultTokens,
         getAllOrders,
         stake,
