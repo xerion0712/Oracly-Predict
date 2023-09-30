@@ -9,12 +9,20 @@ The system has two types of derivative tokens created by the timelock vault. The
 
 The second type is the yield token, which allows anyone to speculate on APR volatility. Holders of yield tokens will be able to claim yield from surplus collateral when the APR is on the rise.
 
-
-
-
-
 - [Live URL](https://app.legato.finance)
 - [YouTube](https://youtu.be/r-t098SBnFo)
+
+## Background
+
+The first version aims to support Staked SUI objects, a new asset class introduced after the SIP-6 updates. When stakers stake SUI tokens with a validator, they receive Staked SUI objects as receipts. These objects can be traded and transferred to someone else but with certain restrictions. Staked SUI objects are considered semi-NFT, which means an object obtained from Pool A cannot be merged with one from Pool B.
+
+![Untitled Diagram drawio (15)](https://github.com/pisuthd/legato-finance/assets/18402217/e5bbccb7-81ca-42ce-bd0a-726e2a5f9cbf)
+
+As staking rewards differ among different staking pools, we cannot directly convert Staked SUI objects into fungible tokens. Therefore, we require a solution that can effectively merge staking rewards across the pools into a pool's APR and must have the mechanism to ensure the APR is correct as time passes
+
+## Principal Token
+
+## Yield Token
 
 ## Repository structure
 
