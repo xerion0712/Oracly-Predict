@@ -22,7 +22,45 @@ As staking rewards differ among different staking pools, we cannot directly conv
 
 ## Principal Token
 
+The Principal Token is the primary token serving token holders who seek to lock up their APR at today's rates. For example, if you are holding a Staked SUI object with a 4% APR, you will need to wait 1 year to receive a profit of 4%. 
+
+Legato provides timelock vaults, each with a fixed maturity date. It can tokenize liquid staking assets along with future yield into fungible derivative tokens called PT that can be traded on any decentralized exchange and/or partially transferred to anyone.
+
+![Untitled Diagram-Page-2 drawio (2)](https://github.com/pisuthd/legato-finance/assets/18402217/354e35fd-c784-4901-bcd7-38cc5bbefb7c)
+
+Before the vault matures, it accumulates yield from the staking protocol or validator node to provide coverage for all distributed PT tokens. This ensures that when the vault matures, PT holders can redeem the locked assets back at a 1:1 ratio. 
+
+In the details of the timelock vault for Staked SUI objects, there will be a shared function that anyone can call. When this function is executed, the vault will unstake all locked Staked SUI objects for SUI tokens and rewards. The rewards will be added to the reward pool and the remaining Staked SUI objects will be restaked on the validator node.
+
+![Untitled Diagram-Page-3 drawio](https://github.com/pisuthd/legato-finance/assets/18402217/504e017b-8e00-415f-9824-a37ac4c71256)
+
+If the APR remains fixed until the vault matures, all SUI tokens in the reward pool will cover all the future yield that has been minted as PT earlier. However, this scenario is unlikely. To sustain the reward supply with dynamic yield, we'll depend on the yield token, which will be explained in the next section.
+
+### Marketplace
+
+PT is a fungible token that can be traded on any exchange, including Legato's marketplace, which we have prepared with an orderbook-based system for users. Since PT represents the future value of Staked SUI, sellers may have the option to set a discount to attract potential buyers and the AMM may not be suitable for this purpose.
+
+### Burning Process
+
+The burning of PT tokens can be broken down into two scenarios, before and after the vault matures.
+
+When the vault matures, PT token holders can redeem the original assets at a 1:1 ratio. However, if the vault has not matured, to exit the position, you must acquire YT tokens equivalent to the remaining future yield not yet acquired by the vault.
+
 ## Yield Token
+
+The yield token is a support token that helps stabilize the reward pool and ensures it has sufficient assets to return to the staker. Each vault has its own set of YT tokens, and the entire supply will be minted at the time of vault generation and instantly topping up the AMM's liquidity pool.
+
+![Untitled Diagram-Page-4 drawio](https://github.com/pisuthd/legato-finance/assets/18402217/eb71c8ec-85b2-4653-b3f6-73704d8daa5e)
+
+YT primarily targets individuals interested in speculating on APR. During an uptrend in APR, YT holders can claim excess yields at their convenience until the vault matures. During APR declines, LP tokens are converted into rewards to cover PT holder yields. In fact, liquidity providers profit during rising APR conditions but may face losses during downturns. 
+
+### Marketplace
+
+YT utilizes an AMM for instant trading of YT tokens without the need to wait for someone to create orders. The token price is determined by supply and demand.
+
+### Burning Process
+
+There is no burning process for YT.
 
 ## Repository structure
 
