@@ -55,17 +55,19 @@ npm run package:client
 
 Name | Address 
 --- | --- 
-Package | 0x89b77424c9514f64537f83ae5e260286ee08f03bbc723cf1cc15c601cea9fb8d
-Mock StakedSui | 0x8ae56684e4541aa5d920f3e08ceedb5927797818e420474e1b7a3b6ef28730a0
-Vault | 0xd39bf3fbf39249bb06e701099ae3647d9d17564de26f0a01c07b9b34559098fc
-Marketplace | 0x0e572306b58cfdc1d70a88aa9eeaa28559b43083d87d8813f06999a100ebe66e
+Package | 0x9c22e4ec6439f67b4bd1c84c9fe7154969e4c88fe1b414602c1a4d56a54209f6
+Vault | 0x50c6f8cf9745a96a7f066afa00633fc06b6f6c33ba7aba4c49de521f07eacf4c
 
 ## Roadmap
 
-- [x] One-way Deposit Timelock Vault
-- [x] Support for PT Trading
-- [x] Landing Page
+- [x] Stake Staked SUI object into Timelock Vault
+- [x] Unstake when Timelock Vault Matures with only PT
+- [x] Orderbook-based Marketplace for trading PT
+- [x] New Landing Page
 - [x] Oracle Contract
-- [ ] PT & YT Merging & Splitting
-- [ ] Deposit and Withdraw on Timelock Vault
-- [ ] AMM & Support for YT Trading
+- [x] Merging & Splitting Coin Objects
+- [x] AMM-based Marketplace for trading YT
+- [ ] Exit the position when the vault is not matures with PT and YT
+- [ ] Accuse yield of locked assets
+- [ ] Fair distribution of exceeded reward to YT holders
+- [ ] Use staking rates on-chain
