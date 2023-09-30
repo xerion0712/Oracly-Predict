@@ -26,10 +26,10 @@ The project using a monorepo structure consists of 2 packages using [Lerna](http
 ## Contract Overview
 
 - `staked_sui.move` - A mock Staked SUI object for testing on the Testnet system.
-- `vault.move` - The timelock vault, 1 mil. yield tokens will be minted and sent to the sender (and later to the AMM contract directly) for YT circulation at the time of generation. Principal tokens (PT) will be minted when a staker deposits the Staked SUI object into the vault plus additional PT estimated to be generated until the vault matures, as per the APR stated in the Oracle contract.
+- `vault.move` - The timelock vault, 1 mil. yield tokens (YT) will be minted and sent to the AMM object for YT circulation at the time of generation. Principal tokens (PT) will be minted when a staker deposits the Staked SUI object into the vault plus additional PT estimated to be generated until the vault matures, as per the APR stated in the Oracle contract.
 - `oracle.move` - The Oracle contract, only authorized wallets can update the APR value observed from an external source and update on every epoch.
 - `marketplace.move` - An Orderbook-based marketplace for trading PT.
-- `amm.move` (WIP) - An AMM-based marketplace for trading YT.
+- `amm.move` - An AMM-based marketplace for trading YT.
 
 ## Getting started
 
@@ -67,7 +67,8 @@ Vault | 0x50c6f8cf9745a96a7f066afa00633fc06b6f6c33ba7aba4c49de521f07eacf4c
 - [x] Oracle Contract
 - [x] Merging & Splitting Coin Objects
 - [x] AMM-based Marketplace for trading YT
-- [ ] Exit the position when the vault is not matures with PT and YT
+- [ ] Exit the position when the vault is not matures with PT,YT
 - [ ] Accuse yield of locked assets
 - [ ] Fair distribution of exceeded reward to YT holders
 - [ ] Use staking rates on-chain
+- [ ] PT,YT to use Coin Currency instead of Coin Balance
