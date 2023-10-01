@@ -1,13 +1,13 @@
 # Legato Finance
 
-Legato is a permissionless yield tokenization protocol for liquid staking assets on Sui blockchain that enables new strategies for staking and provides additional tools for users to capitalize on market volatility. Stakers can hedge their risk by selling their yield in advance and lock in today's APR rate. Non-stakers can perform arbitrage on the APYs by trading these future yield tokens through our exchange platform.
+Legato is a permissionless yield tokenization protocol for liquid staking assets on Sui blockchain that enables new strategies for staking and provides additional tools for users to capitalize on market volatility. Stakers can hedge their risk by lock in today's APR rate and selling their yield in advance. Non-stakers can perform arbitrage on the APYs by trading these future yield tokens through our exchange platform.
 
 ![legato-lsd-hacks drawio](https://github.com/pisuthd/legato-finance/assets/18402217/557e9f25-4494-4dd3-ba1f-f4b07a3124a6)
 
 
 The system has two types of derivative tokens created by the timelock vault. The first type is for stakers who want to lock in their yield. They must deposit liquid staking assets and will receive principal tokens, which include future yield. They can then either wait until the vault matures to redeem their deposit or sell it on the marketplace, possibly at a discount to attract other buyers.
 
-The second type is the yield token, which allows anyone to speculate on APR volatility. Holders of yield tokens will be able to claim yield from surplus collateral when the APR is on the rise.
+The second type is the yield token, which allows anyone to speculate on APR volatility. Holders of yield tokens will be able to claim yield from the surplus when the APR is on the rise.
 
 - [Live URL](https://app.legato.finance)
 - [YouTube](https://youtu.be/r-t098SBnFo)
@@ -18,7 +18,7 @@ The first version aims to support Staked SUI objects, a new asset class introduc
 
 ![Untitled Diagram drawio (15)](https://github.com/pisuthd/legato-finance/assets/18402217/e5bbccb7-81ca-42ce-bd0a-726e2a5f9cbf)
 
-As staking rewards differ among different staking pools, we cannot directly convert Staked SUI objects into fungible tokens. Therefore, we require a solution that can effectively merge staking rewards across the pools into a pool's APR and must have the mechanism to ensure the APR is correct as time passes
+As staking rewards differ among different staking pools, we cannot directly convert Staked SUI objects into fungible tokens. Therefore, we need a solution that can efficiently consolidate staking rewards from various pools into a reliable average APR across all staking pools and must have a mechanism to ensure the accuracy of APR over time.
 
 ## Principal Token
 
@@ -50,7 +50,7 @@ When the vault matures, PT token holders can redeem the original assets at a 1:1
 
 The yield token is a support token that helps stabilize the reward pool and ensures it has sufficient assets to return to the staker. Each vault has its own set of YT tokens, and the entire supply will be minted at the time of vault generation and instantly topping up the AMM's liquidity pool.
 
-![Untitled Diagram-Page-4 drawio](https://github.com/pisuthd/legato-finance/assets/18402217/eb71c8ec-85b2-4653-b3f6-73704d8daa5e)
+![Untitled Diagram-Page-4 drawio (1)](https://github.com/pisuthd/legato-finance/assets/18402217/cf83dbbc-8326-4d8e-9ba6-79153f244044)
 
 YT primarily targets individuals interested in speculating on APR. During an uptrend in APR, YT holders can claim excess yields at their convenience until the vault matures. During APR declines, LP tokens are converted into rewards to cover PT holder yields. In fact, liquidity providers profit during rising APR conditions but may face losses during downturns. 
 
