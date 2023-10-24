@@ -153,7 +153,7 @@ const useLegato = () => {
             return arr
         }, [])
 
-        return (Number(listing[listing.length - 1].value) / 1000)
+        return 3
     }, [])
 
 

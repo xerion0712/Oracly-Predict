@@ -8,6 +8,7 @@ import { VAULT } from "../constants"
 import useLegato from "@/hooks/useLegato"
 import { useWallet } from "@suiet/wallet-kit"
 import Link from 'next/link'
+import DisclaimerModal from '@/modals/Disclaimer'
 
 const vault = VAULT
 
@@ -19,6 +20,8 @@ const Stake = () => {
 
     const wallet = useWallet()
     const { account } = wallet
+
+    const [modal, setModal ] = useState(true)
 
     const { getApr, getStakedSui, getTotalSupply, stake } = useLegato()
     const [loading, setLoading] = useState(false)
@@ -57,7 +60,10 @@ const Stake = () => {
 
     return (
         <div>
-
+            <DisclaimerModal
+                visible={modal}
+                close={() => setModal(false)}
+            />
             <MintPT
                 selected={selected}
                 visible={mintPanelVisible}
@@ -196,7 +202,7 @@ const Stake = () => {
 
             <div className="max-w-lg ml-auto mr-auto">
                 <p class="text-neutral-400 text-sm p-5 text-center">
-                    {`You're using a preview version of Legato Finance. Please note that some functions may not work as intended during this phase.`}
+                    {`You're using a preview version of Legato. Please note that some functions may not work as intended during this phase.`}
                 </p>
                 <p class="text-neutral-400 underline text-sm p-5 pt-0 text-center">
                     <Link href="/portfolio">
