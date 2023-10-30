@@ -1,13 +1,13 @@
 # Legato
 
-Legato is a permissionless yield tokenization protocol for liquid staking assets on Sui blockchain that enables new strategies for staking and provides additional tools for users to capitalize on market volatility. Stakers can hedge their risk by lock in today's APR rate and selling their yield in advance. Non-stakers can perform arbitrage on the APYs by trading these future yield tokens through our exchange platform.
+Legato is a permissionless yield tokenization protocol for liquid staking assets on Sui blockchain that enables new strategies for staking and provides additional tools for users to capitalize on market volatility. Stakers can hedge their risk by lock in today's APY rate and selling their yield in advance. Non-stakers can perform arbitrage on the APYs by trading these future yield tokens through our exchange platform.
 
 ![legato-lsd-hacks drawio](https://github.com/pisuthd/legato-finance/assets/18402217/557e9f25-4494-4dd3-ba1f-f4b07a3124a6)
 
 
 The system has two types of derivative tokens created by the timelock vault. The first type is for stakers who want to lock in their yield. They must deposit liquid staking assets and will receive principal tokens, which include future yield. They can then either wait until the vault matures to redeem their deposit or sell it on the marketplace, possibly at a discount to attract other buyers.
 
-The second type is the yield token, which allows anyone to speculate on APR volatility. Holders of yield tokens will be able to claim yield from the surplus when the APR is on the rise.
+The second type is the yield token, which allows anyone to speculate on APY volatility. Holders of yield tokens will be able to claim yield from the surplus when the APY is on the rise.
 
 - [Live URL](https://app.legato.finance)
 - [YouTube](https://youtu.be/r-t098SBnFo)
@@ -18,11 +18,11 @@ The first version aims to support Staked SUI objects, a new asset class introduc
 
 ![Untitled Diagram drawio (15)](https://github.com/pisuthd/legato-finance/assets/18402217/e5bbccb7-81ca-42ce-bd0a-726e2a5f9cbf)
 
-As staking rewards differ among different staking pools, we cannot directly convert Staked SUI objects into fungible tokens. Therefore, we need a solution that can efficiently consolidate staking rewards from various pools into a reliable average APR across all staking pools and must have a mechanism to ensure the accuracy of APR over time.
+As staking rewards differ among different staking pools, we cannot directly convert Staked SUI objects into fungible tokens. Therefore, we need a solution that can efficiently consolidate staking rewards from various pools into a reliable average APY across all staking pools and must have a mechanism to ensure the accuracy of APY over time.
 
 ## Principal Token
 
-The Principal Token is the primary token serving token holders who seek to lock up their APR at today's rates. For example, if you are holding a Staked SUI object with a 4% APR, you will need to wait 1 year to receive a profit of 4%. 
+The Principal Token is the primary token serving token holders who seek to lock up their APY at today's rates. For example, if you are holding a Staked SUI object with a 4% APY, you will need to wait 1 year to receive a profit of 4%. 
 
 Legato provides timelock vaults, each with a fixed maturity date. It can tokenize liquid staking assets along with future yield into fungible derivative tokens called PT that can be traded on any decentralized exchange and/or partially transferred to anyone.
 
@@ -34,7 +34,7 @@ In the details of the timelock vault for Staked SUI objects, there will be a sha
 
 ![Untitled Diagram-Page-3 drawio](https://github.com/pisuthd/legato-finance/assets/18402217/504e017b-8e00-415f-9824-a37ac4c71256)
 
-If the APR remains fixed until the vault matures, all SUI tokens in the reward pool will cover all the future yield that has been minted as PT earlier. However, this scenario is unlikely. To sustain the reward supply with dynamic yield, we'll depend on the yield token, which will be explained in the next section.
+If the APY remains fixed until the vault matures, all SUI tokens in the reward pool will cover all the future yield that has been minted as PT earlier. However, this scenario is unlikely. To sustain the reward supply with dynamic yield, we'll depend on the yield token, which will be explained in the next section.
 
 ### Marketplace
 
@@ -52,7 +52,7 @@ The yield token is a support token that helps stabilize the reward pool and ensu
 
 ![Untitled Diagram-Page-4 drawio (1)](https://github.com/pisuthd/legato-finance/assets/18402217/cf83dbbc-8326-4d8e-9ba6-79153f244044)
 
-YT primarily targets individuals interested in speculating on APR. During an uptrend in APR, YT holders can claim excess yields at their convenience until the vault matures. During APR declines, LP tokens are converted into rewards to cover PT holder yields. In fact, liquidity providers profit during rising APR conditions but may face losses during downturns. 
+YT primarily targets individuals interested in speculating on APY. During an uptrend in APY, YT holders can claim excess yields at their convenience until the vault matures. During APY declines, LP tokens are converted into rewards to cover PT holder yields. In fact, liquidity providers profit during rising APY conditions but may face losses during downturns. 
 
 ### Marketplace
 
@@ -72,8 +72,8 @@ The project using a monorepo structure consists of 2 packages using [Lerna](http
 ## Contract Overview
 
 - `staked_sui.move` - A mock Staked SUI object for testing on the Testnet system.
-- `vault.move` - The timelock vault, 1 mil. yield tokens (YT) will be minted and sent to the AMM object for YT circulation at the time of generation. Principal tokens (PT) will be minted when a staker deposits the Staked SUI object into the vault plus additional PT estimated to be generated until the vault matures, as per the APR stated in the Oracle contract.
-- `oracle.move` - The Oracle contract, only authorized wallets can update the APR value observed from an external source and update on every epoch.
+- `vault.move` - The timelock vault, 1 mil. yield tokens (YT) will be minted and sent to the AMM object for YT circulation at the time of generation. Principal tokens (PT) will be minted when a staker deposits the Staked SUI object into the vault plus additional PT estimated to be generated until the vault matures, as per the APY stated in the Oracle contract.
+- `oracle.move` - The Oracle contract, only authorized wallets can update the APY value observed from an external source and update on every epoch.
 - `marketplace.move` - An Orderbook-based marketplace for trading PT.
 - `amm.move` - An AMM-based marketplace for trading YT.
 
