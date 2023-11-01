@@ -12,38 +12,33 @@ import {
     ErrorCode,
     formatSUI
 } from "@suiet/wallet-kit";
-import useLegato from '@/hooks/useLegato'
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/20/solid'
-
+import useLegato from '@/hooks/useLegato' 
 
 const Header = () => {
 
     const router = useRouter()
     const wallet = useWallet();
 
-    const { correctedChain } = useLegato()
-
     const { pathname } = router
 
     return (
         <>
             <nav
-                class="flex items-center justify-between flex-wrap  shadow">
-                <div class="flex justify-between lg:w-auto w-full lg:border-b-0 pl-6 pr-2 border-solid border-b-2 border-gray-300 pb-5 lg:pb-0">
-                    <div class="flex items-center flex-shrink-0 text-gray-800 mr-16">
-                        <Link href="https://legato.finance">
-                            <Image
-                                src="/legato-logo.png"
-                                width={150}
-                                height={36}
-                                alt="Logo"
-                            />
-                        </Link>
-                    </div>
+                class="grid grid-cols-5 gap-2 ">
+                <div className='col-span-2 md:col-span-1 pt-2 pl-2 md:pl-6 md:pt-5'>
+                    <Link href="https://legato.finance">
+                        <Image
+                            src="/legato-logo.png"
+                            width={150}
+                            height={36}
+                            alt="Logo"
+                        />
+                    </Link>
+
                 </div>
-                <div class="menu w-full  flex-grow lg:flex lg:items-center lg:w-auto lg:px-3 px-8">
-                    <div class="text-md font-bold text-blue-700 lg:flex-grow">
-                        <div class="container flex items-center justify-center p-6 mx-auto  capitalize  text-gray-300">
+                <div className='col-span-3'>
+                    <div class="text-sm md:text-base font-bold text-blue-700 lg:flex-grow">
+                        <div class="container flex items-center justify-end md:justify-center p-4 pr-2 md:p-6 mx-auto  capitalize  text-gray-300">
                             <Link className={`border-b-2 ${pathname === ("/") ? "text-gray-200 border-blue-700" : "border-transparent hover:text-gray-200 hover:border-blue-700"} mx-1.5 sm:mx-6`} href="/">
                                 Stake
                             </Link>
@@ -55,36 +50,17 @@ const Header = () => {
                             </Link>
                         </div>
                     </div>
-                    <div class="flex ">
+                </div>
+                <div className='col-span-5 md:col-span-1 flex'>
+                    <div className='ml-auto mr-auto pt-0 md:mr-0 md:pr-6 md:pt-3'>
                         <ConnectButton>
                             Connect Wallet
                         </ConnectButton>
-                        {/* {wallet && wallet.connected && (
-                            <div className="fixed top-[30px] right-[240px]">
-                                <div class="flex flex-row top-[10px]">
-                                    <ChevronLeftIcon onClick={() => onBack(wallet.address)} className="h-6 w-6 cursor-pointer text-gray-300" />
-                                    <ChevronRightIcon onClick={() => onNext(wallet.address)} className="h-6 w-6 cursor-pointer text-gray-300" />
-                                </div>
-                            </div>
-                        )} */}
                     </div>
                 </div>
             </nav>
-            {/* <div class="flex h-40 w-full flex-row items-center justify-center">
-  <button class="animate-border inline-block rounded-md bg-white bg-gradient-to-r from-red-500 via-purple-500 to-blue-500 bg-[length:400%_400%] p-1">
-    <span class="block rounded-md bg-slate-900 px-5 py-3 font-bold text-white"> algochurn.com </span>
-  </button>
-</div> */}
-            {wallet && wallet.connected && !correctedChain && (
-                <div class="container ml-auto mr-auto max-w-4xl p-4 mb-4 text-sm text-yellow-800 rounded-lg bg-yellow-50 dark:bg-gray-800 dark:text-yellow-300" role="alert">
-
-                    <strong class="font-bold">Incorrect chain!</strong>{` `}
-                    <span class="block sm:inline ml-1">Support Testnet only</span>
-                </div>
-            )}
         </>
     )
 }
-
 
 export default Header
