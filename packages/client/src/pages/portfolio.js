@@ -7,8 +7,8 @@ const Portfolio = () => {
 
     return (
         <MainLayout>
-            <PortfolioModule/>
-            <MockToken/>
+            {/* <PortfolioModule/>
+            <MockToken/> */}
         </MainLayout>
     )
 }

@@ -4,7 +4,7 @@ import TradePage from "@/components/Trade"
 const Trade = () => {
     return (
         <MainLayout>
-            <TradePage/>
+            {/* <TradePage/> */}
         </MainLayout>
     )
 }
