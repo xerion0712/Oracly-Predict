@@ -2,28 +2,67 @@
 
 import { LegatoContext } from "@/hooks/useLegato"
 import { ModalContext } from "@/hooks/useModal"
+import { useWallet } from '@suiet/wallet-kit'
 import Link from 'next/link'
 import { CheckIcon, ChevronUpDownIcon, ChevronDownIcon, ArrowRightIcon } from "@heroicons/react/20/solid"
-import { useContext } from "react"
+import { useCallback, useContext, useEffect, useState } from "react"
 import { MODAL } from "@/hooks/useModal"
 import SuiToStakedSui from "./SuiToStakedSui"
 import StakedSuiToPT from "./StakedSuiToPT"
+import useSui from "@/hooks/useSui"
 
-const Stake = ({
-    summary,
-    validators,
-    suiPrice,
-    avgApy
-}) => {
+const Stake = (props) => {
+
+    const { suiPrice } = props
+
+    const wallet = useWallet()
+    const { fetchSuiSystem } = useSui()
+
+    const { account, connected } = wallet
+
+    const [values, setValues] = useState({
+        validators: props.validators,
+        avgApy: props.avgApy,
+        isTestnet: false
+    })
+
+    const { validators, avgApy, isTestnet } = values
 
     const { openModal } = useContext(ModalContext)
     const { currentMarket, market } = useContext(LegatoContext)
 
-    const onMarketSelect = () => {
+    const onMarketSelect = useCallback(() => {
         openModal(MODAL.MARKET, {
             suiSystemApy: avgApy
         })
-    }
+    }, [avgApy])
+
+    useEffect(() => {
+        if (connected && account && account.chains) {
+
+            if (account.chains[0] === "sui:testnet") {
+
+                fetchSuiSystem("testnet").then(
+                    ({validators, avgApy }) => { 
+                        setValues({
+                            validators,
+                            avgApy,
+                            isTestnet: true
+                        })
+                    }
+                )
+
+
+            } else {
+                setValues({
+                    validators: props.validators,
+                    avgApy: props.avgApy,
+                    isTestnet: false
+                })
+            }
+
+        }
+    }, [connected, account])
 
     return (
         <div>
@@ -61,6 +100,7 @@ const Stake = ({
                                         validators={validators}
                                         avgApy={avgApy}
                                         suiPrice={suiPrice}
+                                        isTestnet={isTestnet}
                                     />
                                 )}
 
@@ -72,7 +112,6 @@ const Stake = ({
                     </div>
                 </div>
             </div>
-
 
             {/* DISCLAIMER */}
             <div className="max-w-lg ml-auto mr-auto">

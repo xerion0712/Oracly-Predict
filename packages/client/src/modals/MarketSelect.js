@@ -2,10 +2,11 @@ import BaseModal from "./Base"
 import MARKET from "../data/market.json"
 import { useContext } from "react"
 import { LegatoContext } from "@/hooks/useLegato"
+import { Badge, YellowBadge } from "@/components/Badge"
 
 
 const MarketSelectModal = ({ visible, close, currentMarket, info }) => {
-    
+
     const { updateMarket } = useContext(LegatoContext)
 
     let currentKey
@@ -82,6 +83,21 @@ const MarketSelectModal = ({ visible, close, currentMarket, info }) => {
                         <p className="text-sm mt-2 text-gray-400">
                             {currentMarket.description}
                         </p>
+
+                        <div className="mt-2">
+
+                            {currentMarket.networks.find(item => item === "mainnet") && (
+                                <Badge>
+                                    Mainnet
+                                </Badge>
+                            )}
+
+                            {currentMarket.networks.find(item => item === "testnet") && (
+                                <YellowBadge>
+                                    Testnet
+                                </YellowBadge>
+                            )}
+                        </div>
 
                     </div>
 

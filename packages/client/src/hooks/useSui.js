@@ -30,9 +30,9 @@ const useSui = () => {
         }
     }
 
-    const fetchSuiSystem = async () => {
+    const fetchSuiSystem = async (network = "mainnet") => {
 
-        const client = new SuiClient({ url: getFullnodeUrl("mainnet") })
+        const client = new SuiClient({ url: getFullnodeUrl(network) })
 
         let data = await client.getLatestSuiSystemState()
         let validators = data.activeValidators

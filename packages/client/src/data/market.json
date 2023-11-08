@@ -5,6 +5,10 @@
         "from": "SUI",
         "to": "Staked SUI",
         "disabled": false,
+        "networks": [
+            "mainnet",
+            "testnet"
+        ],
         "description": "If you don't have Staked SUI objects, we provide this non-custodian interface where you can stake SUI on a chosen validator to receive Staked SUI objects. These can later be staked for ptStaked SUI, representing the future value of SUI and its future yield."
     },
     "STAKED_SUI_TO_PT": {
@@ -13,6 +17,9 @@
         "from": "Staked SUI",
         "to": "ptStaked SUI",
         "disabled": false,
-        "description": "(Only invite users for now) Allows holders of non-fungible Staked SUI objects to lock in the APY at today's rates for fungible ptStaked SUI tokens that they can then sell for the future value and its yield on Legato's decentralized exchange."
+        "networks": [
+            "testnet"
+        ],
+        "description": "Allows holders of non-fungible Staked SUI objects to lock in the APY at today's rates for fungible ptStaked SUI tokens that they can then sell for the future value and its yield on Legato's decentralized exchange."
     }
 }
