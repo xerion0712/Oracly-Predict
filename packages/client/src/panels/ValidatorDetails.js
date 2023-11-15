@@ -1,7 +1,7 @@
 import BasePanel from "./Base"
 import { useEffect, useState } from "react"
 import { ArrowRightIcon, ArrowLeftIcon } from "@heroicons/react/20/solid"
-import BigNumber from "bignumber.js" 
+import BigNumber from "bignumber.js"
 
 const RowItem = ({
     name,
@@ -36,7 +36,7 @@ const RowItem = ({
     )
 }
 
-const ValidatorDetails = ({ visible, close, data, select, avgApy }) => {
+const ValidatorDetails = ({ visible, close, data, select, avgApy, isTestnet }) => {
 
     if (!data) {
         return
@@ -77,18 +77,23 @@ const ValidatorDetails = ({ visible, close, data, select, avgApy }) => {
                         value={data.projectUrl}
                         link={true}
                     />
-                    <RowItem
-                        name="Staking Volume (24h)"
-                        value={`$${(Number(data.vol) * data.suiPrice).toLocaleString()}`}
-                    />
+                    {!isTestnet && (
+                        <RowItem
+                            name="Staking Volume (24h)"
+                            value={`$${(Number(data.vol) * data.suiPrice).toLocaleString()}`}
+                        />
+                    ) }
+
                     <RowItem
                         name="Current Staked"
                         value={`${currentStaked}M SUI`}
                     />
-                    <RowItem
-                        name="Current Staked in USD"
-                        value={`$${currentStakedUs}M`}
-                    />
+                    {!isTestnet && (
+                        <RowItem
+                            name="Current Staked in USD"
+                            value={`$${currentStakedUs}M`}
+                        />
+                    )}
                     <RowItem
                         name="Next Epoch Stake"
                         value={`${(Number(`${(BigNumber(data.nextEpochStake).dividedBy(BigNumber(1000000000)).toFixed(0))}`)).toLocaleString()} SUI`}
@@ -124,7 +129,7 @@ const ValidatorDetails = ({ visible, close, data, select, avgApy }) => {
                             <ArrowRightIcon className="h-5 w-5 ml-1" />
                         </a>
                     </div>
-                </div> 
+                </div>
             </div>
         </BasePanel>
     )

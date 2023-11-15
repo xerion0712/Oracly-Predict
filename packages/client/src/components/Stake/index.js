@@ -13,7 +13,7 @@ import useSui from "@/hooks/useSui"
 
 const Stake = (props) => {
 
-    const { suiPrice } = props
+    const { suiPrice, summary } = props
 
     const wallet = useWallet()
     const { fetchSuiSystem } = useSui()
@@ -101,6 +101,7 @@ const Stake = (props) => {
                                         avgApy={avgApy}
                                         suiPrice={suiPrice}
                                         isTestnet={isTestnet}
+                                        summary={summary}
                                     />
                                 )}
 
@@ -116,7 +117,7 @@ const Stake = (props) => {
             {/* DISCLAIMER */}
             <div className="max-w-lg ml-auto mr-auto">
                 <p class="text-neutral-400 text-sm p-5 text-center">
-                    {`The Legato version you're using is in its early and unaudited stage. It's still in development and may have undiscovered issues.`}
+                    {`The Legato version you're using is in its early stage. It's still in development and may have undiscovered issues.`}
                 </p>
                 {/* <p class="text-neutral-400 underline text-sm p-5 pt-0 text-center">
                     <Link href="/portfolio">

@@ -34,7 +34,6 @@ const Header = () => {
                             alt="Logo"
                         />
                     </Link>
-
                 </div>
                 <div className='col-span-3'>
                     <div class="text-sm md:text-base font-bold text-blue-700 lg:flex-grow">

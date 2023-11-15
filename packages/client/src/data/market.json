@@ -20,6 +20,6 @@
         "networks": [
             "testnet"
         ],
-        "description": "Allows holders of non-fungible Staked SUI objects to lock in the APY at today's rates for fungible ptStaked SUI tokens that they can then sell for the future value and its yield on Legato's decentralized exchange."
+        "description": "Allows holders of non-fungible Staked SUI objects to lock in the APY at today's rates for fungible ptStaked SUI tokens that they can sell them on Legato's DEX without certain conditions, as non-fungible Staked SUI objects have."
     }
 }

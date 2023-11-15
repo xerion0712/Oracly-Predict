@@ -1,16 +1,13 @@
 import MainLayout from "@/layouts/mainLayout"
+import Portfolio from "@/components/Portfolio"
 
-import PortfolioModule from "@/components/Portfolio"
-import MockToken from "@/components/MockToken"
-
-const Portfolio = () => {
+const PortfolioPage = () => {
 
     return (
         <MainLayout>
-            {/* <PortfolioModule/>
-            <MockToken/> */}
+            <Portfolio/>
         </MainLayout>
     )
 }
 
-export default Portfolio
+export default PortfolioPage
