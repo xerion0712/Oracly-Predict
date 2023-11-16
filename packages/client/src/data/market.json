@@ -1,0 +1,25 @@
+{
+    "SUI_TO_STAKED_SUI": {
+        "img": "./sui-sui-logo.svg",
+        "isPT": false,
+        "from": "SUI",
+        "to": "Staked SUI",
+        "disabled": false,
+        "networks": [
+            "mainnet",
+            "testnet"
+        ],
+        "description": "If you don't have Staked SUI objects, we provide an interface where you can stake SUI on a chosen validator to receive Staked SUI objects. These can later be staked for ptStaked SUI, representing the future value of SUI and its future yield."
+    },
+    "STAKED_SUI_TO_PT": {
+        "img": "./sui-sui-logo.svg",
+        "isPT": true,
+        "from": "Staked SUI",
+        "to": "ptStaked SUI",
+        "disabled": false,
+        "networks": [
+            "testnet"
+        ],
+        "description": "Allows holders of non-fungible Staked SUI objects to lock in the APY at today's rates for fungible ptStaked SUI tokens that they can sell them on Legato's DEX without certain conditions, as non-fungible Staked SUI objects have."
+    }
+}

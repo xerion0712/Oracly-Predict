@@ -92,7 +92,6 @@ const MintPT = ({ visible, close, selected, apr, loading, onStake, items }) => {
                         1 Staked SUI = {(1 + profit[0]).toLocaleString()} PT
                     </span>
                 </div>
-
                 <hr class="h-px my-4 border-0  bg-gray-600" />
                 <div class="grid grid-cols-2 gap-2 mt-2 mb-2">
                     <div>
@@ -127,8 +126,6 @@ const MintPT = ({ visible, close, selected, apr, loading, onStake, items }) => {
                     Mint
                 </button>
             </div>
-
-
         </BasePanel>
     )
 }

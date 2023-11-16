@@ -1,12 +1,12 @@
 import MainLayout from "@/layouts/mainLayout"
-import TradePage from "@/components/Trade"
+import Trade from "@/components/Trade"
 
-const Trade = () => {
+const TradePage = () => {
     return (
         <MainLayout>
-            <TradePage/>
+            <Trade/>
         </MainLayout>
     )
 }
 
-export default Trade
+export default TradePage
