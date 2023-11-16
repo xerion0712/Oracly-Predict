@@ -106,15 +106,4 @@ Vault | 0x50c6f8cf9745a96a7f066afa00633fc06b6f6c33ba7aba4c49de521f07eacf4c
 
 ## Roadmap
 
-- [x] Stake Staked SUI object into Timelock Vault
-- [x] Unstake when Timelock Vault Matures with only PT
-- [x] Orderbook-based Marketplace for trading PT
-- [x] New Landing Page
-- [x] Oracle Contract
-- [x] Merging & Splitting Coin Objects
-- [x] AMM-based Marketplace for trading YT
-- [ ] Exit the position when the vault is not matures with PT,YT
-- [ ] Accuse yield of locked assets
-- [ ] Fair distribution of exceeded reward to YT holders
-- [ ] Use staking rates on-chain
-- [ ] PT,YT to use Coin Currency instead of Coin Balance
+TBD
