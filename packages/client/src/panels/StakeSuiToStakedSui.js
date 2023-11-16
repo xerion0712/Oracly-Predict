@@ -155,9 +155,6 @@ const StakeSuiToStakedSuiPanel = ({
             <div className="border rounded-lg mt-4 p-4 border-gray-400">
                 <div class="mt-2 flex flex-row">
                     <div class="text-gray-300 text-sm font-medium">You will receive</div>
-                    {/* <span class="ml-auto bg-blue-100 text-blue-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
-                        1 Staked SUI = {(1).toLocaleString()} PT
-                    </span> */}
                     <span class="ml-auto bg-blue-100 text-blue-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
                         Next epoch in {countdown}
                     </span>

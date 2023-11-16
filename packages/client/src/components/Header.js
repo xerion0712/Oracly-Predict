@@ -142,9 +142,5 @@ const Header = () => {
     )
 }
 
-function classNames(...classes) {
-    return classes.filter(Boolean).join(' ')
-}
-
 
 export default Header
