@@ -112,7 +112,7 @@ const Header = () => {
 
                                                             <Listbox.Option
                                                                 onClick={() => wallet.disconnect()}
-                                                                className="px-4 mt-1 cursor-pointer py-1 w-full font-medium overflow-auto"
+                                                                className="px-4 cursor-pointer py-1 w-full font-medium overflow-auto text-center"
                                                             >
                                                                 Disconnect
                                                             </Listbox.Option>

@@ -28,6 +28,7 @@ body {
     margin-top: 7px;
     background: #1d4ed8;
     margin-bottom: auto;
+    width: 150px;
   }
   .wkit-button:hover {
     background: #1d4ed8;
