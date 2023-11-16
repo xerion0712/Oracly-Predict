@@ -9,8 +9,6 @@ import { TransactionBlock } from '@mysten/sui.js/transactions';
 import { SUI_SYSTEM_STATE, SUI_SYSTEM } from '@/constants';
 import useSui from "./useSui";
 
-
-
 const useSuiStake = () => {
 
     const wallet = useWallet()
@@ -39,6 +37,51 @@ const useSuiStake = () => {
         const resData = await wallet.signAndExecuteTransactionBlock({
             transactionBlock: tx
         });
+
+    }, [connected])
+
+    const unstake = useCallback(async (objectId) => {
+
+        if (!connected) {
+            return
+        }
+
+        const tx = new TransactionBlock();
+        const packageObjectId = SUI_SYSTEM
+
+        tx.moveCall({
+            target: `${packageObjectId}::sui_system::request_withdraw_stake`,
+            arguments: [tx.pure(SUI_SYSTEM_STATE), tx.pure(objectId)],
+        });
+
+        await wallet.signAndExecuteTransactionBlock({
+            transactionBlock: tx
+        });
+
+    },[connected])
+
+    const transferObject = useCallback(async (objectId, toAddress) => {
+
+        if (!connected) {
+            return
+        }
+
+        if (!toAddress) {
+            throw new Error("Invalid address")
+        }
+
+        const tx = new TransactionBlock()
+
+        tx.transferObjects(
+            [
+                tx.object(objectId),
+            ],
+            tx.pure(toAddress)
+        )
+
+        await wallet.signAndExecuteTransactionBlock({
+            transactionBlock: tx
+        })
 
     }, [connected])
 
@@ -85,7 +128,9 @@ const useSuiStake = () => {
     return {
         stake,
         getStake,
-        getTotalStaked
+        getTotalStaked,
+        unstake,
+        transferObject
     }
 }
 

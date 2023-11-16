@@ -16,9 +16,17 @@ export const AmountInput = ({
                 <div className='flex flex-row mx-2'>
                     <img src={icon} alt="" className="h-5 w-5  mt-auto mb-auto  mr-2 flex-shrink-0 rounded-full" />
                     {tokenName}
-                </div> 
+                </div>
             </div>
         </div>
     )
 }
 
+export const TextInput = ({
+    value,
+    onChange,
+    placeholder
+}) => (
+    <input value={value} onChange={onChange} type="text" id="large-input" placeholder={placeholder} class="block  w-full px-2 py-2 border rounded-md text-sm  bg-gray-700 border-gray-600 placeholder-gray-400 text-white focus:outline-none focus:border-blue-500" />
+
+)

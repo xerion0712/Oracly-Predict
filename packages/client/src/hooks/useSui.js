@@ -1,7 +1,9 @@
 import { createContext, useCallback, useMemo, useEffect, useReducer } from 'react';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
 import BigNumber from "bignumber.js"
-import axios from 'axios';
+import axios from 'axios'; 
+
+import { TransactionBlock } from '@mysten/sui.js/transactions';
 
 const FALLBACK_SUI_PRICE = 0.5
 
@@ -55,6 +57,7 @@ const useSui = () => {
                 nextEpochStake: item.nextEpochStake,
                 stakingPoolActivationEpoch: item.stakingPoolActivationEpoch,
                 stakingPoolSuiBalance: item.stakingPoolSuiBalance,
+                suiAddress: item.suiAddress,
                 vol: `${vol}`,
                 apy: apyItem ? Number(apyItem.apy) * 100 : 0
             }

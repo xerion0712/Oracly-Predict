@@ -53,7 +53,7 @@ export const parseAmount = (input) => {
     else if (input >= 10) {
         input = `${input.toFixed(4)}`
     } else {
-        input = `${input.toFixed(6)}`
+        input = `${input.toFixed(4)}`
     }
 
     return input

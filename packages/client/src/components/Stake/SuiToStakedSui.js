@@ -31,6 +31,7 @@ const SuiToStakedSui = ({
 
     const { balance } = useAccountBalance()
 
+    const [tick, setTick] = useState(0)
     const [totalStaked, setTotalStaked] = useState({
         stakedAmount: 0,
         totalStaked: 0
@@ -84,7 +85,11 @@ const SuiToStakedSui = ({
                 })
             }
         )
-    }, [connected, account, isTestnet])
+    }, [connected, account, isTestnet, tick])
+
+    const increaseTick = useCallback(() => {
+        setTick(tick + 1)
+    }, [tick])
 
     const setDefaultItem = useCallback(() => {
         setSelected(parsedValidator[0])
@@ -108,6 +113,7 @@ const SuiToStakedSui = ({
                     balance={balanceStr}
                     openValidator={() => setPanel(PANEL.VALIDATOR)}
                     summary={summary}
+                    increaseTick={increaseTick}
                 />
             )}
             <Selector
@@ -145,7 +151,7 @@ const SuiToStakedSui = ({
                         Total Staked
                     </div>
                     <div className="text-2xl">
-                        ${ (totalStaked.totalStaked.toLocaleString())}
+                        ${(totalStaked.totalStaked.toLocaleString())}
                     </div>
                 </div>
             </div>
@@ -156,7 +162,7 @@ const SuiToStakedSui = ({
                     </div>
                     <div className='flex flex-row text-lg'>
                         <img src={"./sui-sui-logo.svg"} alt="" className="h-5 w-5  mr-2  mt-auto mb-auto flex-shrink-0 rounded-full" />
-                        ${ parseAmount(totalStaked.stakedAmount)}{` SUI`}
+                        {parseAmount(totalStaked.stakedAmount)}{` SUI`}
                     </div>
                 </div>
                 <div className='text-right'>

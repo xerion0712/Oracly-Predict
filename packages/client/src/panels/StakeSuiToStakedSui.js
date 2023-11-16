@@ -27,7 +27,8 @@ const StakeSuiToStakedSuiPanel = ({
     validator,
     balance,
     openValidator,
-    summary
+    summary,
+    increaseTick
 }) => {
 
     const { connected } = useWallet()
@@ -65,6 +66,7 @@ const StakeSuiToStakedSuiPanel = ({
             await stake(validator.suiAddress, amount)
 
             close()
+            increaseTick()
 
         } catch (e) {
             console.log(e)
@@ -73,7 +75,7 @@ const StakeSuiToStakedSuiPanel = ({
 
         setLoading(false)
 
-    }, [validator, amount])
+    }, [validator, amount, stake])
 
     useInterval(
         () => {

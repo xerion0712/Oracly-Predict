@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import MARKET from "../../data/market.json"
 import usePortfolio from "@/hooks/usePortfolio"
 import useSui from "@/hooks/useSui"
@@ -20,7 +20,8 @@ const RowContainer = ({ children }) => (
 const TabPanel = ({
     perValidator,
     validators,
-    isTestnet
+    isTestnet,
+    increaseTick
 }) => {
 
     const validatorInfo = validators.find(item => item.suiAddress.toLowerCase() === perValidator.validatorAddress.toLowerCase())
@@ -31,7 +32,12 @@ const TabPanel = ({
         <>
             <StakedSuiModal
                 visible={selected !== undefined}
-                close={() => setSelected(undefined)}
+                close={() => {
+                    setSelected(undefined)
+                    setTimeout(() => {
+                        increaseTick()
+                    }, 1000) 
+                }}
                 info={selected}
                 validatorInfo={validatorInfo}
                 isTestnet={isTestnet}
@@ -138,9 +144,11 @@ const StakedSuiTable = ({ assetKey, account, isTestnet }) => {
 
     const { fetchSuiSystem } = useSui()
 
+    const [tick, setTick] = useState(0)
+
     useEffect(() => {
         getAllObjectsByKey(assetKey, account.address, isTestnet).then(setPerValidators)
-    }, [account, isTestnet])
+    }, [account, isTestnet, tick])
 
     useEffect(() => {
         setTimeout(() => {
@@ -148,13 +156,13 @@ const StakedSuiTable = ({ assetKey, account, isTestnet }) => {
                 ({ suiPrice, totalStaked, totalPending }) => {
                     const totalStakedUsd = BigNumber(totalStaked).dividedBy(10 ** 9).multipliedBy(suiPrice)
                     setTotalStaked(Number(`${totalStakedUsd}`))
-                    
+
                     const totalPendingUsd = BigNumber(totalPending).dividedBy(10 ** 9).multipliedBy(suiPrice)
                     setTotalPending(Number(`${totalPendingUsd}`))
                 }
             )
         }, 1000)
-    }, [account, isTestnet])
+    }, [account, isTestnet, tick])
 
     useEffect(() => {
         fetchSuiSystem(isTestnet ? "testnet" : "mainnet").then(
@@ -164,6 +172,10 @@ const StakedSuiTable = ({ assetKey, account, isTestnet }) => {
             }
         )
     }, [isTestnet])
+
+    const increaseTick = useCallback(() => {
+        setTick(tick + 1)
+    }, [tick])
 
     return (
         <div className="w-full">
@@ -237,6 +249,7 @@ const StakedSuiTable = ({ assetKey, account, isTestnet }) => {
                         perValidator={perValidators[tab]}
                         validators={validators}
                         isTestnet={isTestnet}
+                        increaseTick={increaseTick}
                     />
                 )}
 
