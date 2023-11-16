@@ -145,7 +145,7 @@ const SuiToStakedSui = ({
                         Total Staked
                     </div>
                     <div className="text-2xl">
-                        ${ parseAmount(totalStaked.totalStaked)}
+                        ${ (totalStaked.totalStaked.toLocaleString())}
                     </div>
                 </div>
             </div>

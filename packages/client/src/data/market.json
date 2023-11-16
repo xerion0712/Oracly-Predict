@@ -9,7 +9,7 @@
             "mainnet",
             "testnet"
         ],
-        "description": "If you don't have Staked SUI objects, we provide this non-custodian interface where you can stake SUI on a chosen validator to receive Staked SUI objects. These can later be staked for ptStaked SUI, representing the future value of SUI and its future yield."
+        "description": "If you don't have Staked SUI objects, we provide an interface where you can stake SUI on a chosen validator to receive Staked SUI objects. These can later be staked for ptStaked SUI, representing the future value of SUI and its future yield."
     },
     "STAKED_SUI_TO_PT": {
         "img": "./sui-sui-logo.svg",

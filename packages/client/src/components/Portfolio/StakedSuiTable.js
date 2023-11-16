@@ -184,13 +184,13 @@ const StakedSuiTable = ({ assetKey, account, isTestnet }) => {
                         <div className="col-span-1 border-2  border-l-0 border-gray-700   px-8    p-2  ">
                             Total Staked
                             <h3 class={`text-lg font-medium text-white`}>
-                                ${parseAmount(totalStaked)}
+                                ${Number(totalStaked).toLocaleString()}
                             </h3>
                         </div>
                         <div className="col-span-1 border-2 border-gray-700   px-8 border-l-0 p-2 rounded-r-md">
                             Pending
                             <h3 class={`text-lg font-medium text-white`}>
-                                ${totalPending}
+                                ${Number(totalPending).toLocaleString()}
                             </h3>
                         </div>
                     </div>

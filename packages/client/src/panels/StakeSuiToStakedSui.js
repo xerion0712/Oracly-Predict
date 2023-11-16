@@ -108,7 +108,7 @@ const StakeSuiToStakedSuiPanel = ({
             </h2>
             <hr class="my-12 h-0.5 border-t-0 bg-neutral-100 mt-2 mb-2 opacity-50" />
             <p class="  text-sm text-gray-300  mt-2">
-                This is a non-custodial interface that allows you to stake SUI tokens for Staked SUI objects on the chosen validator. You can then convert them into fungible tokens by switching the market to Staked SUI-ptStaked SUI.
+            Legato provides an interface to stake on validators on the network to receive Stake SUI objects. We don't have any relationship with any validators and don't receive commissions from them.
             </p>
             <div className="border rounded-lg mt-4   p-4 border-gray-400">
                 <div className="flex items-center">
@@ -189,10 +189,10 @@ const StakeSuiToStakedSuiPanel = ({
                     value={`${validator.apy ? validator.apy.toFixed(2) : 0}%`}
                 />
 
-                <InfoRow
+                {/* <InfoRow
                     name={"Est. Profit after 1 year"}
                     value={`${profit < 1 ? profit.toFixed(6) : profit.toFixed(2)} SUI`}
-                />
+                /> */}
 
                 <hr class="h-px my-4 border-0 bg-gray-600" />
                 <button disabled={disabled} onClick={onStake} className={`py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700 ${disabled && "opacity-60"}`}>
