@@ -43,7 +43,7 @@ const ValidatorDetails = ({ visible, close, data, select, avgApy, isTestnet }) =
     }
 
     const currentStaked = (Number(`${(BigNumber(data.stakingPoolSuiBalance).dividedBy(BigNumber(1000000000)).toFixed(2))}`) / 1000000).toFixed(1)
-    const currentStakedUs = currentStaked * data.suiPrice
+    const currentStakedUs = Number(currentStaked * data.suiPrice).toLocaleString()
 
     return (
         <BasePanel
