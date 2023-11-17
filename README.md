@@ -106,4 +106,9 @@ Vault | 0x50c6f8cf9745a96a7f066afa00633fc06b6f6c33ba7aba4c49de521f07eacf4c
 
 ## Roadmap
 
-TBD
+- [x] Stake SUI to receive Staked SUI objects from validators
+- [x] Browse Staked SUI objects and unstake
+- [ ] On-chain staking APY fetcher
+- [ ] Basic Timelock Vault
+- [ ] Marketplace for trading PT, YT
+- [ ] Claim yield from the surplus
