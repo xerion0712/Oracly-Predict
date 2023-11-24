@@ -1,0 +1,37 @@
+{
+  "name": "scripts",
+  "version": "0.0.0",
+  "description": "> TODO: description",
+  "author": "pisuthd <pisuth.dae@gmail.com>",
+  "homepage": "https://github.com/pisuthd/legato-finance#readme",
+  "license": "MIT",
+  "main": "lib/index.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "files": [
+    "lib"
+  ],
+  "dependencies": {
+    "@mysten/bcs": "^0.8.1",
+    "@mysten/sui.js": "^0.47.0",
+    "bignumber.js": "^9.1.2",
+    "dotenv": "^16.0.3"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^8.0.1",
+    "chai": "^4.3.7",
+    "mocha": "^10.2.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pisuthd/legato-finance.git"
+  },
+  "scripts": {
+    "test": "mocha --timeout 120000 --reporter spec test/*.js"
+  },
+  "bugs": {
+    "url": "https://github.com/pisuthd/legato-finance/issues"
+  }
+}
