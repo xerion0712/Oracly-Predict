@@ -5,9 +5,7 @@ module legato::apy_reader_tests {
     use sui::coin;
     use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
     use sui_system::sui_system::{Self, SuiSystemState, validator_staking_pool_id};
-    use sui::tx_context::{Self};
-    // use sui_system::staking_pool::{ Self };
-    // use sui::table::{Self };
+    use sui::tx_context::{Self}; 
 
     use sui_system::governance_test_utils::{  
         Self,
