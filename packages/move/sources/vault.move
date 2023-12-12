@@ -7,6 +7,7 @@ module legato::vault {
     use sui::transfer; 
     use sui::table::{Self, Table};
     use std::vector;
+    use std::string::{ String};
 
     use sui_system::sui_system::{SuiSystemState };
     use sui_system::staking_pool::{Self, StakedSui};
@@ -16,6 +17,7 @@ module legato::vault {
     // ======== Constants ========
     const MIST_PER_SUI : u64 = 1_000_000_000;
     const EPOCH_OPTIONS : vector<u8> = vector[0,10,30];
+    const INIT_RAND_NONCE: u64 = 32012210897210;
 
     // ======== Errors ========
     const E_EMPTY_VECTOR: u64 = 1;
@@ -25,6 +27,7 @@ module legato::vault {
     const E_INSUFFICIENT_AMOUNT: u64 = 5;
     const E_RESERVE_PAUSED: u64 = 6;
     const E_UNAUTHOIZED: u64 = 7;
+    const E_EXCEED_LIMIT: u64 = 8;
 
     // ======== Structs =========
 
@@ -32,18 +35,16 @@ module legato::vault {
         id: UID
     }
 
-    struct DepositInfo has store {
-        
-    }
-
     struct Reserve has key {
         id: UID,
+        name: String,
+        symbol: String,
+        rand_nonce: u64,
         paused: bool,
-        start_epoch: u64,
+        created_epoch: u64,
         pools: vector<ID>, // supported staking pools
         whitelist: vector<address>, // whitelisting users (will be removed in the next version)
-        deposited: Table<u64, StakedSui>,
-        deposited_info: Table<u64, DepositInfo>,
+        holdings: Table<u64, StakedSui>,
         deposit_count: u64
     }
 
@@ -60,7 +61,7 @@ module legato::vault {
     }
 
     // convert Staked SUI to receive PT
-    public entry fun lock(
+    public entry fun mint(
         reserve: &mut Reserve,
         staked_sui: &mut StakedSui,
         amount: u64,
@@ -76,24 +77,17 @@ module legato::vault {
         let sender = tx_context::sender(ctx);
         assert!(vector::contains(&reserve.whitelist, &sender), E_UNAUTHOIZED);
 
-        let asset_locked = staking_pool::split(staked_sui, amount, ctx);
-
-        table::add(
-            &mut reserve.deposited,
-            reserve.deposit_count,
-            asset_locked
-        );
-
-        reserve.deposit_count = reserve.deposit_count + 1;
-
-        // send the caller YT tokens
+        // Take the Staked SUI
+        
 
     }
 
+    // get supported staking pools
     public entry fun staking_pools(reserve: &Reserve) : vector<ID> {
         reserve.pools
     }
 
+    // avr. apy across staking pools
     public entry fun vault_apy(wrapper: &mut SuiSystemState, reserve: &Reserve, epoch: u64): u64 {
         let count = vector::length(&reserve.pools);
         let i = 0;
@@ -108,6 +102,7 @@ module legato::vault {
         total_sum / i
     }
 
+    // check whether the given address is whitelisted
     public entry fun check_whitelist(reserve: &Reserve, account: address): bool {
         vector::contains(&reserve.whitelist, &account)
     }
@@ -125,22 +120,25 @@ module legato::vault {
     // create new vault
     public entry fun new_vault(
         _manager_cap: &mut ManagerCap,
+        name: String,
+        symbol: String,
         pools: vector<ID>,
         ctx: &mut TxContext
     ) {
         assert!(vector::length<ID>(&pools) > 0, E_EMPTY_VECTOR);
 
-        let deposited = table::new(ctx);
-        let deposited_info = table::new(ctx);
+        let holdings = table::new(ctx); 
 
         let reserve = Reserve {
             id: object::new(ctx),
+            name,
+            symbol,
+            rand_nonce: INIT_RAND_NONCE ,
             paused: false,
-            start_epoch: tx_context::epoch(ctx),
+            created_epoch: tx_context::epoch(ctx),
             pools,
             whitelist: vector::empty<address>(),
-            deposited,
-            deposited_info,
+            holdings,
             deposit_count: 0
         };
 
@@ -217,6 +215,21 @@ module legato::vault {
         _manager_cap: &ManagerCap
     ) {
         reserve.paused = false;
+    }
+
+    // update vault name 
+    public entry fun update_name(reserve: &mut Reserve, _manager_cap: &ManagerCap, name: String) {
+        reserve.name = name;
+    }
+
+    // update vault symbol 
+    public entry fun update_symbol(reserve: &mut Reserve, _manager_cap: &ManagerCap, symbol: String) {
+        reserve.symbol = symbol;
+    }
+
+    // update rand_nonce
+    public entry fun update_rand_nonce(reserve: &mut Reserve, _manager_cap: &ManagerCap, rand_nonce: u64) {
+        reserve.rand_nonce = rand_nonce;
     }
 
 }

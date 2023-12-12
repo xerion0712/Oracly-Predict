@@ -3,11 +3,13 @@ module legato::vault_tests {
 
     // use std::debug;
     use std::vector;
+    use std::string::{Self};
     use sui::test_scenario::{Self as test, Scenario, next_tx, ctx };
     use sui_system::sui_system::{ SuiSystemState, validator_staking_pool_id, epoch};
     // use sui::tx_context::{Self};
     use legato::vault::{Self, ManagerCap, Reserve };
-    use sui::object::{  ID};
+    use sui::object::{ID};
+   
 
     use sui_system::governance_test_utils::{  
         // Self,
@@ -70,7 +72,7 @@ module legato::vault_tests {
             vector::push_back<ID>(&mut pools, pool_id_3);
             vector::push_back<ID>(&mut pools, pool_id_4);
 
-            vault::new_vault(&mut managercap, pools , ctx(test));
+            vault::new_vault(&mut managercap, string::utf8(b"Test Vault"), string::utf8(b"TEST"), pools , ctx(test));
 
             test::return_to_sender(test, managercap);
             test::return_shared(system_state);
@@ -109,6 +111,9 @@ module legato::vault_tests {
             test::return_to_sender(test, managercap);
             test::return_shared(reserve);
         };
+
+        // mint PT
+        
         
     }
 
