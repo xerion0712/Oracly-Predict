@@ -11,7 +11,6 @@ module legato::apy_reader {
     use sui::object::{ID};
     use sui::table::{Self,  Table};
     
-    // const STAKE_SUBSIDY_START_EPOCH : u64 = 20;
     const EPOCH_TO_WEIGHT : u64 = 30;
     const MIST_PER_SUI: u64 = 1_000_000_000;
 
@@ -53,10 +52,10 @@ module legato::apy_reader {
         let current_rate = table::borrow(table_rates, epoch);
         let ref_rate = table::borrow(table_rates, ref_epoch);
 
-        let numerator = (staking_pool::sui_amount(current_rate) as u128) * (staking_pool::pool_token_amount(ref_rate) as u128) / (MIST_PER_SUI as u128);
-        let denominator = (staking_pool::sui_amount(ref_rate) as u128) * (staking_pool::pool_token_amount(current_rate) as u128) / (MIST_PER_SUI as u128);
+        let numerator = (staking_pool::sui_amount(current_rate) as u256) * (staking_pool::pool_token_amount(ref_rate) as u256) / (MIST_PER_SUI as u256);
+        let denominator = (staking_pool::sui_amount(ref_rate) as u256) * (staking_pool::pool_token_amount(current_rate) as u256) / (MIST_PER_SUI as u256);
 
-        (((numerator * (MIST_PER_SUI as u128)  / denominator) - (MIST_PER_SUI as u128)) as u64) * (365/(epoch-ref_epoch))
+        (((numerator * (MIST_PER_SUI as u256)  / denominator) - (MIST_PER_SUI as u256)) as u64) * (365/(epoch-ref_epoch))
     }
 
 }
