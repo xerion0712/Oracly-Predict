@@ -2,9 +2,11 @@
 module legato::apy_reader_tests {
 
     // use std::debug;
+    
     use sui::coin;
     use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
-    use sui_system::sui_system::{Self, SuiSystemState, validator_staking_pool_id};
+    use sui_system::sui_system::{Self, SuiSystemState, validator_staking_pool_id, epoch};
+    use sui_system::staking_pool::{ StakedSui};
     use sui::tx_context::{Self}; 
 
     use sui_system::governance_test_utils::{  
@@ -77,12 +79,25 @@ module legato::apy_reader_tests {
             let pool_id = validator_staking_pool_id(system_state_mut_ref, VALIDATOR_ADDR_1);
             let current_epoch = tx_context::epoch(ctx(test));
 
-            // debug::print(&apy_reader::pool_apy(system_state_mut_ref, &pool_id, current_epoch));
             assert!(apy_reader::pool_apy(system_state_mut_ref, &pool_id, current_epoch) > 10000000 , 1);
 
             test::return_shared(system_state);
         };
 
+        // calculate the rewards to be received
+        next_tx(test, STAKER_ADDR_2);
+        {
+            let system_state = test::take_shared<SuiSystemState>(test);
+            let staked_sui = test::take_from_sender<StakedSui>(test);
+
+            let current_epoch = epoch(&mut system_state);
+            let rewards = apy_reader::earnings_from_staked_sui(&mut system_state, &staked_sui, current_epoch);
+
+            assert!( rewards== 1249875012, 2);
+
+            test::return_to_sender(test, staked_sui);
+            test::return_shared(system_state);
+        };
 
     }
 

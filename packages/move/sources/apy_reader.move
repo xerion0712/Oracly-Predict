@@ -6,10 +6,11 @@ module legato::apy_reader {
     // use std::debug;
 
     use sui_system::sui_system::{SuiSystemState, pool_exchange_rates};
-    use sui_system::staking_pool::{ Self, PoolTokenExchangeRate};
+    use sui_system::staking_pool::{ Self, PoolTokenExchangeRate, StakedSui};
 
     use sui::object::{ID};
     use sui::table::{Self,  Table};
+    
     
     const EPOCH_TO_WEIGHT : u64 = 30;
     const MIST_PER_SUI: u64 = 1_000_000_000;
@@ -57,5 +58,77 @@ module legato::apy_reader {
 
         (((numerator * (MIST_PER_SUI as u256)  / denominator) - (MIST_PER_SUI as u256)) as u64) * (365/(epoch-ref_epoch))
     }
+ 
+    // re-implement from staking_pool module
+    public fun earnings_from_staked_sui(wrapper: &mut SuiSystemState, staked_sui: &StakedSui, to_epoch: u64): u64  {
+
+        let activation_epoch = staking_pool::stake_activation_epoch(staked_sui);
+        let principal_amount = staking_pool::staked_sui_amount(staked_sui);
+        let pool_id = staking_pool::pool_id(staked_sui);
+
+        assert!(to_epoch > activation_epoch, EInvalidEpoch);
+        
+        let table_rates = pool_exchange_rates(wrapper, &pool_id);
+
+        let at_staking_rate = table::borrow(table_rates, activation_epoch);        
+        let pool_token_withdraw_amount = get_token_amount(at_staking_rate, principal_amount);
+
+        let epoch = to_epoch;
+        let target_epoch = activation_epoch;
+
+        while(epoch >= activation_epoch) {
+            if (table::contains(table_rates, epoch)) {
+                target_epoch = epoch;
+                activation_epoch = epoch+1; // break loop
+            };
+            epoch = epoch - 1;
+        };
+
+        let current_rate = table::borrow(table_rates, target_epoch);
+        let total_sui_withdraw_amount = get_sui_amount(current_rate, pool_token_withdraw_amount);
+
+        let reward_withdraw_amount =
+            if (total_sui_withdraw_amount >= principal_amount)
+                total_sui_withdraw_amount - principal_amount
+            else 0;
+
+        reward_withdraw_amount
+    }
+
+    // ======== Helper Functions =========
+
+    fun get_token_amount(exchange_rate: &PoolTokenExchangeRate, sui_amount: u64): u64 {
+
+        let rate_sui_amount = staking_pool::sui_amount(exchange_rate);
+        let rate_pool_token_amount = staking_pool::pool_token_amount(exchange_rate);
+
+        // When either amount is 0, that means we have no stakes with this pool.
+        // The other amount might be non-zero when there's dust left in the pool.
+        if (rate_sui_amount == 0 || rate_pool_token_amount == 0) {
+            return sui_amount
+        };
+        let res = (rate_pool_token_amount as u128)
+                * (sui_amount as u128)
+                / (rate_sui_amount as u128);
+        (res as u64)
+    }
+
+    fun get_sui_amount(exchange_rate: &PoolTokenExchangeRate, token_amount: u64): u64 {
+
+        let rate_sui_amount = staking_pool::sui_amount(exchange_rate);
+        let rate_pool_token_amount = staking_pool::pool_token_amount(exchange_rate);
+
+        // When either amount is 0, that means we have no stakes with this pool.
+        // The other amount might be non-zero when there's dust left in the pool.
+        if (rate_sui_amount == 0 || rate_pool_token_amount == 0) {
+            return token_amount
+        };
+        let res = (rate_sui_amount as u128)
+                * (token_amount as u128)
+                / (rate_pool_token_amount as u128);
+        (res as u64)
+    }
+
+
 
 }
