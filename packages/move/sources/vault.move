@@ -27,6 +27,7 @@ module legato::vault {
     const MIN_PT_TO_REDEEM: u64 = 3_000_000_000; // 3 PT
     const MAX_EPOCH: u64 = 365;
     const COOLDOWN_EPOCH: u64 = 3;
+    const YT_TOTAL_SUPPLY: u64 = 10_000_000_000 * 1_000_000_000; // 10 Mil. 
 
     // ======== Errors ========
     const E_EMPTY_VECTOR: u64 = 1;
@@ -68,23 +69,31 @@ module legato::vault {
         debt_balance: u64
     }
 
-    // TODO: emit reward_balance
-
     struct MintEvent has copy, drop {
         vault_id: ID,
         pool_id: ID,
-        principal_amount: u64,
+        input_amount: u64,
         pt_issued: u64,
         deposit_id: u64,
         asset_object_id: ID,
-        sender: address
+        sender: address,
+        epoch: u64,
+        principal_balance: u64,
+        debt_balance: u64,
+        earning_balance: u64,
+        pending_balance: u64
     }
 
     struct RedeemEvent has copy, drop {
         vault_id: ID,
         pt_burned: u64,
         sui_amount: u64,
-        sender: address
+        sender: address,
+        epoch: u64,
+        principal_balance: u64,
+        debt_balance: u64,
+        earning_balance: u64,
+        pending_balance: u64
     }
 
     struct NewVaultEvent has copy, drop {
@@ -100,8 +109,11 @@ module legato::vault {
         vault_id: ID,
         symbol: String,
         vault_apy: u64,
+        epoch: u64,
         principal_balance: u64,
-        debt_balance: u64
+        debt_balance: u64,
+        earning_balance: u64,
+        pending_balance: u64
     }
 
     fun init(ctx: &mut TxContext) {
@@ -115,6 +127,7 @@ module legato::vault {
 
     // convert Staked SUI to PT
     public entry fun mint<P>(
+        wrapper: &mut SuiSystemState,
         vault: &mut Vault<P>,
         staked_sui: StakedSui,
         ctx: &mut TxContext
@@ -145,16 +158,23 @@ module legato::vault {
         // Mint to the user
         mint_pt(vault, pt_amount, ctx);
 
+        let earning_balance = vault_rewards(wrapper, vault, tx_context::epoch(ctx));
+
         event::emit(MintEvent {
             vault_id: object::id(vault),
             pool_id,
-            principal_amount,
+            input_amount: principal_amount,
             pt_issued : pt_amount,
             deposit_id,
             asset_object_id,
-            sender
+            sender,
+            epoch: tx_context::epoch(ctx),
+            principal_balance: vault.principal_balance,
+            debt_balance: vault.debt_balance,
+            earning_balance,
+            pending_balance: balance::value(&vault.pending_withdrawal)
         });
-    }
+    }   
 
     // redeem when the vault reaches its maturity date
     public entry fun redeem<P>(
@@ -186,11 +206,18 @@ module legato::vault {
         // burn PT tokens
         let burned_balance = balance::decrease_supply(&mut vault.pt_supply, coin::into_balance(pt));
 
+        let earning_balance = vault_rewards(wrapper, vault, tx_context::epoch(ctx));
+
         event::emit(RedeemEvent {
             vault_id: object::id(vault),
             pt_burned : burned_balance,
             sui_amount: paidout_amount,
-            sender : tx_context::sender(ctx)
+            sender : tx_context::sender(ctx),
+            epoch: tx_context::epoch(ctx),
+            principal_balance: vault.principal_balance,
+            debt_balance: vault.debt_balance,
+            earning_balance,
+            pending_balance: balance::value(&vault.pending_withdrawal)
         });
     }
 
@@ -203,7 +230,8 @@ module legato::vault {
         while (i < count) {
             if (table::contains(&vault.holdings, i)) {
                 let staked_sui = table::borrow(&vault.holdings, i);
-                total_sum = total_sum+apy_reader::earnings_from_staked_sui(wrapper, staked_sui, epoch);
+                let activation_epoch = staking_pool::stake_activation_epoch(staked_sui);
+                if (epoch > activation_epoch) total_sum = total_sum+apy_reader::earnings_from_staked_sui(wrapper, staked_sui, epoch);
             };
             i = i + 1;
         };
@@ -247,11 +275,10 @@ module legato::vault {
         // setup YT
         let yt_supply = balance::create_supply(TOKEN<P,YT> {});
 
-        // give 1 mil. of YT tokens to the AMM
-        // let minted_yt = balance::increase_supply(&mut yt,YT_TOTAL_SUPPLY);
-        // let amm_for_yt = amm::new_pool<TOKEN<YT>>(coin::from_balance(minted_yt, ctx), to_new_pool, ctx);
-
         // TODO: YT supposed to be global 
+        // TODO: Init AMM pool, gives all YT tokens to the AMM
+        let minted_yt = balance::increase_supply(&mut yt_supply, YT_TOTAL_SUPPLY);
+        transfer::public_transfer(coin::from_balance(minted_yt, ctx), tx_context::sender(ctx));
 
         let vault = Vault {
             id: object::new(ctx),
@@ -314,18 +341,25 @@ module legato::vault {
 
     // update vault APY
     public entry fun update_vault_apy<P>(
+        wrapper: &mut SuiSystemState,
         vault: &mut Vault<P>,
         _manager_cap: &ManagerCap,
-        value: u64
+        value: u64,
+        ctx: &mut TxContext
     ) {
         vault.vault_apy = value;
         
+        let earning = vault_rewards(wrapper, vault, tx_context::epoch(ctx));
+
         event::emit(UpdateVaultApy {
             vault_id: object::id(vault),
             symbol: vault.symbol,
             vault_apy: value,
+            epoch: tx_context::epoch(ctx),
             principal_balance: vault.principal_balance,
-            debt_balance: vault.debt_balance
+            debt_balance: vault.debt_balance,
+            pending_balance: balance::value(&vault.pending_withdrawal),
+            earning_balance: earning
         });
     }
 
@@ -452,6 +486,21 @@ module legato::vault {
         while (i < count) {
             let pool_id = vector::borrow(&vault.pools, i);
             output = math::max( output, apy_reader::pool_apy(wrapper, pool_id, epoch) );
+            i = i + 1;
+        };
+        output
+    }
+
+    #[test_only]
+    public fun floor_apy<P>(wrapper: &mut SuiSystemState, vault: &Vault<P>, epoch: u64): u64 {
+        let count = vector::length(&vault.pools);
+        let i = 0;
+        let output = 0;
+        while (i < count) {
+            let pool_id = vector::borrow(&vault.pools, i);
+            if (output == 0)
+                    output = apy_reader::pool_apy(wrapper, pool_id, epoch)
+                else output = math::min( output, apy_reader::pool_apy(wrapper, pool_id, epoch) );
             i = i + 1;
         };
         output

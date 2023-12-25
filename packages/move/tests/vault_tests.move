@@ -3,7 +3,7 @@
 #[test_only]
 module legato::vault_tests {
 
-    use std::debug;
+    // use std::debug;
 
     use std::vector;
     use std::string::{Self};
@@ -65,6 +65,13 @@ module legato::vault_tests {
         test::end(scenario);
     }
 
+    #[test]
+    public fun test_surplus_flow() {
+        let scenario = scenario();
+        test_surplus_flow_(&mut scenario);
+        test::end(scenario);
+    }
+
     // the balanced state, where the debts equal the accumulated rewards.
     fun test_balanced_flow_(test: &mut Scenario) {
         set_up_sui_system_state();
@@ -89,7 +96,7 @@ module legato::vault_tests {
             // debug::print(&median_apy);
 
             assert!(median_apy == 45485582, ASSERT_CHECK_APY);
-            vault::update_vault_apy( &mut vault ,&mut managercap, median_apy);
+            vault::update_vault_apy( &mut system_state, &mut vault ,&mut managercap, median_apy, ctx(test));
 
             test::return_shared(system_state);
             test::return_shared(vault);
@@ -160,7 +167,7 @@ module legato::vault_tests {
             let ceil_apy = vault::ceil_apy(&mut system_state, &vault, current_epoch);
        
             assert!(ceil_apy == 45485582, ASSERT_CHECK_APY);
-            vault::update_vault_apy( &mut vault, &mut managercap, ceil_apy);
+            vault::update_vault_apy( &mut system_state, &mut vault, &mut managercap, ceil_apy, ctx(test));
 
             test::return_shared(system_state);
             test::return_shared(vault);
@@ -196,6 +203,38 @@ module legato::vault_tests {
 
             test::return_shared(vault);
             test::return_shared(system_state);
+        };
+
+    }
+
+    // the surplus state, where the accumulated rewards exceed the outstanding debt
+    // additionally, YT holders are able to claim rewards from the surplus
+    fun test_surplus_flow_(test: &mut Scenario) {
+        set_up_sui_system_state_imbalance();
+        advance_epoch(test, 40);
+
+        // setup a vault
+        setup_vault(test, ADMIN_ADDR);
+
+        // whitelisting users
+        whitelist_users(test, ADMIN_ADDR);
+
+        // Using ceil APY
+        next_tx(test, ADMIN_ADDR);
+        {
+            let managercap = test::take_from_sender<ManagerCap>(test);
+            let system_state = test::take_shared<SuiSystemState>(test);
+            let vault = test::take_shared<Vault<JAN_2024>>(test);
+
+            let current_epoch = epoch(&mut system_state);
+            let floor_apy = vault::floor_apy(&mut system_state, &vault, current_epoch);
+       
+            assert!(floor_apy == 18227552, ASSERT_CHECK_APY);
+            vault::update_vault_apy( &mut system_state, &mut vault, &mut managercap, floor_apy, ctx(test));
+
+            test::return_shared(system_state);
+            test::return_shared(vault);
+            test::return_to_sender(test, managercap);
         };
 
     }
@@ -255,7 +294,7 @@ module legato::vault_tests {
             let vault = test::take_shared<Vault<JAN_2024>>(test);
             let staked_sui = test::take_from_sender<StakedSui>(test);
 
-            vault::mint<JAN_2024>(&mut vault, staked_sui, ctx(test));
+            vault::mint<JAN_2024>(&mut system_state, &mut vault, staked_sui, ctx(test));
 
             test::return_shared(system_state);
             test::return_shared(vault);
