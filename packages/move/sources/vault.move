@@ -20,14 +20,18 @@ module legato::vault {
     use sui_system::sui_system::{  Self, SuiSystemState };
 
     use legato::apy_reader::{Self};
+    use legato::amm::{Self, Global};
+    use legato::math::mul_div;
 
     // ======== Constants ========
     const MIST_PER_SUI : u64 = 1_000_000_000;
     const MIN_SUI_TO_STAKE : u64 = 10_000_000_000; // 10 Sui
+    const MIN_YT_TO_DEPOSIT: u64 = 1_000_000_000;
     const MIN_PT_TO_REDEEM: u64 = 3_000_000_000; // 3 PT
     const MAX_EPOCH: u64 = 365;
     const COOLDOWN_EPOCH: u64 = 3;
-    const YT_TOTAL_SUPPLY: u64 = 10_000_000_000 * 1_000_000_000; // 10 Mil. 
+    const CLAIM_EPOCH: u64 = 3; // able to claim at every 3 epoch
+    const YT_TOTAL_SUPPLY: u64 = 10_000_000 * 1_000_000_000; // 10 Mil. 
 
     // ======== Errors ========
     const E_EMPTY_VECTOR: u64 = 1;
@@ -40,6 +44,11 @@ module legato::vault {
     const E_UNAUTHORIZED_POOL: u64 = 8;
     const E_VAULT_NOT_MATURED: u64 = 9;
     const E_INVALID_AMOUNT: u64 = 10;
+    const E_INVALID_ADDRESS: u64 = 11;
+    const E_FIRST_CLAIM_EPOCH: u64 = 12;
+    const E_CLAIM_DISABLED: u64 = 13;
+    const E_ALREADY_CLAIM: u64 = 14;
+    const E_SURPLUS_ZERO: u64 = 15;
 
     // ======== Structs =========      
     struct ManagerCap has key {
@@ -66,7 +75,9 @@ module legato::vault {
         pt_supply: Supply<TOKEN<P, PT>>,
         yt_supply: Supply<TOKEN<P, YT>>,
         principal_balance: u64,
-        debt_balance: u64
+        debt_balance: u64,
+        claim_enabled: bool,
+        claim_table: Table<u64, vector<address>>
     }
 
     struct MintEvent has copy, drop {
@@ -110,6 +121,20 @@ module legato::vault {
         symbol: String,
         vault_apy: u64,
         epoch: u64,
+        principal_balance: u64,
+        debt_balance: u64,
+        earning_balance: u64,
+        pending_balance: u64
+    }
+
+    struct ClaimEvent has copy, drop {
+        vault_id: ID,
+        sender: address,
+        epoch: u64,
+        claim_epoch: u64,
+        input_amount: u64,
+        output_amount: u64,
+        is_pt: bool,
         principal_balance: u64,
         debt_balance: u64,
         earning_balance: u64,
@@ -188,20 +213,10 @@ module legato::vault {
 
         let paidout_amount = coin::value<TOKEN<P,PT>>(&pt);
 
-        if (paidout_amount > balance::value(&vault.pending_withdrawal)) {
-             // extract all asset IDs to be withdrawn
-            let asset_ids = locate_withdrawable_asset(wrapper, vault, paidout_amount, tx_context::epoch(ctx));
+        prepare_withdraw<P>(wrapper, vault, paidout_amount, ctx);
 
-            // unstake assets
-            let sui_balance = unstake_staked_sui(wrapper, vault, asset_ids, ctx);
-            balance::join<SUI>(&mut vault.pending_withdrawal, sui_balance);
-            
-            // withdraw 
-            withdraw_sui(vault, paidout_amount, tx_context::sender(ctx) , ctx );
-        } else {
-            // withdraw
-            withdraw_sui(vault, paidout_amount, tx_context::sender(ctx), ctx );
-        };
+        // withdraw 
+        withdraw_sui(vault, paidout_amount, tx_context::sender(ctx) , ctx );
 
         // burn PT tokens
         let burned_balance = balance::decrease_supply(&mut vault.pt_supply, coin::into_balance(pt));
@@ -221,7 +236,110 @@ module legato::vault {
         });
     }
 
+    // claim yield from the surplus
+    public entry fun claim<P>(
+        wrapper: &mut SuiSystemState,
+        vault: &mut Vault<P>,
+        global: &mut Global,
+        yt: &Coin<TOKEN<P,YT>>,
+        ctx: &mut TxContext
+    ) {
+        assert!( vault.claim_enabled == true , E_CLAIM_DISABLED);
 
+        let current_claim_epoch = find_claim_epoch( vault, tx_context::epoch(ctx) );
+        assert!( current_claim_epoch > 1 , E_FIRST_CLAIM_EPOCH);
+
+        let total_claim_epoch = total_claim_epoch(vault);
+        let epoch_to_considered = vault.created_epoch+((current_claim_epoch-1)*CLAIM_EPOCH);
+
+        let accumulated_rewards = vault_rewards(wrapper, vault, epoch_to_considered );
+        let outstanding_debts = vault.debt_balance;
+
+        let input_amount = coin::value<TOKEN<P,YT>>(yt);
+        let yt_circulation = yt_circulation<P>(vault, global);
+
+        let surplus = 
+            if (accumulated_rewards >= outstanding_debts)
+                accumulated_rewards - outstanding_debts
+            else 0;
+
+        assert!( surplus > 0 , E_SURPLUS_ZERO);
+
+        if (vault.maturity_epoch >= tx_context::epoch(ctx) ) {
+            // sending PT before matures
+            let remaining_claim_epoch = total_claim_epoch-current_claim_epoch;
+            let allocation = surplus/remaining_claim_epoch;
+            let output_amount = mul_div(allocation, input_amount, yt_circulation);
+
+            let claimer_list = 
+                if (table::contains( &vault.claim_table, current_claim_epoch ))
+                    table::remove(&mut vault.claim_table, current_claim_epoch)
+                else vector::empty<address>();
+
+            assert!( vector::contains(&claimer_list, &tx_context::sender(ctx) ) == false , E_ALREADY_CLAIM);
+
+            vector::push_back<address>(&mut claimer_list, tx_context::sender(ctx));
+            table::add(&mut vault.claim_table, current_claim_epoch, claimer_list);
+
+            mint_pt(vault, output_amount, ctx);
+
+            // emit event
+            let earning_balance = vault_rewards(wrapper, vault, tx_context::epoch(ctx));
+
+            event::emit(ClaimEvent {
+                vault_id: object::id(vault),
+                sender: tx_context::sender(ctx),
+                epoch: tx_context::epoch(ctx),
+                claim_epoch: current_claim_epoch,
+                input_amount,
+                output_amount,
+                is_pt: true,
+                principal_balance: vault.principal_balance,
+                debt_balance: vault.debt_balance,
+                earning_balance,
+                pending_balance: balance::value(&vault.pending_withdrawal)
+            });
+
+        } else {
+            // sending SUI after matures 
+            let allocation = surplus/COOLDOWN_EPOCH;
+            let output_amount = mul_div(allocation, input_amount, yt_circulation);
+
+            let claimer_list = 
+                if (table::contains( &vault.claim_table, current_claim_epoch ))
+                    table::remove(&mut vault.claim_table, current_claim_epoch)
+                else vector::empty<address>();
+
+            assert!( vector::contains(&claimer_list, &tx_context::sender(ctx) ) == false , E_ALREADY_CLAIM);
+
+            vector::push_back<address>(&mut claimer_list, tx_context::sender(ctx));
+            table::add(&mut vault.claim_table, current_claim_epoch, claimer_list);
+
+            prepare_withdraw<P>(wrapper, vault, surplus, ctx);
+
+            // withdraw
+            withdraw_sui(vault, output_amount, tx_context::sender(ctx) , ctx );
+
+            // emit event
+            let earning_balance = vault_rewards(wrapper, vault, tx_context::epoch(ctx));
+
+            event::emit(ClaimEvent {
+                vault_id: object::id(vault),
+                sender: tx_context::sender(ctx),
+                epoch: tx_context::epoch(ctx),
+                claim_epoch: current_claim_epoch,
+                input_amount,
+                output_amount,
+                is_pt: false,
+                principal_balance: vault.principal_balance,
+                debt_balance: vault.debt_balance,
+                earning_balance,
+                pending_balance: balance::value(&vault.pending_withdrawal)
+            });
+        };
+
+
+    }
 
     public fun vault_rewards<P>(wrapper: &mut SuiSystemState, vault: &Vault<P>, epoch: u64): u64 {
         let count = table::length(&vault.holdings);
@@ -265,6 +383,8 @@ module legato::vault {
         initial_apy: u64,
         pools: vector<ID>,
         maturity_epoch: u64,
+        global: &mut Global,
+        initial_liquidity: Coin<SUI>,
         ctx: &mut TxContext
     ) {
         assert!(vector::length<ID>(&pools) > 0, E_EMPTY_VECTOR);
@@ -276,9 +396,26 @@ module legato::vault {
         let yt_supply = balance::create_supply(TOKEN<P,YT> {});
 
         // TODO: YT supposed to be global 
-        // TODO: Init AMM pool, gives all YT tokens to the AMM
         let minted_yt = balance::increase_supply(&mut yt_supply, YT_TOTAL_SUPPLY);
-        transfer::public_transfer(coin::from_balance(minted_yt, ctx), tx_context::sender(ctx));
+  
+        // setup AMM pool
+        let is_order = amm::is_order<SUI, TOKEN<P,YT>>();
+        if (!amm::has_registered<SUI, TOKEN<P,YT>>(global)) {
+            amm::register_pool<SUI, TOKEN<P,YT>>(global, is_order)
+        };
+        let pool = amm::get_mut_pool<SUI, TOKEN<P,YT>>(global, is_order);
+
+        let (lp, _pool_id) = amm::add_liquidity<SUI, TOKEN<P,YT>>(
+            pool,
+            initial_liquidity,
+            1,
+            coin::from_balance(minted_yt, ctx),
+            1,
+            is_order,
+            ctx
+        );
+
+        transfer::public_transfer( lp , tx_context::sender(ctx));
 
         let vault = Vault {
             id: object::new(ctx),
@@ -295,7 +432,9 @@ module legato::vault {
             pt_supply,
             yt_supply,
             principal_balance: 0,
-            debt_balance: 0
+            debt_balance: 0,
+            claim_enabled: true,
+            claim_table: table::new(ctx)
         };
 
         transfer::share_object(vault);
@@ -371,6 +510,14 @@ module legato::vault {
     ) {
         let balance = coin::into_balance(sui);
         balance::join<SUI>(&mut vault.pending_withdrawal, balance);
+    }
+
+    public entry fun enable_claim<P>(vault: &mut Vault<P>, _manager_cap: &ManagerCap) {
+        vault.claim_enabled = true;
+    }
+
+    public entry fun disable_claim<P>(vault: &mut Vault<P>, _manager_cap: &ManagerCap) {
+        vault.claim_enabled = false;
     }
 
     // ======== Internal Functions =========
@@ -449,7 +596,10 @@ module legato::vault {
             balance::join<SUI>(&mut balance_sui, balance_each);
 
             vault.principal_balance = vault.principal_balance-principal_amount;
-            vault.debt_balance = vault.debt_balance-reward_amount;
+            vault.debt_balance = 
+                if (vault.debt_balance >= reward_amount)
+                    vault.debt_balance - reward_amount
+                else 0;
         };
 
         balance_sui
@@ -460,8 +610,52 @@ module legato::vault {
         
         let payout_balance = balance::split(&mut vault.pending_withdrawal, amount);
         transfer::public_transfer(coin::from_balance(payout_balance, ctx), recipient);
+    }
+
+    fun prepare_withdraw<P>(wrapper: &mut SuiSystemState, vault: &mut Vault<P>, paidout_amount: u64, ctx: &mut TxContext) {
+
+        if (paidout_amount > balance::value(&vault.pending_withdrawal)) {
+             // extract all asset IDs to be withdrawn
+            let asset_ids = locate_withdrawable_asset(wrapper, vault, paidout_amount, tx_context::epoch(ctx));
+
+            // unstake assets
+            let sui_balance = unstake_staked_sui(wrapper, vault, asset_ids, ctx);
+            balance::join<SUI>(&mut vault.pending_withdrawal, sui_balance);
+            
+        };
 
     }
+
+    fun find_claim_epoch<P>(vault: &Vault<P>, current_epoch: u64): u64 {
+        math::divide_and_round_up( current_epoch-vault.created_epoch , CLAIM_EPOCH)
+    }
+
+    fun total_claim_epoch<P>(vault: &Vault<P>): u64 {
+        math::divide_and_round_up( vault.maturity_epoch-vault.created_epoch, CLAIM_EPOCH)
+    }
+
+    fun yt_circulation<P>(vault: &mut Vault<P>, global: &mut Global): u64 {
+        let pool = amm::get_mut_pool<SUI, TOKEN<P,YT>>(global, amm::is_order<SUI, TOKEN<P, YT>>());
+        let yt_total_supply = balance::supply_value<TOKEN<P,YT>>(&vault.yt_supply);
+        let yt_amount_in_pool = amm::balance_y<SUI, TOKEN<P,YT>>(pool);
+        yt_total_supply-yt_amount_in_pool
+    }
+
+    // fun claim_amount<P>(wrapper: &mut SuiSystemState, vault: &Vault<P>, current_epoch: u64, holder: address): u64 {
+
+    //     let _deposit_amount = *table::borrow( &vault.claim_pool_table, holder);
+    //     let _total_amount = balance::value(&vault.claim_pool);
+
+    //     let accumulated_rewards = vault_rewards(wrapper, vault, current_epoch);
+    //     let outstanding_debts = vault.debt_balance;
+
+    //     let surplus =
+    //         if (accumulated_rewards >= outstanding_debts)
+    //             accumulated_rewards - outstanding_debts
+    //         else 0;
+
+    //     surplus
+    // }
 
     // ======== Test-related Functions =========
 
@@ -505,8 +699,6 @@ module legato::vault {
         };
         output
     }
-
-    // TODO: floor_apy
 
     #[test_only]
     public fun test_init(ctx: &mut TxContext) {

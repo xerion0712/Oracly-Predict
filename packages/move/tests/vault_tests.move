@@ -14,8 +14,8 @@ module legato::vault_tests {
     use sui_system::sui_system::{ Self, SuiSystemState, validator_staking_pool_id, epoch };
     use sui_system::staking_pool::{ StakedSui};
 
-    use legato::vault::{Self, ManagerCap, Vault, TOKEN, PT };
-    // use legato::apy_reader::{Self};
+    use legato::vault::{Self, ManagerCap, Vault, TOKEN, PT, YT };
+    use legato::amm::{Self, Global};
     
     use sui_system::governance_test_utils::{  
         // Self,
@@ -37,6 +37,7 @@ module legato::vault_tests {
     const STAKER_ADDR_2: address = @0x43;
 
     const MIST_PER_SUI: u64 = 1_000_000_000;
+    const INIT_LIQUIDITY: u64 = 10_000_000_000;
 
     // ======== Asserts ========
     const ASSERT_CHECK_APY: u64 = 1;
@@ -219,7 +220,7 @@ module legato::vault_tests {
         // whitelisting users
         whitelist_users(test, ADMIN_ADDR);
 
-        // Using ceil APY
+        // Using floor APY
         next_tx(test, ADMIN_ADDR);
         {
             let managercap = test::take_from_sender<ManagerCap>(test);
@@ -237,9 +238,67 @@ module legato::vault_tests {
             test::return_to_sender(test, managercap);
         };
 
+        stake_and_mint(test, STAKER_ADDR_1, 100 * MIST_PER_SUI, VALIDATOR_ADDR_1);
+
+        advance_epoch(test, 30);
+
+        // Buy YT from AMM
+        buy_yt( test, 1_000_000, STAKER_ADDR_1 );
+        buy_yt( test, 1_000_000, STAKER_ADDR_2 );
+
+        // Claim yield before matures
+        next_tx(test, STAKER_ADDR_1);
+        {
+            let system_state = test::take_shared<SuiSystemState>(test);
+            let vault = test::take_shared<Vault<JAN_2024>>(test);
+            let global = test::take_shared<Global>(test);
+            let yt_token = test::take_from_sender<Coin<TOKEN<JAN_2024,YT>>>(test);
+            let pt_token = test::take_from_sender<Coin<TOKEN<JAN_2024,PT>>>(test);
+
+            vault::claim<JAN_2024>(&mut system_state, &mut vault, &mut global, &yt_token, ctx(test));
+
+            test::return_shared(vault);
+            test::return_shared(system_state);
+            test::return_shared(global);
+            test::return_to_sender(test, yt_token);
+            test::return_to_sender(test, pt_token);
+        };
+
+        advance_epoch(test, 31);
+
+        // Claim yield after matures
+        next_tx(test, STAKER_ADDR_2);
+        {
+            let system_state = test::take_shared<SuiSystemState>(test);
+            let global = test::take_shared<Global>(test);
+            let vault = test::take_shared<Vault<JAN_2024>>(test);
+            let yt_token = test::take_from_sender<Coin<TOKEN<JAN_2024,YT>>>(test);
+            
+            vault::claim<JAN_2024>(&mut system_state, &mut vault, &mut global, &yt_token, ctx(test));
+            
+            test::return_shared(system_state);
+            test::return_shared(vault);
+            test::return_shared(global);
+            test::return_to_sender(test, yt_token);
+        };
+
+        // Redeem
+        next_tx(test, STAKER_ADDR_1);
+        {
+            
+            let system_state = test::take_shared<SuiSystemState>(test);
+            let vault = test::take_shared<Vault<JAN_2024>>(test);
+            let pt_token = test::take_from_sender<Coin<TOKEN<JAN_2024,PT>>>(test);
+
+            vault::redeem<JAN_2024>(&mut system_state, &mut vault, pt_token, ctx(test));
+
+            test::return_shared(vault);
+            test::return_shared(system_state);
+        };
+
     }
 
-    fun advance_epoch(test: &mut Scenario, value: u64) {
+    public(friend) fun advance_epoch(test: &mut Scenario, value: u64) {
         let i = 0;
         while (i < value) {
             advance_epoch_with_reward_amounts(0, 500, test);
@@ -263,7 +322,7 @@ module legato::vault_tests {
         test::end(scenario_val);
     }
 
-    fun set_up_sui_system_state_imbalance() {
+    public(friend) fun set_up_sui_system_state_imbalance() {
         let scenario_val = test::begin(@0x0);
         let scenario = &mut scenario_val;
         let ctx = test::ctx(scenario);
@@ -279,7 +338,7 @@ module legato::vault_tests {
         test::end(scenario_val);
     }
 
-    fun stake_and_mint(test: &mut Scenario, staker_address: address, amount : u64, validator_address: address) {
+    public(friend) fun stake_and_mint(test: &mut Scenario, staker_address: address, amount : u64, validator_address: address) {
 
         next_tx(test, staker_address);
         {
@@ -302,17 +361,23 @@ module legato::vault_tests {
 
     }
 
-    fun setup_vault(test: &mut Scenario, admin_address:address) {
+    public(friend) fun setup_vault(test: &mut Scenario, admin_address:address) {
 
         next_tx(test, admin_address);
         {
             vault::test_init(ctx(test));
         };
 
+        next_tx(test, admin_address);
+        {
+            amm::init_for_testing(ctx(test));
+        };
+
         // vault matures in 60 epochs
         next_tx(test, admin_address);
         {
             let system_state = test::take_shared<SuiSystemState>(test);
+            let global = test::take_shared<Global>(test);
             let managercap = test::take_from_sender<ManagerCap>(test);
             let pools = vector::empty<ID>();
 
@@ -330,15 +395,48 @@ module legato::vault_tests {
             let maturity_epoch = epoch(&mut system_state)+VAULT_MATURE_IN;
             let initial_apy = 30000000; // APY = 3%
 
-            vault::new_vault(&mut managercap, JAN_2024 {},  string::utf8(b"Test Vault"), string::utf8(b"TEST"), initial_apy, pools , maturity_epoch,  ctx(test));
+            vault::new_vault(
+                &mut managercap, 
+                JAN_2024 {},  
+                string::utf8(b"Test Vault"), 
+                string::utf8(b"TEST"), 
+                initial_apy, 
+                pools, 
+                maturity_epoch,  
+                &mut global,
+                coin::mint_for_testing<SUI>(INIT_LIQUIDITY, ctx(test)),
+                ctx(test)
+            );
 
             test::return_shared(system_state);
+            test::return_shared(global);
             test::return_to_sender(test, managercap);
         };
 
     }
 
-    fun whitelist_users(test: &mut Scenario, admin_address:address) {
+    fun buy_yt(test: &mut Scenario, amount: u64, recipient_address: address) {
+
+        next_tx(test, recipient_address);
+        {
+            let global = test::take_shared<Global>(test);
+            let sui_coin = coin::mint_for_testing<SUI>( amount, ctx(test));
+            
+            let returns = amm::swap_for_testing<SUI, TOKEN<JAN_2024, YT>>(
+                &mut global,
+                sui_coin,
+                1,
+                ctx(test)
+            );
+
+            assert!(vector::length(&returns) == 4, vector::length(&returns));
+
+            test::return_shared(global);
+        };
+
+    }
+
+    public(friend) fun whitelist_users(test: &mut Scenario, admin_address:address) {
         next_tx(test, admin_address);
         {
             let managercap = test::take_from_sender<ManagerCap>(test);
@@ -356,6 +454,6 @@ module legato::vault_tests {
         vector[VALIDATOR_ADDR_1, VALIDATOR_ADDR_2, VALIDATOR_ADDR_3, VALIDATOR_ADDR_4]
     }
 
-    fun scenario(): Scenario { test::begin(VALIDATOR_ADDR_1) }
+    public(friend) fun scenario(): Scenario { test::begin(VALIDATOR_ADDR_1) }
 
 }
