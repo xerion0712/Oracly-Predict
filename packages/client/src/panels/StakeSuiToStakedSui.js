@@ -110,7 +110,7 @@ const StakeSuiToStakedSuiPanel = ({
             </h2>
             <hr class="my-12 h-0.5 border-t-0 bg-neutral-100 mt-2 mb-2 opacity-50" />
             <p class="  text-sm text-gray-300  mt-2">
-            Legato provides an interface to stake on validators on the network to receive Stake SUI objects. We don't have any relationship with any validators and don't receive commissions from them.
+                Legato provides a non-custodial interface for staking SUI on validators and earning staking rewards over time. You can then convert the received Staked SUI objects into fungible tokens at your convenience.
             </p>
             <div className="border rounded-lg mt-4   p-4 border-gray-400">
                 <div className="flex items-center">

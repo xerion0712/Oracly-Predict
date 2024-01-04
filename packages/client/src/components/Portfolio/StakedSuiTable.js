@@ -107,7 +107,7 @@ const TabPanel = ({
                                 <div class="col-span-2 flex flex-row ">
                                     {item.status.toLowerCase() === "active" ? (
                                         <div className="ml-auto my-auto flex flex-row">
-                                            <Badge>{last} epo.</Badge>
+                                            <Badge>ready</Badge>
                                         </div>
                                     ) : <>
                                         <div className="ml-auto my-auto flex flex-row">

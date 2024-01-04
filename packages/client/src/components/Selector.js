@@ -75,4 +75,29 @@ const Selector = ({
     )
 }
 
+export const FixedSelector = ({ name, selected, select }) => {
+    return (
+        <>
+            <Listbox>
+                <Listbox.Label className="block mt-6 text-sm font-medium leading-6 text-gray-300">{name}</Listbox.Label>
+                <div className="relative mt-2">
+                    <Listbox.Button onClick={select} className="relative hover:cursor-pointer w-full cursor-default rounded-md  py-3 pl-3 pr-10 text-left  shadow-sm sm:text-sm sm:leading-6  bg-gray-700 placeholder-gray-400 text-white   ">
+                        <span className="flex items-center">
+                            <span className="mr-3 block truncate">{selected && selected.name}</span>
+                            <img src={selected && selected.image} alt="" className="h-5 w-5 ml-auto flex-shrink-0 rounded-full" />
+                            <span className="ml-2 block font-medium w-[32px] text-right">
+                                {selected && selected.value}
+                            </span>
+                        </span>
+                        <span className="pointer-events-none absolute inset-y-0 right-0 ml-3 flex items-center pr-2">
+                            <ChevronUpDownIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                        </span>
+                    </Listbox.Button>
+                </div>
+            </Listbox>
+
+        </>
+    )
+}
+
 export default Selector

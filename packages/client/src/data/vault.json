@@ -2,7 +2,21 @@
     {
         "id": 1,
         "name": "October 31, 2023",
-        "image": "./sui-sui-logo.svg",
-        "value": "0"
+        "image": "./clock.png",
+        "value": "0d",
+        "network": "mainnet",
+        "disabled": true
+    },
+    {
+        "id": 1,
+        "name": "January 10, 2024",
+        "image": "./clock.png",
+        "value": "0d",
+        "network": "testnet",
+        "disabled": false,
+        "packageId": "0xec23537e93ef41e7f82edd49d3490d1df240b4d2aa5686b044c241e0b4b6a29b",
+        "vaultType": "0xec23537e93ef41e7f82edd49d3490d1df240b4d2aa5686b044c241e0b4b6a29b::template::JAN_2024",
+        "vaultId": "0x24cab32c4244a1dbec5e327e4186fd4c98b15d38570f3ead6f656b03ad93a28d",
+        "suiSystemStateId": "0x0000000000000000000000000000000000000000000000000000000000000005"
     }
 ]

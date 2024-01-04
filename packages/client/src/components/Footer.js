@@ -4,7 +4,7 @@ const Footer = () => {
         <footer class="bg-transparent rounded-lg shadow mt-4 ">
             <div class="w-full p-2 sm:p-4 flex md:items-center md:justify-between">
                 <div class="text-xs mt-1 sm:text-sm mr-2 ">
-                    © 2023 Legato Finance
+                    © 2024 Legato
                 </div>
                 <ul class="flex flex-wrap items-center mt-1 text-xs sm:text-sm sm:mt-0">
                     <li>

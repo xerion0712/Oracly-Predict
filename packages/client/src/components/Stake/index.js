@@ -7,65 +7,69 @@ import Link from 'next/link'
 import { CheckIcon, ChevronUpDownIcon, ChevronDownIcon, ArrowRightIcon } from "@heroicons/react/20/solid"
 import { useCallback, useContext, useEffect, useState } from "react"
 import { MODAL } from "@/hooks/useModal"
+import useSui from "@/hooks/useSui"
+import BigNumber from "bignumber.js"
+
 import SuiToStakedSui from "./SuiToStakedSui"
 import StakedSuiToPT from "./StakedSuiToPT"
-import useSui from "@/hooks/useSui"
+
+import MARKET from "../../data/market.json"
 
 const Stake = (props) => {
 
     const { suiPrice, summary } = props
 
-    const wallet = useWallet()
-    const { fetchSuiSystem } = useSui()
-
-    const { account, connected } = wallet
-
-    const [values, setValues] = useState({
-        validators: props.validators,
-        avgApy: props.avgApy,
-        isTestnet: false
-    })
-
-    const { validators, avgApy, isTestnet } = values
-
+    const { account, connected } = useWallet()
+    const { fetchSuiSystem, fetchAllVault } = useSui()
     const { openModal } = useContext(ModalContext)
-    const { currentMarket, market } = useContext(LegatoContext)
+    const {
+        updateValues,
+        currentMarket,
+        market,
+        validators,
+        avgApy,
+        isTestnet,
+        vaults,
+        updateMarket
+    } = useContext(LegatoContext)
 
     const onMarketSelect = useCallback(() => {
+
+        const floorApy = vaults.filter(item => item.disabled === false).reduce((output, item) => {
+            return item.vault_apy
+        }, 0)
+
         openModal(MODAL.MARKET, {
-            suiSystemApy: avgApy
+            suiSystemApy: avgApy,
+            floorApy: Number(`${(BigNumber(floorApy).dividedBy(BigNumber(10000000)))}`).toFixed(2)
         })
-    }, [avgApy])
+    }, [avgApy, vaults])
 
     useEffect(() => {
-        if (connected && account && account.chains) {
 
-            if (account.chains[0] === "sui:testnet") {
-
-                fetchSuiSystem("testnet").then(
-                    ({validators, avgApy }) => { 
-                        setValues({
-                            validators,
-                            avgApy,
-                            isTestnet: true
-                        })
-                    }
-                )
-
-
-            } else {
-                setValues({
-                    validators: props.validators,
-                    avgApy: props.avgApy,
-                    isTestnet: false
-                })
-            }
-
+        if (connected && account && account.chains && account.chains[0] === "sui:testnet") {
+            fetchSuiSystem("testnet").then(({ summary, validators, avgApy }) => {
+                updateValues({ validators, avgApy, isTestnet: true, vaults: [] })
+                fetchAllVault("testnet", summary).then((vaults) => updateValues({ vaults }))
+            })
+        } else {
+            updateValues({ validators: props.validators, avgApy: props.avgApy, isTestnet: false, vaults: props.vaults })
         }
+
     }, [connected, account])
+
+    useEffect(() => {
+
+        if (localStorage.getItem("legatoDefaultMarket")) {
+            const defaultMarket = localStorage.getItem("legatoDefaultMarket")
+            MARKET[defaultMarket] ? updateMarket(defaultMarket) : localStorage.removeItem("legatoDefaultMarket")
+        }
+
+    },[])
 
     return (
         <div>
+
             <div className="max-w-xl ml-auto mr-auto">
                 <div class="wrapper pt-10">
                     <div class="rounded-3xl p-px bg-gradient-to-b  from-blue-800 to-purple-800 ">
@@ -106,7 +110,10 @@ const Stake = (props) => {
                                 )}
 
                                 {currentMarket === "STAKED_SUI_TO_PT" && (
-                                    <StakedSuiToPT />
+                                    <StakedSuiToPT
+                                        isTestnet={isTestnet}
+                                        suiPrice={suiPrice}
+                                    />
                                 )}
                             </div>
                         </div>
@@ -119,11 +126,6 @@ const Stake = (props) => {
                 <p class="text-neutral-400 text-sm p-5 text-center">
                     {`The Legato version you're using is in its early stage. It's still in development and may have undiscovered issues.`}
                 </p>
-                {/* <p class="text-neutral-400 underline text-sm p-5 pt-0 text-center">
-                    <Link href="/portfolio">
-                        Wrap your Testnet SUI to Staked SUI object{` >>`}
-                    </Link>
-                </p> */}
             </div>
         </div>
     )

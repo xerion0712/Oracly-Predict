@@ -21,7 +21,7 @@ const MarketSelectModal = ({ visible, close, currentMarket, info }) => {
             ...MARKET[key]
         }
     })
-
+ 
     return (
         <BaseModal
             title="Select Market"
@@ -35,7 +35,10 @@ const MarketSelectModal = ({ visible, close, currentMarket, info }) => {
 
                     {marketList.map((item, index) => {
                         return (
-                            <div key={index} onClick={() => updateMarket(item.key)} class={` ${item.active && "bg-gray-700"} flex gap-4 items-center border-2 border-gray-700  hover:border-blue-700 flex-1 p-2 mb-2 hover:cursor-pointer py-3 px-5  rounded-md`}>
+                            <div key={index} onClick={() => {
+                                localStorage.setItem( "legatoDefaultMarket", item.key  )
+                                updateMarket(item.key)
+                            }} class={` ${item.active && "bg-gray-700"} flex gap-4 items-center border-2 border-gray-700  hover:border-blue-700 flex-1 p-2 mb-2 hover:cursor-pointer py-3 px-5  rounded-md`}>
                                 <div class="relative">
                                     <img class="h-12 w-12 rounded-full" src={item.img} alt="" />
                                     {item.isPT && <img src="/pt-badge.png" class="bottom-0 right-7 absolute  w-7 h-4  " />}
@@ -55,7 +58,7 @@ const MarketSelectModal = ({ visible, close, currentMarket, info }) => {
                         <div class="grid grid-cols-7 gap-3  ">
                             <div className="col-span-2">
                                 <span className="font-bold">
-                                    Stake:
+                                    From:
                                 </span>
                                 <span className="ml-1  ">
                                     {currentMarket.from}
@@ -64,7 +67,7 @@ const MarketSelectModal = ({ visible, close, currentMarket, info }) => {
                             </div>
                             <div className="col-span-2">
                                 <span className="font-bold">
-                                    For:
+                                    To:
                                 </span>
                                 <span className="ml-1  ">
                                     {currentMarket.to}
@@ -76,6 +79,7 @@ const MarketSelectModal = ({ visible, close, currentMarket, info }) => {
                                 </span>
                                 <span className="ml-1  ">
                                     {currentKey === "SUI_TO_STAKED_SUI" && `${info && info.suiSystemApy && info.suiSystemApy.toFixed(2)}%`}
+                                    {currentKey === "STAKED_SUI_TO_PT" && `${info && info.floorApy && info.floorApy}%`}
                                 </span>
                             </div>
                         </div>
