@@ -1,9 +1,7 @@
 
 
 module legato::vault {
-
-    // use std::debug;
-
+    
     use sui::math;
     use sui::tx_context::{Self, TxContext};
     use sui::table::{ Self, Table};
@@ -14,7 +12,6 @@ module legato::vault {
     use sui::transfer;
     use std::vector;
     use sui::event;
-    use std::string::{ String};
     
     use sui_system::staking_pool::{ Self, StakedSui};
     use sui_system::sui_system::{  Self, SuiSystemState };
@@ -25,13 +22,14 @@ module legato::vault {
 
     // ======== Constants ========
     const MIST_PER_SUI : u64 = 1_000_000_000;
-    const MIN_SUI_TO_STAKE : u64 = 10_000_000_000; // 10 Sui
+    const MIN_SUI_TO_STAKE : u64 = 1_000_000_000; // 1 Sui
     const MIN_YT_TO_DEPOSIT: u64 = 1_000_000_000;
-    const MIN_PT_TO_REDEEM: u64 = 3_000_000_000; // 3 PT
+    const MIN_PT_TO_REDEEM: u64 = 1_000_000_000; // 1 PT
     const MAX_EPOCH: u64 = 365;
     const COOLDOWN_EPOCH: u64 = 3;
     const CLAIM_EPOCH: u64 = 3; // able to claim at every 3 epoch
-    const YT_TOTAL_SUPPLY: u64 = 10_000_000 * 1_000_000_000; // 10 Mil. 
+    const YT_TOTAL_SUPPLY: u64 = 100_000_000 * 1_000_000_000; // 100 Mil. 
+    
 
     // ======== Errors ========
     const E_EMPTY_VECTOR: u64 = 1;
@@ -51,6 +49,7 @@ module legato::vault {
     const E_SURPLUS_ZERO: u64 = 15;
 
     // ======== Structs =========      
+
     struct ManagerCap has key {
         id: UID
     }
@@ -62,8 +61,6 @@ module legato::vault {
 
     struct Vault<phantom P> has key {
         id: UID,
-        symbol: String,
-        name: String,
         created_epoch: u64,
         maturity_epoch: u64,
         vault_apy: u64,
@@ -108,17 +105,13 @@ module legato::vault {
     }
 
     struct NewVaultEvent has copy, drop {
-        name: String,
-        symbol: String,
         created_epoch: u64,
         maturity_epoch:u64,
-        initial_apy: u64,
-        pools: vector<ID>
+        initial_apy: u64
     }
 
     struct UpdateVaultApy has copy, drop {
         vault_id: ID,
-        symbol: String,
         vault_apy: u64,
         epoch: u64,
         principal_balance: u64,
@@ -147,8 +140,9 @@ module legato::vault {
             tx_context::sender(ctx)
         );
     }
-
+ 
     // ======== Public Functions =========
+
 
     // convert Staked SUI to PT
     public entry fun mint<P>(
@@ -375,19 +369,14 @@ module legato::vault {
     // ======== Only Governance =========
 
     // create new vault
-    public entry fun new_vault<P: drop>(
+    public entry fun new_vault<P>(
         _manager_cap: &mut ManagerCap,
-        _: P,
-        name: String,
-        symbol: String,
         initial_apy: u64,
-        pools: vector<ID>,
         maturity_epoch: u64,
         global: &mut Global,
         initial_liquidity: Coin<SUI>,
         ctx: &mut TxContext
     ) {
-        assert!(vector::length<ID>(&pools) > 0, E_EMPTY_VECTOR);
         assert!( maturity_epoch > tx_context::epoch(ctx) , E_INVALID_MATURITY);
 
         // setup PT
@@ -398,6 +387,8 @@ module legato::vault {
         // TODO: YT supposed to be global 
         let minted_yt = balance::increase_supply(&mut yt_supply, YT_TOTAL_SUPPLY);
   
+        // TODO: Add Coin Metadata
+
         // setup AMM pool
         let is_order = amm::is_order<SUI, TOKEN<P,YT>>();
         if (!amm::has_registered<SUI, TOKEN<P,YT>>(global)) {
@@ -419,12 +410,10 @@ module legato::vault {
 
         let vault = Vault {
             id: object::new(ctx),
-            name,
-            symbol,
             created_epoch: tx_context::epoch(ctx),
             maturity_epoch,
             vault_apy: initial_apy,
-            pools,
+            pools : vector::empty<ID>(),
             whitelist: vector::empty<address>(),
             holdings: table::new(ctx),
             deposit_count: 0,
@@ -441,11 +430,8 @@ module legato::vault {
 
         // emit event
         event::emit(NewVaultEvent {
-            name,
-            symbol,
             created_epoch: tx_context::epoch(ctx),
             maturity_epoch,
-            pools,
             initial_apy
         });
 
@@ -478,6 +464,33 @@ module legato::vault {
         vector::remove<address>(&mut vault.whitelist, index);
     }
 
+    // add pool
+    public entry fun add_pool<P>(
+        vault: &mut Vault<P>,
+        _manager_cap: &ManagerCap,
+        pool_id: ID
+    ) {
+        assert!(
+            !vector::contains(&vault.pools, &pool_id),
+            E_DUPLICATED_ENTRY
+        );
+        vector::push_back<ID>(&mut vault.pools, pool_id);
+    }
+
+    // remove pool
+    public entry fun remove_pool<P>(
+        vault: &mut Vault<P>,
+        _manager_cap: &ManagerCap,
+        pool_id: ID
+    ) {
+        let (contained, index) = vector::index_of<ID>(&vault.pools, &pool_id);
+        assert!(
+            contained,
+            E_NOT_FOUND
+        );
+        vector::remove<ID>(&mut vault.pools, index);
+    }
+
     // update vault APY
     public entry fun update_vault_apy<P>(
         wrapper: &mut SuiSystemState,
@@ -492,7 +505,6 @@ module legato::vault {
 
         event::emit(UpdateVaultApy {
             vault_id: object::id(vault),
-            symbol: vault.symbol,
             vault_apy: value,
             epoch: tx_context::epoch(ctx),
             principal_balance: vault.principal_balance,
@@ -520,7 +532,8 @@ module legato::vault {
         vault.claim_enabled = false;
     }
 
-    // ======== Internal Functions =========
+
+    // ======== Internal Functions ========='
 
     fun receive_staked_sui<P>(vault: &mut Vault<P>, staked_sui: StakedSui) : u64 {
         let deposit_id = vault.deposit_count;
@@ -640,22 +653,6 @@ module legato::vault {
         let yt_amount_in_pool = amm::balance_y<SUI, TOKEN<P,YT>>(pool);
         yt_total_supply-yt_amount_in_pool
     }
-
-    // fun claim_amount<P>(wrapper: &mut SuiSystemState, vault: &Vault<P>, current_epoch: u64, holder: address): u64 {
-
-    //     let _deposit_amount = *table::borrow( &vault.claim_pool_table, holder);
-    //     let _total_amount = balance::value(&vault.claim_pool);
-
-    //     let accumulated_rewards = vault_rewards(wrapper, vault, current_epoch);
-    //     let outstanding_debts = vault.debt_balance;
-
-    //     let surplus =
-    //         if (accumulated_rewards >= outstanding_debts)
-    //             accumulated_rewards - outstanding_debts
-    //         else 0;
-
-    //     surplus
-    // }
 
     // ======== Test-related Functions =========
 

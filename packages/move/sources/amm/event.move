@@ -1,11 +1,9 @@
-// Copyright 2022 OmniBTC Authors. Licensed under Apache-2.0 License.
+ 
 module legato::event {
     use std::string::String;
 
     use sui::event::emit;
     use sui::object::ID;
-
-    friend legato::interface;
 
     /// Liquidity pool added event.
     struct AddedEvent has copy, drop {

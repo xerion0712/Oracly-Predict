@@ -3,14 +3,11 @@
 
 module legato::apy_reader {
 
-    // use std::debug;
-
     use sui_system::sui_system::{SuiSystemState, pool_exchange_rates};
     use sui_system::staking_pool::{ Self, PoolTokenExchangeRate, StakedSui};
 
     use sui::object::{ID};
     use sui::table::{Self,  Table};
-    
     
     const EPOCH_TO_WEIGHT : u64 = 30;
     const MIST_PER_SUI: u64 = 1_000_000_000;

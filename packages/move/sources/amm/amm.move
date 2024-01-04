@@ -5,11 +5,9 @@
 
 module legato::amm {
     
-    // use std::debug;
-
     use std::ascii::into_bytes;
     use std::type_name::{get, into_string};
-    use std::string::{Self, String};
+    use std::string::{Self, String}; 
     use std::vector;
 
     use sui::bag::{Self, Bag};
@@ -21,9 +19,6 @@ module legato::amm {
 
     use legato::comparator;
     use legato::math;
-
-    friend legato::interface;
-    friend legato::vault;
 
     /// For when Coin is zero.
     const ERR_ZERO_AMOUNT: u64 = 0;
@@ -58,12 +53,11 @@ module legato::amm {
     /// Insufficient liquidity
     const ERR_INSUFFICIENT_LIQUIDITY_MINTED: u64 = 15;
 
+    const ERR_UNAUTHORISED: u64 = 16;
+    const ERR_INVALID_INDEX: u64 = 17;
 
     /// The max value that can be held in one of the Balances of
     /// a Pool. U64 MAX / FEE_SCALE
-    // const MAX_POOL_VALUE: u64 = {
-    //     18446744073709551615 / 10000
-    // };
     const MAX_POOL_VALUE : u64 = 18446744073709551615;
     /// Minimal liquidity.
     const MINIMAL_LIQUIDITY: u64 = 1000;
@@ -88,7 +82,7 @@ module legato::amm {
     struct Global has key {
         id: UID,
         has_paused: bool,
-        pools: Bag,
+        pools: Bag
     }
 
     struct ManagerCap has key {
@@ -97,6 +91,7 @@ module legato::amm {
 
     /// Init global config
     fun init(ctx: &mut TxContext) {
+ 
         let global = Global {
             id: object::new(ctx),
             has_paused: false,
@@ -115,11 +110,11 @@ module legato::amm {
         pool.global
     }
 
-    public(friend) fun id<X, Y>(global: &Global): ID {
+    public fun id<X, Y>(global: &Global): ID {
         object::uid_to_inner(&global.id)
     }
 
-    public(friend) fun get_mut_pool<X, Y>(
+    public fun get_mut_pool<X, Y>(
         global: &mut Global,
         is_order: bool,
     ): &mut Pool<X, Y> {
@@ -132,15 +127,15 @@ module legato::amm {
         bag::borrow_mut<String, Pool<X, Y>>(&mut global.pools, lp_name)
     }
 
-    public(friend) fun balance_x<X,Y>(pool: &Pool<X, Y>): u64 {
+    public fun balance_x<X,Y>(pool: &Pool<X, Y>): u64 {
         balance::value<X>(&pool.coin_x)
     }
 
-    public(friend) fun balance_y<X,Y>(pool: &Pool<X, Y>): u64 {
+    public fun balance_y<X,Y>(pool: &Pool<X, Y>): u64 {
         balance::value<Y>(&pool.coin_y)
     }
 
-    public(friend) fun has_registered<X, Y>(
+    public fun has_registered<X, Y>(
         global: &Global
     ): bool {
         let lp_name = generate_lp_name<X, Y>();
@@ -155,7 +150,7 @@ module legato::amm {
         global.has_paused = false
     }
 
-    public(friend) fun is_emergency(global: &Global): bool {
+    public fun is_emergency(global: &Global): bool {
         global.has_paused
     }
 
@@ -188,7 +183,7 @@ module legato::amm {
     }
 
     /// Register pool
-    public(friend) fun register_pool<X, Y>(
+    public fun register_pool<X, Y>(
         global: &mut Global,
         is_order: bool
     ) {
@@ -212,7 +207,7 @@ module legato::amm {
     /// Add liquidity to the `Pool`. Sender needs to provide both
     /// `Coin<X>` and `Coin<Y>`, and in exchange he gets `Coin<LP>` -
     /// liquidity provider tokens.
-    public(friend) fun add_liquidity<X, Y>(
+    public fun add_liquidity<X, Y>(
         pool: &mut Pool<X, Y>,
         coin_x: Coin<X>,
         coin_x_min: u64,
@@ -296,7 +291,7 @@ module legato::amm {
 
     /// Remove liquidity from the `Pool` by burning `Coin<LP>`.
     /// Returns `Coin<X>` and `Coin<Y>`.
-    public(friend) fun remove_liquidity<X, Y>(
+    public fun remove_liquidity<X, Y>(
         pool: &mut Pool<X, Y>,
         lp_coin: Coin<LP<X, Y>>,
         is_order: bool,
@@ -321,7 +316,7 @@ module legato::amm {
 
     /// Swap Coin<X> for Coin<Y>
     /// Returns Coin<Y>
-    public(friend) fun swap_out<X, Y>(
+    public fun swap_out<X, Y>(
         global: &mut Global,
         coin_in: Coin<X>,
         coin_out_min: u64,
