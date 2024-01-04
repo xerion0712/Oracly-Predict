@@ -17,18 +17,21 @@ export default function Home(props) {
 
 export async function getStaticProps() {
 
-  const { fetchSuiSystem, getSuiPrice } = useSui()
+  const { fetchSuiSystem, getSuiPrice, fetchAllVault } = useSui()
 
   const suiPrice = await getSuiPrice()
 
   const { summary, avgApy, validators } = await fetchSuiSystem()
+
+  const vaults = await fetchAllVault("mainnet", summary)
 
   return {
     props: {
       summary,
       validators,
       avgApy,
-      suiPrice
+      suiPrice,
+      vaults
     },
     revalidate: 600
   };

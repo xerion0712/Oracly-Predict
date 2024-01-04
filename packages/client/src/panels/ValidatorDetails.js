@@ -20,9 +20,7 @@ const RowItem = ({
                     >
                         {value}
                     </h4>
-                )
-
-                }
+                )}
                 {(link && value) && (
                     <a href={value} target="_blank"
                         className="text-lg truncate ml-auto hover:underline  text-white"

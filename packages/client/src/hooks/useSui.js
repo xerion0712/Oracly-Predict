@@ -1,35 +1,37 @@
 import { createContext, useCallback, useMemo, useEffect, useReducer } from 'react';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
 import BigNumber from "bignumber.js"
-import axios from 'axios'; 
+import axios from 'axios';
+import Vault from "../data/vault.json"
 
 import { TransactionBlock } from '@mysten/sui.js/transactions';
 
-const FALLBACK_SUI_PRICE = 0.6
+const FALLBACK_SUI_PRICE = 0.77
 
 const useSui = () => {
 
     const getSuiPrice = async () => {
         let response
-        try {
-            response = await axios.get('https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest?id=20947', {
-                headers: {
-                    'X-CMC_PRO_API_KEY': process.env.COINMARKETCAP_API
-                },
-            });
-        } catch (ex) {
-            response = null;
-            // error
-            console.log(ex);
-        }
+        return FALLBACK_SUI_PRICE
+        // try {
+        //     response = await axios.get('https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest?id=20947', {
+        //         headers: {
+        //             'X-CMC_PRO_API_KEY': process.env.COINMARKETCAP_API
+        //         },
+        //     });
+        // } catch (ex) {
+        //     response = null;
+        //     // error
+        //     console.log(ex);
+        // }
 
-        if (response) {
-            const { data } = response
-            const price = data.data["20947"]["quote"]["USD"]["price"]
-            return Number(price)
-        } else {
-            return FALLBACK_SUI_PRICE
-        }
+        // if (response) {
+        //     const { data } = response
+        //     const price = data.data["20947"]["quote"]["USD"]["price"]
+        //     return Number(price)
+        // } else {
+        //     return FALLBACK_SUI_PRICE
+        // }
     }
 
     const fetchSuiSystem = async (network = "mainnet") => {
@@ -58,6 +60,7 @@ const useSui = () => {
                 stakingPoolActivationEpoch: item.stakingPoolActivationEpoch,
                 stakingPoolSuiBalance: item.stakingPoolSuiBalance,
                 suiAddress: item.suiAddress,
+                stakingPoolId: item.stakingPoolId,
                 vol: `${vol}`,
                 apy: apyItem ? Number(apyItem.apy) * 100 : 0
             }
@@ -71,9 +74,67 @@ const useSui = () => {
 
     }
 
+    const fetchAllVault = async (networkName, summary) => {
+
+        const vaultList = Vault.filter(item => networkName === "testnet" ? item.network === "testnet" : item.network !== "testnet")
+
+        const client = new SuiClient({ url: getFullnodeUrl(networkName) })
+
+        let output = []
+
+        for (let vault of vaultList) {
+            const { name, image, value, network, disabled } = vault
+
+            if (disabled) {
+                output.push({
+                    name,
+                    image,
+                    value,
+                    network,
+                    disabled
+                })
+            } else {
+
+                const { vaultId } = vault
+
+                const { data } = await client.getObject({
+                    id: vaultId,
+                    options: {
+                        "showType": false,
+                        "showOwner": false,
+                        "showPreviousTransaction": false,
+                        "showDisplay": false,
+                        "showContent": true,
+                        "showBcs": false,
+                        "showStorageRebate": false
+                    }
+                })
+
+                let { fields } = data.content
+
+                delete fields.id
+
+                let remainingDays =  Number(fields.maturity_epoch)-Number(summary.epoch)
+
+                output.push({
+                    name,
+                    image,
+                    value: `${remainingDays > 0 ? remainingDays : 0}d`,
+                    network,
+                    disabled,
+                    ...fields
+                })
+            }
+
+        }
+
+        return output
+    }
+
     return {
         getSuiPrice,
-        fetchSuiSystem
+        fetchSuiSystem,
+        fetchAllVault
     }
 
 }

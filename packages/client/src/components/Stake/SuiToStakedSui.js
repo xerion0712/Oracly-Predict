@@ -1,20 +1,23 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useState, useReducer } from "react"
 import { ArrowRightIcon } from "@heroicons/react/20/solid"
-import Selector from "../Selector"
+import Selector, { FixedSelector } from "../Selector"
 import Vault from "../../data/vault.json"
-import ValidatorDetails from "@/panels/ValidatorDetails"
+import ValidatorDetails from "@/modals/ValidatorDetails"
 import BigNumber from "bignumber.js"
-import { YellowBadge } from "../Badge"
+import { Badge, YellowBadge } from "../Badge"
 import { useAccountBalance } from '@suiet/wallet-kit'
 import StakeSuiToStakedSuiPanel from "@/panels/StakeSuiToStakedSui"
 import useSuiStake from "@/hooks/useSuiStake"
 import { useWallet } from '@suiet/wallet-kit'
 import { parseAmount } from "@/helpers"
+import { useInterval } from "@/hooks/useInterval"
+import ValidatorList from "@/modals/ValidatorList"
 
 const PANEL = {
     NONE: "NONE",
-    VALIDATOR: "VALIDATOR",
-    STAKE: "STAKE"
+    VALIDATOR_LIST: "VALIDATOR_LIST",
+    STAKE: "STAKE",
+    VALIDATOR_DETAILS: "VALIDATOR_DETAILS"
 }
 
 const SuiToStakedSui = ({
@@ -25,52 +28,37 @@ const SuiToStakedSui = ({
     isTestnet
 }) => {
 
+    const parsedValidator = validators.map((item, index) => ({
+        index,
+        ...item,
+        name: item.name,
+        image: item.imageUrl,
+        value: !isTestnet ? `$${(Number(`${(BigNumber(item.stakingPoolSuiBalance).dividedBy(BigNumber(1000000000)).toFixed(2))}`) * suiPrice / 1000000).toFixed(0)}M` : `${(Number(`${(BigNumber(item.stakingPoolSuiBalance).dividedBy(BigNumber(1000000000)).toFixed(2))}`) / 1000000).toFixed(1)}M`,
+        suiPrice
+    }));
+
     const { connected, account } = useWallet()
-
     const { getTotalStaked } = useSuiStake()
-
     const { balance } = useAccountBalance()
-
-    const [tick, setTick] = useState(0)
-    const [totalStaked, setTotalStaked] = useState({
-        stakedAmount: 0,
-        totalStaked: 0
-    })
 
     const balanceStr = balance ? `${BigNumber(balance).div(10 ** 9)}` : 0
 
-    const parsedValidator = validators.map((item, index) => {
-
-        let value
-
-        if (!isTestnet) {
-            // use USD on Mainnet
-            value = `$${(Number(`${(BigNumber(item.stakingPoolSuiBalance).dividedBy(BigNumber(1000000000)).toFixed(2))}`) * suiPrice / 1000000).toFixed(0)}M`
-        } else {
-            value = `${(Number(`${(BigNumber(item.stakingPoolSuiBalance).dividedBy(BigNumber(1000000000)).toFixed(2))}`) / 1000000).toFixed(1)}M`
+    const [values, dispatch] = useReducer(
+        (curVal, newVal) => ({ ...curVal, ...newVal }),
+        {
+            tick: 0,
+            stakedAmount: 0,
+            totalStaked: 0,
+            selected: undefined,
+            panel: PANEL.NONE
         }
+    )
 
-        return {
-            index,
-            ...item,
-            name: `${item.name}`,
-            image: item.imageUrl,
-            value,
-            suiPrice
-        }
-    })
+    const { tick, stakedAmount, totalStaked, selected, panel } = values
 
-    const [selected, setSelected] = useState()
-    // details panel
-    const [panel, setPanel] = useState(PANEL.NONE)
-
-    const onSelectIndex = (index) => {
+    const onSelectIndex = useCallback((index) => {
         if (index >= 0 && validators.length > index) setSelected(parsedValidator[index])
-    }
-
-    useEffect(() => {
-        setDefaultItem()
-    }, [isTestnet])
+    }, [validators, parsedValidator])
 
     useEffect(() => {
         connected && getTotalStaked(account.address, isTestnet).then(
@@ -79,7 +67,7 @@ const SuiToStakedSui = ({
                 const stakedAmount = (BigNumber(totalStaked).plus(BigNumber(totalPending))).dividedBy(10 ** 9)
                 const stakedAmountInUS = stakedAmount.multipliedBy(suiPrice)
 
-                setTotalStaked({
+                dispatch({
                     stakedAmount: Number(`${stakedAmount}`),
                     totalStaked: Number(`${stakedAmountInUS}`)
                 })
@@ -88,47 +76,82 @@ const SuiToStakedSui = ({
     }, [connected, account, isTestnet, tick])
 
     const increaseTick = useCallback(() => {
-        setTick(tick + 1)
+        dispatch({ tick: tick + 1 })
     }, [tick])
 
     const setDefaultItem = useCallback(() => {
-        setSelected(parsedValidator[0])
+        dispatch({ selected: parsedValidator[0] })
     }, [parsedValidator])
+
+    useEffect(() => {
+        setDefaultItem()
+    }, [isTestnet])
+
+    useInterval(
+        () => {
+            if (!selected) {
+                setDefaultItem()
+            }
+            // TODO: maybe check status
+        },
+        1000,
+    )
+
+    const setSelected = (item) => {
+        dispatch({ selected: item })
+    }
+
+    const setPanel = (panel) => {
+        dispatch({ panel })
+    }
+
+    const onShowValidator = useCallback(() => {
+        selected && dispatch({ panel: PANEL.VALIDATOR_LIST })
+    }, [selected])
 
     return (
         <div>
             <ValidatorDetails
-                visible={panel === PANEL.VALIDATOR}
-                close={() => setPanel(PANEL.NONE)}
+                visible={panel === PANEL.VALIDATOR_DETAILS}
+                close={() => dispatch({panel : PANEL.NONE})}
                 data={selected}
                 select={onSelectIndex}
                 avgApy={avgApy}
                 isTestnet={isTestnet}
             />
             {selected && (
-                <StakeSuiToStakedSuiPanel
-                    visible={panel === PANEL.STAKE}
-                    close={() => setPanel(PANEL.NONE)}
-                    validator={selected}
-                    balance={balanceStr}
-                    openValidator={() => setPanel(PANEL.VALIDATOR)}
-                    summary={summary}
-                    increaseTick={increaseTick}
-                />
+                <>
+                    <ValidatorList
+                        visible={panel === PANEL.VALIDATOR_LIST}
+                        close={() => dispatch({ panel: PANEL.NONE })}
+                        selected={selected}
+                        select={onSelectIndex}
+                        isTestnet={isTestnet}
+                        validators={parsedValidator}
+                    />
+                    <StakeSuiToStakedSuiPanel
+                        visible={panel === PANEL.STAKE}
+                        close={() => dispatch({ panel: PANEL.NONE })}
+                        validator={selected}
+                        balance={balanceStr}
+                        openValidator={() => dispatch({ panel: PANEL.VALIDATOR_DETAILS })}
+                        summary={summary}
+                        increaseTick={increaseTick}
+                    />
+                </>
             )}
-            <Selector
+            <FixedSelector
                 name="Validator to stake into"
                 selected={selected}
-                setSelected={setSelected}
-                options={parsedValidator}
+                select={onShowValidator}
             />
             <div className="grid grid-cols-2">
                 <div className="col-span-1">
                     {isTestnet && <YellowBadge>Testnet</YellowBadge>}
-                </div>
+                </div> 
                 <div className="col-span-1">
                     <div class="text-xs flex font-medium text-gray-300 justify-end flex-row mt-2">
-                        <a onClick={() => setPanel(PANEL.VALIDATOR)} className="flex flex-row hover:underline cursor-pointer">
+                        <a onClick={() => setPanel(PANEL.VALIDATOR_DETAILS)} className="flex flex-row hover:underline cursor-pointer">
                             Details
                             <ArrowRightIcon className="h-4 w-4 ml-[1px]" />
                         </a>
@@ -151,7 +174,7 @@ const SuiToStakedSui = ({
                         Total Staked
                     </div>
                     <div className="text-2xl">
-                        ${(totalStaked.totalStaked.toLocaleString())}
+                        ${(totalStaked.toLocaleString())}
                     </div>
                 </div>
             </div>
@@ -162,7 +185,7 @@ const SuiToStakedSui = ({
                     </div>
                     <div className='flex flex-row text-lg'>
                         <img src={"./sui-sui-logo.svg"} alt="" className="h-5 w-5  mr-2  mt-auto mb-auto flex-shrink-0 rounded-full" />
-                        {parseAmount(totalStaked.stakedAmount)}{` SUI`}
+                        {parseAmount(stakedAmount)}{` SUI`}
                     </div>
                 </div>
                 <div className='text-right'>
