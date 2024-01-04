@@ -8,7 +8,7 @@ import { useWallet } from "@suiet/wallet-kit"
 import { LegatoContext } from "@/hooks/useLegato"
 import BigNumber from "bignumber.js"
 import { parseAmount } from "@/helpers"
-import StakedSuiToPTPanel from "@/panels/StakedSuiToPT"
+import StakeStakedSuiToPT from "@/panels/StakeStakedSuiToPT"
 import PTValidatorList from "@/modals/PTValidatorList"
 import useSuiStake from "@/hooks/useSuiStake"
 
@@ -91,10 +91,11 @@ const StakedSuiToPT = ({ isTestnet, suiPrice }) => {
                         close={() => setModal(PANEL.NONE)}
                         vault={selected}
                     />
-                    <StakedSuiToPTPanel
+                    <StakeStakedSuiToPT
                         visible={modal === PANEL.STAKE}
                         close={() => setModal(PANEL.NONE)}
                         isTestnet={isTestnet}
+                        vault={selected}
                     />
                 </>
             )}

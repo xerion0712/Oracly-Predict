@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, useReducer } from "react"
 import { ArrowRightIcon } from "@heroicons/react/20/solid"
 import Selector, { FixedSelector } from "../Selector"
 import Vault from "../../data/vault.json"
-import ValidatorDetails from "@/panels/ValidatorDetails"
+import ValidatorDetails from "@/modals/ValidatorDetails"
 import BigNumber from "bignumber.js"
 import { Badge, YellowBadge } from "../Badge"
 import { useAccountBalance } from '@suiet/wallet-kit'

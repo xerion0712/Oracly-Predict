@@ -139,7 +139,7 @@ const StakeSuiToStakedSuiPanel = ({
                         Available: {Number(balance).toFixed(3)} SUI
                     </div>
                     <div className="ml-auto  flex flex-row ">
-                        <OptionBadge onClick={() => balance && Number(balance) > 1 ? setAmount(1) : 0} className="cursor-pointer hover:underline">
+                        <OptionBadge onClick={() => balance && Number(balance) >= 1 ? setAmount(1) : 0} className="cursor-pointer hover:underline">
                             1 SUI
                         </OptionBadge>
                         <OptionBadge onClick={() => setAmount((Math.floor(Number(balance) * 500) / 1000))} className="cursor-pointer hover:underline">
