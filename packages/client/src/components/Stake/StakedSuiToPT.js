@@ -50,6 +50,10 @@ const StakedSuiToPT = ({ isTestnet, suiPrice }) => {
         setSelected(vaults[0])
     }, [vaults])
 
+    const increaseTick = useCallback(() => {
+        setTick(tick+1)
+    },[tick])
+
     const onNext = useCallback(() => {
 
         if (!selected) {
@@ -93,9 +97,13 @@ const StakedSuiToPT = ({ isTestnet, suiPrice }) => {
                     />
                     <StakeStakedSuiToPT
                         visible={modal === PANEL.STAKE}
-                        close={() => setModal(PANEL.NONE)}
+                        close={() => {
+                            setModal(PANEL.NONE)
+                            increaseTick()
+                        }}
                         isTestnet={isTestnet}
                         vault={selected}
+                        tick={tick}
                     />
                 </>
             )}

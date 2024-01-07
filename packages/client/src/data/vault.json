@@ -9,6 +9,18 @@
     },
     {
         "id": 1,
+        "name": "January 20, 2024",
+        "image": "./clock.png",
+        "value": "0d",
+        "network": "testnet",
+        "disabled": false,
+        "packageId": "0xec23537e93ef41e7f82edd49d3490d1df240b4d2aa5686b044c241e0b4b6a29b",
+        "vaultType": "0xec23537e93ef41e7f82edd49d3490d1df240b4d2aa5686b044c241e0b4b6a29b::template::FEB_2024",
+        "vaultId": "0xb7a8786558e1b8a305a07c8d8a0c4fc3fd28c158f953b1b7b7b03edc6294bba7",
+        "suiSystemStateId": "0x0000000000000000000000000000000000000000000000000000000000000005"
+    },
+    {
+        "id": 2,
         "name": "January 10, 2024",
         "image": "./clock.png",
         "value": "0d",
@@ -19,4 +31,5 @@
         "vaultId": "0x24cab32c4244a1dbec5e327e4186fd4c98b15d38570f3ead6f656b03ad93a28d",
         "suiSystemStateId": "0x0000000000000000000000000000000000000000000000000000000000000005"
     }
+    
 ]

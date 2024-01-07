@@ -1,101 +1,37 @@
 import { useWallet } from "@suiet/wallet-kit"
 import BasePanel from "./Base"
 import usePortfolio from "@/hooks/usePortfolio"
-import { useContext, useEffect, useReducer } from "react"
+import { useCallback, useContext, useEffect, useReducer, useState } from "react"
 import { LegatoContext } from "@/hooks/useLegato"
 import BigNumber from "bignumber.js"
 import { Badge, YellowBadge } from "@/components/Badge"
 import { X } from "react-feather"
 import { AmountInput } from "@/components/Input"
 import { OptionBadge } from "@/components/Badge"
-
-const Modal = ({
-    totalAssets,
-    dispatch,
-    myStakedSui,
-    validators,
-    selected
-}) => {
-    return (
-        <div class="fixed inset-0 flex items-center justify-center  z-50">
-            <div class="absolute inset-0 bg-gray-900 opacity-50"></div>
-            <div class={`relative   bg-gray-800 p-6 w-full ml-5 mr-7 mb-[200px]  border  border-gray-700 text-white rounded-lg`}>
-                <h5 class="text-xl font-bold mb-2"> All Staked SUI ({totalAssets})</h5>
-                <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-400" onClick={() => dispatch({ modal: false })}>
-                    <X />
-                </button>
-                <div className="grid grid-cols-3 gap-2 mt-4 mb-2">
-                    {myStakedSui.map((perValidator, x) => {
-
-                        const perValidatorInfo = validators && validators.find(v => v.stakingPoolId === perValidator.stakingPool)
-                        const imageUrl = perValidatorInfo.imageUrl || "/sui-sui-logo.svg"
-
-                        return (
-                            <>
-                                {perValidator.stakes.map((item, y) => {
-
-                                    const amount = Number(`${(BigNumber(item.principal)).dividedBy(BigNumber(10 ** 9))}`)
-                                    const isActive = selected && item && item.stakedSuiId === selected.stakedSuiId
-
-                                    return (
-                                        <div onClick={() => {
-                                            dispatch({
-                                                modal: false,
-                                                amount: 0,
-                                                selected: {
-                                                    stakingPool: perValidator.stakingPool,
-                                                    ...item
-                                                }
-                                            })
-                                        }} className={`col-span-1  border-2 border-gray-700 ${isActive && "bg-gray-700"} p-2 rounded-md hover:border-blue-700 flex-1  hover:cursor-pointer flex`} key={`${x}-${y}`}>
-                                            <div class="my-auto">
-                                                <div class="w-1/2 mx-auto mt-1">
-                                                    <img
-                                                        class="h-full w-full object-contain object-center rounded-full"
-                                                        src={imageUrl}
-                                                        alt=""
-                                                    />
-                                                </div>
-                                                <div className="p-2 px-1 pb-0 text-center">
-                                                    <h3 class="text-sm font-medium leading-4 text-white">{perValidatorInfo.name}</h3>
-                                                    <h3 class="text-sm p-1 mr-2 text-white leading-4">
-                                                        {`${amount.toLocaleString()} SUI`}
-                                                    </h3>
-                                                    {/* {item.status.toLowerCase() === "active" ? (
-                                                    <Badge>ready</Badge>
-                                                ) : <>
-                                                    <YellowBadge>pending</YellowBadge>
-                                                </>} */}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                            </>
-                        )
-                    })}
-                </div>
-            </div>
-        </div>
-    )
-}
+import useSui from "@/hooks/useSui"
+import { useInterval } from "@/hooks/useInterval"
+import { parseAmount, secondsToDDHHMMSS } from "@/helpers"
+import Spinner from "@/components/Spinner"
 
 
 const StakeStakedSuiToPT = ({
     visible,
     close,
     isTestnet,
-    vault
+    vault,
+    tick
 }) => {
 
     const { account } = useWallet()
+    const { getCurrentEpoch } = useSui()
     const { getAllObjectsByKey } = usePortfolio()
-    const { validators } = useContext(LegatoContext)
+    const { validators, summary, mint } = useContext(LegatoContext)
+
+    const [countdown, setCountdown] = useState(`0d 0h 0m 0s`)
 
     const [values, dispatch] = useReducer(
         (curVal, newVal) => ({ ...curVal, ...newVal }),
         {
-            tick: 0,
             myStakedSui: [],
             selected: undefined,
             modal: false,
@@ -106,7 +42,7 @@ const StakeStakedSuiToPT = ({
         }
     )
 
-    const { tick, myStakedSui, selected, modal, amount, disabled, loading, errorMessage } = values
+    const { myStakedSui, selected, modal, amount, disabled, loading, errorMessage } = values
 
     useEffect(() => {
         account && account.address ? getAllObjectsByKey("SUI_TO_STAKED_SUI", account.address, isTestnet).then((myStakedSui) => dispatch({ myStakedSui, selected: undefined })) : dispatch({ myStakedSui: [], selected: undefined })
@@ -121,11 +57,63 @@ const StakeStakedSuiToPT = ({
         })
     }, [myStakedSui])
 
+    useInterval(
+        () => {
+
+            const current = new Date()
+
+            const diffEpoch = Number(vault.maturity_epoch) - Number(summary.epoch)
+            const matureDate = new Date((new Date(Number(summary.epochStartTimestampMs))).valueOf() + (Number(summary.epochDurationMs) * (diffEpoch > 0 ? diffEpoch : 0)))
+
+            const diffTime = Math.abs(matureDate - current);
+            const totals = Math.floor(diffTime / 1000)
+
+            const { days, hours, minutes, seconds } = secondsToDDHHMMSS(totals)
+
+            setCountdown(`${days}d ${hours}h ${minutes}m ${seconds}s`)
+        },
+        1000,
+    )
+
     const handleChange = (e) => {
         dispatch({
             amount: Number(e.target.value)
         })
     }
+
+    const onMint = useCallback(async () => {
+
+        dispatch({ errorMessage: undefined })
+
+        if (!summary || !vault || !selected) return
+
+        if (Number(summary.epoch) > (Number(vault.maturity_epoch) - 3)) {
+            dispatch({ errorMessage: "Not allowing to mint during cooldown epochs" })
+            return
+        }
+
+        if (1 > amount) {
+            dispatch({ errorMessage: "Amount must be greater than 1" })
+            return
+        }
+
+        dispatch({ loading: true })
+
+        try {
+
+            await mint(vault, amount, selected)
+
+            dispatch({ amount: 0, loading: false })
+            close()
+
+        } catch (e) {
+            console.log(e)
+            dispatch({ errorMessage: `${e.message}` })
+        }
+
+        dispatch({ loading: false })
+
+    }, [summary, vault, amount, selected])
 
     const validator = selected && validators && validators.find(v => v.stakingPoolId === selected.stakingPool)
 
@@ -134,6 +122,10 @@ const StakeStakedSuiToPT = ({
     }, 0)
 
     const available = selected ? Number(`${(BigNumber(selected.principal)).dividedBy(BigNumber(10 ** 9))}`) : 0
+    const apy = vault && Number(`${(BigNumber(vault.vault_apy)).dividedBy(BigNumber(10 ** 7))}`)
+
+    const ptMulfiplier = summary && vault && 1 + ((Number(`${(BigNumber(vault.vault_apy)).dividedBy(BigNumber(10 ** 9))}`)) * (Number(vault.maturity_epoch) - Number(summary.epoch)) / 365)
+    const ptAmount = ptMulfiplier ? amount * ptMulfiplier : 0
 
     return (
         <>
@@ -221,9 +213,9 @@ const StakeStakedSuiToPT = ({
                 <div className="border rounded-lg mt-4 p-4 border-gray-400">
                     <div class="mt-2 flex flex-row">
                         <div class="text-gray-300 text-sm font-medium">You will receive</div>
-                        {/* <span class="ml-auto bg-blue-100 text-blue-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
-                            Matures in {vault.value}
-                        </span> */}
+                        <span class="ml-auto bg-blue-100 text-blue-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
+                            Vault matures in {countdown}
+                        </span>
                     </div>
                     <hr class="h-px my-4 border-0  bg-gray-600" />
                     <div class="grid grid-cols-2 gap-2 mt-2 mb-2">
@@ -237,25 +229,35 @@ const StakeStakedSuiToPT = ({
                         </div>
                         <div className="flex">
                             <div className="text-3xl font-medium mx-auto mt-3 mb-auto mr-2">
-                                {(amount).toLocaleString()}
+                                {parseAmount(ptAmount)}
                             </div>
                         </div>
                     </div>
-
-                    <InfoRow
+                    {/* <InfoRow
                         name={"Vault matures in"}
                         value={`${vault.value}`}
+                    /> */}
+                    <InfoRow
+                        name={"Epoch at the moment"}
+                        value={`${summary ? summary.epoch : 0}`}
                     />
                     <InfoRow
-                        name={"Redeem SUI after epoch"}
-                        value={`${vault.maturity_epoch}`}
+                        name={"Vault creation/maturity epoch"}
+                        value={`${vault.created_epoch}/${vault.maturity_epoch}`}
+                    />
+                    <InfoRow
+                        name={"Last epoch eligible for minting"}
+                        value={`${Number(vault.maturity_epoch) - 3}`}
                     />
                     <InfoRow
                         name={"APY to lock-in"}
-                        value={`1%`}
+                        value={`${apy}%`}
                     />
+                    <div className="w-full text-xs my-3 font-medium p-2 py-1 text-center rounded border border-blue-400 text-blue-400">
+                        The vault is in private alpha, reach out to the team for grant access
+                    </div>
                     <hr class="h-px my-4 border-0 bg-gray-600" />
-                    <button disabled={disabled} onClick={() => console.log("soon...")} className={`py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700 ${disabled && "opacity-60"}`}>
+                    <button disabled={disabled} onClick={onMint} className={`py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700 ${disabled && "opacity-60"}`}>
                         {loading && <Spinner />}
                         Mint
                     </button>
@@ -284,5 +286,78 @@ const InfoRow = ({ name, value }) => {
         </div>
     )
 }
+
+
+const Modal = ({
+    totalAssets,
+    dispatch,
+    myStakedSui,
+    validators,
+    selected
+}) => {
+    return (
+        <div class="fixed inset-0 flex items-center justify-center  z-50">
+            <div class="absolute inset-0 bg-gray-900 opacity-50"></div>
+            <div class={`relative   bg-gray-800 p-6 w-full ml-5 mr-7 mb-[200px]  border  border-gray-700 text-white rounded-lg`}>
+                <h5 class="text-xl font-bold mb-2"> All Staked SUI ({totalAssets})</h5>
+                <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-400" onClick={() => dispatch({ modal: false })}>
+                    <X />
+                </button>
+                <div className="grid grid-cols-3 gap-2 mt-4 mb-2">
+                    {myStakedSui.map((perValidator, x) => {
+
+                        const perValidatorInfo = validators && validators.find(v => v.stakingPoolId === perValidator.stakingPool)
+                        const imageUrl = perValidatorInfo.imageUrl || "/sui-sui-logo.svg"
+
+                        return (
+                            <>
+                                {perValidator.stakes.map((item, y) => {
+
+                                    const amount = Number(`${(BigNumber(item.principal)).dividedBy(BigNumber(10 ** 9))}`)
+                                    const isActive = selected && item && item.stakedSuiId === selected.stakedSuiId
+
+                                    return (
+                                        <div onClick={() => {
+                                            dispatch({
+                                                modal: false,
+                                                amount: 0,
+                                                selected: {
+                                                    stakingPool: perValidator.stakingPool,
+                                                    ...item
+                                                }
+                                            })
+                                        }} className={`col-span-1  border-2 border-gray-700 ${isActive && "bg-gray-700"} p-2 rounded-md hover:border-blue-700 flex-1  hover:cursor-pointer flex`} key={`${x}-${y}`}>
+                                            <div class="my-auto">
+                                                <div class="w-1/2 mx-auto mt-1">
+                                                    <img
+                                                        class="h-full w-full object-contain object-center rounded-full"
+                                                        src={imageUrl}
+                                                        alt=""
+                                                    />
+                                                </div>
+                                                <div className="p-2 px-1 pb-0 text-center">
+                                                    <h3 class="text-sm font-medium leading-4 text-white">{perValidatorInfo.name}</h3>
+                                                    <h3 class="text-sm p-1 mr-2 text-white leading-4">
+                                                        {`${amount.toLocaleString()} SUI`}
+                                                    </h3>
+                                                    {/* {item.status.toLowerCase() === "active" ? (
+                                                    <Badge>ready</Badge>
+                                                ) : <>
+                                                    <YellowBadge>pending</YellowBadge>
+                                                </>} */}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </>
+                        )
+                    })}
+                </div>
+            </div>
+        </div>
+    )
+}
+
 
 export default StakeStakedSuiToPT

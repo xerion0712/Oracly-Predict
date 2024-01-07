@@ -131,10 +131,17 @@ const useSui = () => {
         return output
     }
 
+    const getCurrentEpoch = async (networkName) => {
+        const client = new SuiClient({ url: getFullnodeUrl(networkName) })
+        const { epoch } = await client.call('suix_getLatestSuiSystemState', [])
+        return epoch
+    }
+
     return {
         getSuiPrice,
         fetchSuiSystem,
-        fetchAllVault
+        fetchAllVault,
+        getCurrentEpoch
     }
 
 }
