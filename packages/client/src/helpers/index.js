@@ -36,12 +36,34 @@ export const secondsToHHMMSS = (totalSeconds) => {
     }
 }
 
+export const secondsToDDHHMMSS = (totalSeconds) => {
+
+    var days = Math.floor(totalSeconds / 24 / 60 / 60);
+    var hoursLeft = Math.floor((totalSeconds) - (days * 86400));
+    var hours = Math.floor(hoursLeft / 3600);
+    var minutesLeft = Math.floor((hoursLeft) - (hours * 3600));
+    var minutes = Math.floor(minutesLeft / 60);
+    var seconds = totalSeconds % 60;
+
+    // Padding the values to ensure they are two digits
+    if (hours < 10) { hours = "0" + hours; }
+    if (minutes < 10) { minutes = "0" + minutes; }
+    if (seconds < 10) { seconds = "0" + seconds; }
+
+    return {
+        days,
+        hours,
+        minutes,
+        seconds
+    }
+}
+
 export const parseAmount = (input) => {
     input = Number(input)
 
     if (input % 1 === 0) {
 
-    }else if (input >= 1000000) {
+    } else if (input >= 1000000) {
         input = `${(input / 1000000).toFixed(4)}M`
     }
     else if (input >= 10000) {
