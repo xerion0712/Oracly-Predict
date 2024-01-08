@@ -96,6 +96,45 @@ const Provider = ({ children }) => {
 
     }, [connected])
 
+    const getTotalPT = useCallback(async (address, isTestnet = false) => {
+
+        const suiClient = new SuiClient({ url: getFullnodeUrl(isTestnet ? "testnet" : "mainnet") })
+
+        const vaultList = VAULT.filter(item => !item.disabled && item.network === (isTestnet ? "testnet" : "mainnet"));
+
+        const objects = await Promise.all(
+            vaultList.map(async (vault) => {
+                const { vaultType, packageId } = vault;
+                const StructType = `0x2::coin::Coin<${packageId}::vault::TOKEN<${vaultType},${packageId}::vault::PT>>`;
+                const { data } = await suiClient.call("suix_getOwnedObjects", [
+                    address,
+                    {
+                        "filter": {
+                            "MatchAll": [
+                                {
+                                    "StructType": StructType
+                                }
+                            ]
+                        },
+                        "options": {
+                            "showContent": true
+                        }
+                    }
+                ]);
+        
+                return data.map(({ data }) => ({
+                    vault: vault.name,
+                    digest: data.digest,
+                    objectId: data.objectId,
+                    version: data.version,
+                    balance: data.content.fields.balance
+                }));
+            })
+        ).then((results) => [].concat(...results));
+        
+        return objects
+    }, [])
+
     const legatoContext = useMemo(
         () => ({
             market,
@@ -107,7 +146,8 @@ const Provider = ({ children }) => {
             updateValues,
             vaults,
             summary,
-            mint
+            mint,
+            getTotalPT
         }),
         [
             market,

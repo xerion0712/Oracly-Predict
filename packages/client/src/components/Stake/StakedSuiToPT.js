@@ -21,12 +21,14 @@ const PANEL = {
 
 const StakedSuiToPT = ({ isTestnet, suiPrice }) => {
 
-    const { vaults } = useContext(LegatoContext)
+    const { vaults, getTotalPT } = useContext(LegatoContext)
 
     const { connected, account } = useWallet()
     const { getTotalStaked } = useSuiStake()
     const [selected, setSelected] = useState()
     const [totalStaked, setTotalStaked] = useState(0)
+    const [pt, setPT] = useState([])
+
     const [modal, setModal] = useState(PANEL.NONE)
 
     const [tick, setTick] = useState(0)
@@ -44,6 +46,7 @@ const StakedSuiToPT = ({ isTestnet, suiPrice }) => {
             }
         )
 
+        connected && getTotalPT(account.address, isTestnet).then(setPT)
     }, [connected, account, isTestnet, tick])
 
     const setDefaultItem = useCallback(() => {
@@ -51,8 +54,8 @@ const StakedSuiToPT = ({ isTestnet, suiPrice }) => {
     }, [vaults])
 
     const increaseTick = useCallback(() => {
-        setTick(tick+1)
-    },[tick])
+        setTick(tick + 1)
+    }, [tick])
 
     const onNext = useCallback(() => {
 
@@ -78,6 +81,12 @@ const StakedSuiToPT = ({ isTestnet, suiPrice }) => {
     // const totalStakingPool = selected && selected.pools ? selected.pools.length : 0
 
     const apy = selected && selected.vault_apy ? Number(`${(BigNumber(selected.vault_apy)).dividedBy(BigNumber(10 ** 7))}`) : 0
+
+    const stakedAmount = selected ? pt.filter(item => item.vault === selected.name).reduce((output, item) => {
+        return output + Number(`${(BigNumber(item.balance)).dividedBy(BigNumber(10 ** 9))}`)
+    }, 0) : 0
+
+    const stakedAmountInUs = stakedAmount * suiPrice
 
     return (
         <div>
@@ -147,7 +156,7 @@ const StakedSuiToPT = ({ isTestnet, suiPrice }) => {
                         Total Staked
                     </div>
                     <div className="text-2xl">
-                        $0
+                        ${stakedAmountInUs.toLocaleString()}
                     </div>
                 </div>
             </div>
@@ -159,7 +168,7 @@ const StakedSuiToPT = ({ isTestnet, suiPrice }) => {
                     </div>
                     <div className='flex flex-row text-lg'>
                         <img src={"./sui-sui-logo.svg"} alt="" className="h-5 w-5  mr-2  mt-auto mb-auto flex-shrink-0 rounded-full" />
-                        0
+                        {parseAmount(stakedAmount)}
                     </div>
                 </div>
                 <div className='text-right'>
