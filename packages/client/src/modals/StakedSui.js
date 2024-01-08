@@ -6,7 +6,11 @@ import { TextInput } from "@/components/Input"
 import useSuiStake from "@/hooks/useSuiStake"
 import Spinner from "@/components/Spinner"
 
-const StakedSuiModal = ({ visible, close, info, validatorInfo, isTestnet }) => {
+const StakedSuiModal = ({ visible, close, info, validators, isTestnet }) => {
+
+    // const validatorInfo = info && validators && validators.find(v => v.suiAddress.toLowerCase() === info.validatorAddress.toLowerCase())
+
+    const validatorInfo = info && validators && validators.find(v => v.suiAddress.toLowerCase() === info.validatorAddress.toLowerCase())
 
     const [tab, setTab] = useState(1)
 
@@ -199,7 +203,7 @@ const TransferPanel = ({ info, close }) => {
                         value={toAddress}
                         onChange={(e) => setAddress(e.target.value)}
                     />
-                </div> 
+                </div>
             </div>
             <button disabled={loading} onClick={onTransfer} className={`${loading && "opacity-40"} mt-4 py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700`}>
                 {loading && <Spinner />}
