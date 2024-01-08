@@ -3,6 +3,7 @@ import { Fragment, useEffect, useState } from 'react'
 import MARKET from "../../data/market.json"
 import StakedSuiTable from './StakedSuiTable'
 import { useWallet } from '@suiet/wallet-kit'
+import useSui from "@/hooks/useSui"
 import { CloudOff } from 'react-feather'
 import PTTable from './PTTable'
 
@@ -11,8 +12,11 @@ const Portfolio = () => {
     const [tab, setTab] = useState("ALL")
 
     const wallet = useWallet()
+    const [validators, setValidators] = useState([])
+    const { fetchSuiSystem } = useSui()
 
     const { account, connected } = wallet
+    const isTestnet = connected && account && account.chains && account.chains[0] === "sui:testnet" ? true : false
 
     const marketList = Object.keys(MARKET).map((key) => {
         if (tab === MARKET[key]) currentKey = key
@@ -23,7 +27,28 @@ const Portfolio = () => {
         }
     })
 
-    const isTestnet = connected && account && account.chains && account.chains[0] === "sui:testnet" ? true : false
+    useEffect(() => {
+        fetchSuiSystem(isTestnet ? "testnet" : "mainnet").then(
+            ({ summary, validators }) => {
+                const nextEpoch = new Date(Number(summary.epochStartTimestampMs) + Number(summary.epochDurationMs))
+                setValidators(validators.map(item => ({ ...item, epoch: summary.epoch, nextEpoch })))
+            }
+        )
+    }, [isTestnet])
+
+    useEffect(() => {
+
+        if (localStorage.getItem("legatoDefaultPortfolio")) {
+            const defaultPortfolio = localStorage.getItem("legatoDefaultPortfolio")
+            setTab(defaultPortfolio)
+        }
+
+    }, [])
+
+    const updateTab = (value) => {
+        setTab(value)
+        localStorage.setItem("legatoDefaultPortfolio", value)
+    }
 
     return (
         <div class="wrapper pt-10">
@@ -31,7 +56,7 @@ const Portfolio = () => {
 
                 <div className='grid grid-cols-9 gap-2'>
 
-                    <div onClick={() => setTab("ALL")} class={`col-span-2 ${tab === "ALL" && "bg-gray-700"} flex gap-3 items-center border-2 border-gray-700  hover:border-blue-700 flex-1 p-2 px-4 mb-2 hover:cursor-pointer rounded-md`}>
+                    <div onClick={() => updateTab("ALL")} class={`col-span-2 ${tab === "ALL" && "bg-gray-700"} flex gap-3 items-center border-2 border-gray-700  hover:border-blue-700 flex-1 p-2 px-4 mb-2 hover:cursor-pointer rounded-md`}>
                         <div class="relative">
                             <img class="h-8 w-8 rounded-full" src={"./asset-icon.png"} alt="" />
                         </div>
@@ -42,7 +67,7 @@ const Portfolio = () => {
 
                     {marketList.map((item, index) => {
                         return (
-                            <div key={index} onClick={() => setTab(item.key)} class={`col-span-2 ${item.active && "bg-gray-700"} flex gap-3 items-center border-2 border-gray-700  hover:border-blue-700 flex-1 p-2 px-4 mb-2 hover:cursor-pointer rounded-md`}>
+                            <div key={index} onClick={() => updateTab(item.key)} class={`col-span-2 ${item.active && "bg-gray-700"} flex gap-3 items-center border-2 border-gray-700  hover:border-blue-700 flex-1 p-2 px-4 mb-2 hover:cursor-pointer rounded-md`}>
                                 <div class="relative">
                                     <img class="h-8 w-8 rounded-full" src={item.img} alt="" />
                                     {item.isPT && <img src="/pt-badge.png" class="bottom-0 right-5 absolute  w-7 h-4  " />}
@@ -55,7 +80,7 @@ const Portfolio = () => {
                     })}
                 </div>
 
-                <div className='py-3'>
+                <div className='py-3 max-h-[500px]  overflow-y-auto'>
 
                     <div class="relative overflow-x-auto">
                         <table class="w-full text-sm text-left  text-gray-400">
@@ -74,15 +99,14 @@ const Portfolio = () => {
                                         Est. Rewards
                                     </th>
                                     <th scope="col" class="px-6 py-3">
-                                       
+
                                     </th>
                                 </tr>
                             </thead>
                             <tbody>
 
-                                {(tab === "SUI_TO_STAKED_SUI" || tab === "ALL") && <StakedSuiTable account={account} isTestnet={isTestnet} />}
-
-                                
+                                {(tab === "SUI_TO_STAKED_SUI" || tab === "ALL") && <StakedSuiTable account={account} isTestnet={isTestnet} validators={validators} />}
+                                {(tab === "STAKED_SUI_TO_PT" || tab === "ALL") && <PTTable account={account} isTestnet={isTestnet} />}
 
                             </tbody>
                         </table>
@@ -100,37 +124,8 @@ const Portfolio = () => {
                             </div>
                         )}
                     </div>
-
-
-                    {/* {connected
-                        ?
-                        <>
-                            {tab === "SUI_TO_STAKED_SUI" && <StakedSuiTable
-                                assetKey={tab}
-                                account={account}
-                                isTestnet={isTestnet}
-                            />}
-                            {tab === "STAKED_SUI_TO_PT" && <PTTable
-                                assetKey={tab}
-                            />}
-                        </>
-                        :
-                        <div className='flex flex-grow pb-4'>
-                            <div className='border text-gray-300 text-sm font-medium m-auto rounded-md border-gray-300  px-2 py-4 text-center w-full max-w-xs  '>
-                                <CloudOff
-                                    size={32}
-                                    className='ml-auto mr-auto'
-                                />
-                                <div className='p-2 pb-0'>
-                                    Connect wallet to continue
-                                </div>
-                            </div>
-                        </div>
-                    } */}
                 </div>
-
             </div>
-
         </div>
     )
 }

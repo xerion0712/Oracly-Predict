@@ -251,28 +251,16 @@ import useSuiStake from "@/hooks/useSuiStake"
 //     )
 // }
 
-const StakedSuiTable = ({ account, isTestnet }) => {
+const StakedSuiTable = ({ account, isTestnet, validators }) => {
 
     const { getAllObjectsByKey } = usePortfolio()
     const [tick, setTick] = useState(0)
-    const [perValidators, setPerValidators] = useState([])
-    const [validators, setValidators] = useState([])
-    const [selected, setSelected] = useState(undefined)
-    const { fetchSuiSystem } = useSui()
-
+    const [perValidators, setPerValidators] = useState([]) 
+    const [selected, setSelected] = useState(undefined) 
 
     useEffect(() => {
         account && account.address && getAllObjectsByKey("SUI_TO_STAKED_SUI", account.address, isTestnet).then(setPerValidators)
     }, [account, isTestnet, tick])
-
-    useEffect(() => {
-        fetchSuiSystem(isTestnet ? "testnet" : "mainnet").then(
-            ({ summary, validators }) => {
-                const nextEpoch = new Date(Number(summary.epochStartTimestampMs) + Number(summary.epochDurationMs))
-                setValidators(validators.map(item => ({ ...item, epoch: summary.epoch, nextEpoch })))
-            }
-        )
-    }, [isTestnet])
 
     const increaseTick = useCallback(() => {
         setTick(tick + 1)
@@ -296,7 +284,6 @@ const StakedSuiTable = ({ account, isTestnet }) => {
                 const validatorInfo = validators.find(v => v.suiAddress.toLowerCase() === item.validatorAddress.toLowerCase())
                 return (
                     <>
-
                         {
                             item.stakes.map((object, y) => {
 

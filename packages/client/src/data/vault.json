@@ -2,7 +2,7 @@
     {
         "id": 1,
         "name": "October 31, 2023",
-        "image": "./clock.png",
+        "image": "./vault-icon.png",
         "value": "0d",
         "network": "mainnet",
         "disabled": true
@@ -10,7 +10,7 @@
     {
         "id": 1,
         "name": "January 20, 2024",
-        "image": "./clock.png",
+        "image": "./vault-icon.png",
         "value": "0d",
         "network": "testnet",
         "disabled": false,
@@ -22,7 +22,7 @@
     {
         "id": 2,
         "name": "January 10, 2024",
-        "image": "./clock.png",
+        "image": "./vault-icon.png",
         "value": "0d",
         "network": "testnet",
         "disabled": false,
