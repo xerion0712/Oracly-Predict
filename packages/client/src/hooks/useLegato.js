@@ -96,6 +96,103 @@ const Provider = ({ children }) => {
 
     }, [connected])
 
+
+    const swap = useCallback(async (baseCurrency, pairCurrency, amount , isTestnet = false) => {
+
+        if (!connected) {
+            return
+        }
+
+        const { symbol } = baseCurrency
+
+        if (symbol === "SUI") {
+            const { vaultId } = pairCurrency
+            const { ammId, packageId, vaultType } = VAULT.find(item => item.id === vaultId)
+
+            await suiToYT(packageId, vaultType, ammId, amount)
+        } else if (symbol.includes("yt")) {
+            const { vaultId } = baseCurrency
+            const { ammId, packageId, vaultType } = VAULT.find(item => item.id === vaultId)
+
+            await ytToSui(packageId, vaultType, ammId, amount, isTestnet)
+        }
+
+    }, [connected])
+
+    const suiToYT = useCallback(async (packageId, vaultType, ammId, amount) => {
+
+        const tx = new TransactionBlock()
+
+        const [coin] = tx.splitCoins(tx.gas, [tx.pure((amount) * 1000000000)]);
+
+        tx.moveCall({
+            typeArguments: [
+                "0x2::sui::SUI",
+                `${packageId}::vault::TOKEN<${vaultType}, ${packageId}::vault::YT>`
+            ],
+            target: `${packageId}::amm::swap_out`,
+            arguments: [
+                tx.pure(ammId),
+                coin,
+                tx.pure(1),
+                tx.pure(true)
+            ]
+        })
+
+        await wallet.signAndExecuteTransactionBlock({
+            transactionBlock: tx
+        });
+
+    }, [connected])
+
+    const ytToSui = useCallback(async (packageId, vaultType, ammId, amount, isTestnet) => {
+
+        const allYT = await getTotalYT(wallet.account.address, isTestnet)
+
+        const ytObject = allYT.find( item => Number(amount) <= Number(BigNumber(item.balance).dividedBy(BigNumber(10 ** 9)) ) )
+        if (ytObject) {
+            const { objectId }  = ytObject
+
+            const tx = new TransactionBlock()
+            
+            // splitting to new object
+            const [splited_coin] = tx.moveCall({
+                typeArguments: [
+                    `${packageId}::vault::TOKEN<${vaultType}, ${packageId}::vault::YT>`
+                ],
+                target: `0x2::coin::split`,
+                arguments: [
+                    tx.pure(objectId),
+                    tx.pure(`${(BigNumber(amount)).multipliedBy(BigNumber(10 ** 9))}`)
+                ]
+            })
+
+            tx.moveCall({
+                typeArguments: [
+                    `${packageId}::vault::TOKEN<${vaultType}, ${packageId}::vault::YT>`,
+                    "0x2::sui::SUI"
+                ],
+                target: `${packageId}::amm::swap_out`,
+                arguments: [
+                    tx.pure(ammId),
+                    splited_coin,
+                    tx.pure(1),
+                    tx.pure(false)
+                ]
+            })
+
+
+            await wallet.signAndExecuteTransactionBlock({
+                transactionBlock: tx
+            });
+
+        } else {
+            throw new Error("Invalid amount")
+        }
+        
+
+    }, [connected, wallet])
+
     const getTotalPT = useCallback(async (address, isTestnet = false) => {
 
         const suiClient = new SuiClient({ url: getFullnodeUrl(isTestnet ? "testnet" : "mainnet") })
@@ -121,7 +218,7 @@ const Provider = ({ children }) => {
                         }
                     }
                 ]);
-        
+
                 return data.map(({ data }) => ({
                     vault: vault.name,
                     digest: data.digest,
@@ -131,8 +228,48 @@ const Provider = ({ children }) => {
                 }));
             })
         ).then((results) => [].concat(...results));
-        
+
         return objects
+    }, [])
+
+    const getTotalYT = useCallback(async (address, isTestnet = false) => {
+
+        const suiClient = new SuiClient({ url: getFullnodeUrl(isTestnet ? "testnet" : "mainnet") })
+
+        const vaultList = VAULT.filter(item => !item.disabled && item.network === (isTestnet ? "testnet" : "mainnet"));
+
+        const objects = await Promise.all(
+            vaultList.map(async (vault) => {
+                const { vaultType, packageId } = vault;
+                const StructType = `0x2::coin::Coin<${packageId}::vault::TOKEN<${vaultType},${packageId}::vault::YT>>`;
+                const { data } = await suiClient.call("suix_getOwnedObjects", [
+                    address,
+                    {
+                        "filter": {
+                            "MatchAll": [
+                                {
+                                    "StructType": StructType
+                                }
+                            ]
+                        },
+                        "options": {
+                            "showContent": true
+                        }
+                    }
+                ]);
+
+                return data.map(({ data }) => ({
+                    vault: vault.name,
+                    digest: data.digest,
+                    objectId: data.objectId,
+                    version: data.version,
+                    balance: data.content.fields.balance
+                }));
+            })
+        ).then((results) => [].concat(...results));
+
+        return objects
+
     }, [])
 
     const legatoContext = useMemo(
@@ -147,7 +284,9 @@ const Provider = ({ children }) => {
             vaults,
             summary,
             mint,
-            getTotalPT
+            getTotalPT,
+            getTotalYT,
+            swap,
         }),
         [
             market,
@@ -156,7 +295,8 @@ const Provider = ({ children }) => {
             avgApy,
             isTestnet,
             summary,
-            mint
+            mint,
+            swap
         ]
     )
 

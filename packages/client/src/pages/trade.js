@@ -3,8 +3,10 @@ import Trade from "@/components/Trade"
 
 const TradePage = () => {
     return (
-        <MainLayout>
-            <Trade/>
+        <MainLayout
+            bodyClassname="my-auto"
+        >
+            <Trade/> 
         </MainLayout>
     )
 }

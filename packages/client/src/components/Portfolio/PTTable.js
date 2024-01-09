@@ -92,7 +92,7 @@ const PTTable = ({ account, isTestnet }) => {
                             <div className=" flex flex-row">
                                 <div className=" flex  items-center ">
                                     <div class="relative">
-                                        <img class="h-5 w-5 rounded-full" src={"./vault-icon.png"} alt="" />
+                                        <img class="h-5 w-5 rounded-full" src={"./vault-icon-2.png"} alt="" />
                                     </div>
                                 </div>
                                 <div className=" ml-2 flex  items-center ">

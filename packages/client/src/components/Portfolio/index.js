@@ -7,16 +7,15 @@ import useSui from "@/hooks/useSui"
 import { CloudOff } from 'react-feather'
 import PTTable from './PTTable'
 
-const Portfolio = () => {
+const Portfolio = ({ mainnet, testnet }) => {
 
     const [tab, setTab] = useState("ALL")
 
     const wallet = useWallet()
-    const [validators, setValidators] = useState([])
-    const { fetchSuiSystem } = useSui()
 
     const { account, connected } = wallet
     const isTestnet = connected && account && account.chains && account.chains[0] === "sui:testnet" ? true : false
+    const validators = isTestnet ? testnet.validators : mainnet.validators
 
     const marketList = Object.keys(MARKET).map((key) => {
         if (tab === MARKET[key]) currentKey = key
@@ -26,15 +25,6 @@ const Portfolio = () => {
             ...MARKET[key]
         }
     })
-
-    useEffect(() => {
-        fetchSuiSystem(isTestnet ? "testnet" : "mainnet").then(
-            ({ summary, validators }) => {
-                const nextEpoch = new Date(Number(summary.epochStartTimestampMs) + Number(summary.epochDurationMs))
-                setValidators(validators.map(item => ({ ...item, epoch: summary.epoch, nextEpoch })))
-            }
-        )
-    }, [isTestnet])
 
     useEffect(() => {
 
@@ -51,7 +41,10 @@ const Portfolio = () => {
     }
 
     return (
-        <div class="wrapper pt-10">
+        <div class="wrapper pt-5">
+            <h5 class="text-2xl  mx-auto max-w-4xl text-white font-bold m-2 my-3  ">
+                Portfolio
+            </h5>
             <div class={` bg-gray-900 p-6 w-full flex flex-col mx-auto max-w-4xl border min-h-[225px] border-gray-700 text-white rounded-xl`}>
 
                 <div className='grid grid-cols-9 gap-2'>
@@ -105,8 +98,14 @@ const Portfolio = () => {
                             </thead>
                             <tbody>
 
-                                {(tab === "SUI_TO_STAKED_SUI" || tab === "ALL") && <StakedSuiTable account={account} isTestnet={isTestnet} validators={validators} />}
-                                {(tab === "STAKED_SUI_TO_PT" || tab === "ALL") && <PTTable account={account} isTestnet={isTestnet} />}
+                                {connected && (
+                                    <>
+                                        {(tab === "SUI_TO_STAKED_SUI" || tab === "ALL") && <StakedSuiTable account={account} isTestnet={isTestnet} validators={validators} />}
+                                        {(tab === "STAKED_SUI_TO_PT" || tab === "ALL") && <PTTable account={account} isTestnet={isTestnet} />}
+                                    </>
+                                )
+
+                                }
 
                             </tbody>
                         </table>
