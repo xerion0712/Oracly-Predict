@@ -116,7 +116,7 @@ const useSui = () => {
                 output.push({
                     name,
                     image,
-                    value: `$${(Number(`${(BigNumber(fields.principal_balance).plus(BigNumber(fields.debt_balance)).dividedBy(BigNumber(1000000000)).toFixed(2))}`) * suiPrice).toFixed(0)}`,
+                    value: `$${(Number(`${(BigNumber(fields.principal_balance).plus(BigNumber(fields.debt_balance)).dividedBy(BigNumber(1000000000)).toFixed(2))}`) * suiPrice).toFixed(2)}`,
                     network,
                     disabled,
                     ...fields
