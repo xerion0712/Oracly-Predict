@@ -6,32 +6,31 @@ import Vault from "../data/vault.json"
 
 import { TransactionBlock } from '@mysten/sui.js/transactions';
 
-const FALLBACK_SUI_PRICE = 0.77
+const FALLBACK_SUI_PRICE = 0.8
 
 const useSui = () => {
 
     const getSuiPrice = async () => {
         let response
-        return FALLBACK_SUI_PRICE
-        // try {
-        //     response = await axios.get('https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest?id=20947', {
-        //         headers: {
-        //             'X-CMC_PRO_API_KEY': process.env.COINMARKETCAP_API
-        //         },
-        //     });
-        // } catch (ex) {
-        //     response = null;
-        //     // error
-        //     console.log(ex);
-        // }
+        try {
+            response = await axios.get('https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest?id=20947', {
+                headers: {
+                    'X-CMC_PRO_API_KEY': process.env.COINMARKETCAP_API
+                },
+            });
+        } catch (ex) {
+            response = null;
+            // error
+            console.log(ex);
+        }
 
-        // if (response) {
-        //     const { data } = response
-        //     const price = data.data["20947"]["quote"]["USD"]["price"]
-        //     return Number(price)
-        // } else {
-        //     return FALLBACK_SUI_PRICE
-        // }
+        if (response) {
+            const { data } = response
+            const price = data.data["20947"]["quote"]["USD"]["price"]
+            return Number(price)
+        } else {
+            return FALLBACK_SUI_PRICE
+        }
     }
 
     const fetchSuiSystem = async (network = "mainnet") => {
@@ -74,9 +73,9 @@ const useSui = () => {
 
     }
 
-    const fetchAllVault = async (networkName, summary) => {
+    const fetchAllVault = async (networkName, summary, suiPrice) => {
 
-        const vaultList = Vault.filter(item => networkName === "testnet" ? item.network === "testnet" : item.network !== "testnet")
+        const vaultList = Vault.filter(item => item.id !== 1).filter(item => networkName === "testnet" ? item.network === "testnet" : item.network !== "testnet")
 
         const client = new SuiClient({ url: getFullnodeUrl(networkName) })
 
@@ -113,13 +112,11 @@ const useSui = () => {
                 let { fields } = data.content
 
                 delete fields.id
-
-                let remainingDays =  Number(fields.maturity_epoch)-Number(summary.epoch)
-
+ 
                 output.push({
                     name,
                     image,
-                    value: `${remainingDays > 0 ? remainingDays : 0}d`,
+                    value: `$${(Number(`${(BigNumber(fields.principal_balance).plus(BigNumber(fields.debt_balance)).dividedBy(BigNumber(1000000000)).toFixed(2))}`) * suiPrice).toFixed(0)}`,
                     network,
                     disabled,
                     ...fields

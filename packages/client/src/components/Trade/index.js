@@ -57,7 +57,7 @@ const Trade = () => {
     useEffect(() => {
         dispatch({
             baseCurrency: isTestnet ? CURRENCY[1] : CURRENCY[0],
-            pairCurrency: isTestnet ? CURRENCY[2] : CURRENCY[0]
+            pairCurrency: isTestnet ? CURRENCY[2] : CURRENCY[3]
         })
     }, [isTestnet])
 
