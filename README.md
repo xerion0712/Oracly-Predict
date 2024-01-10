@@ -97,18 +97,16 @@ npm run package:client
 
 ## Deployment
 
+### Sui Mainnet
+
+Name | Address 
+--- | --- 
+Package | 0x5019da065d03c055aad8ad983d026f7e58ad33a2440d660cdbb14afdb689eeeb
+Vault | 0x23e08548e58cad3a493307d283251c0094debf109d7753b5f69d73d9bc581d85
+
 ### Sui Testnet
 
 Name | Address 
 --- | --- 
-Package | 0x9c22e4ec6439f67b4bd1c84c9fe7154969e4c88fe1b414602c1a4d56a54209f6
-Vault | 0x50c6f8cf9745a96a7f066afa00633fc06b6f6c33ba7aba4c49de521f07eacf4c
-
-## Roadmap
-
-- [x] Stake SUI to receive Staked SUI objects from validators
-- [x] Browse Staked SUI objects and unstake
-- [ ] On-chain staking APY fetcher
-- [ ] Basic Timelock Vault
-- [ ] Marketplace for trading PT, YT
-- [ ] Claim yield from the surplus
+Package | 0xec23537e93ef41e7f82edd49d3490d1df240b4d2aa5686b044c241e0b4b6a29b
+Vault | 0xb7a8786558e1b8a305a07c8d8a0c4fc3fd28c158f953b1b7b7b03edc6294bba7
