@@ -3,58 +3,14 @@ import { useContext, useState, useCallback, useEffect } from "react"
 import { LegatoContext } from "@/hooks/useLegato"
 import BigNumber from "bignumber.js"
 import { parseAmount } from "@/helpers"
-import PTItemModal from "@/modals/PTItem"
+import YTItemModal from "@/modals/YTItem"
 
-// const PTTableOLD = ({ assetKey }) => {
 
-//     const market = MARKET[assetKey]
+const YTTable = ({ account, isTestnet }) => {
 
-//     return (
-//         <div className="w-full">
-//             <div className="flex  flex-col">
-//                 <div className="flex flex-row gap-3 p-2 pt-0 ">
-//                     <div className="grid grid-cols-3 w-full my-1 text-center text-sm text-gray-300">
-//                         <div className="col-span-1 border-2 border-gray-700  p-2 flex flex-row  rounded-l-md">
-//                             <div className=" flex  items-center p-2">
-//                                 <div class="relative">
-//                                     <img class="h-8 w-8 rounded-full  " src={market.img} alt="" />
-//                                     {market.isPT && <img src="/pt-badge.png" class="bottom-0 right-4 absolute  w-7 h-4  " />}
-//                                 </div>
-//                             </div>
-//                             <div className="  flex  items-center ">
-//                                 <h3 class={`text-base font-medium text-white`}>{market.to}</h3>
-//                             </div>
-//                         </div>
-
-//                         <div className="col-span-1 border-2  border-l-0 border-gray-700   px-8    p-2  ">
-//                             Total Staked
-//                             <h3 class={`text-lg font-medium text-white`}>
-//                                 $0
-//                             </h3>
-//                         </div>
-//                         <div className="col-span-1 border-2 border-gray-700   px-8 border-l-0 p-2 rounded-r-md">
-//                             Pending
-//                             <h3 class={`text-lg font-medium text-white`}>
-//                                 $0
-//                             </h3>
-//                         </div>
-//                     </div>
-//                 </div>
-
-//                 <div class="text-gray-300 text-sm px-2">
-//                     All Assets (-)
-//                 </div>
-
-//             </div>
-//         </div>
-//     )
-// }
-
-const PTTable = ({ account, isTestnet }) => {
-
-    const { getTotalPT } = useContext(LegatoContext)
+    const { getTotalYT } = useContext(LegatoContext)
     const [tick, setTick] = useState(0)
-    const [pt, setPT] = useState([])
+    const [yt, setYT] = useState([])
     const [selected, setSelected] = useState(undefined)
 
     const increaseTick = useCallback(() => {
@@ -62,12 +18,12 @@ const PTTable = ({ account, isTestnet }) => {
     }, [tick])
 
     useEffect(() => {
-        account && account.address && getTotalPT(account.address, isTestnet).then(setPT)
+        account && account.address && getTotalYT(account.address, isTestnet).then(setYT)
     }, [account, isTestnet, tick])
 
     return (
         <>
-            <PTItemModal
+            <YTItemModal
                 visible={selected !== undefined}
                 close={() => {
                     setSelected(undefined)
@@ -79,7 +35,7 @@ const PTTable = ({ account, isTestnet }) => {
                 isTestnet={isTestnet}
             />
 
-            {pt.map((item, index) => {
+            {yt.map((item, index) => {
 
                 const amount = Number(`${(BigNumber(item.balance)).dividedBy(BigNumber(10 ** 9))}`)
                 const parsedAmount = parseAmount(amount)
@@ -88,7 +44,7 @@ const PTTable = ({ account, isTestnet }) => {
                     <tr onClick={() => setSelected({
                         ...item
                     })} key={index} class="border-b border-gray-700 hover:border-blue-700 cursor-pointer ">
-                       <td class="px-6 py-4  text-white">
+                        <td class="px-6 py-4  text-white">
                             <div className=" flex flex-row">
                                 <div className=" flex  items-center ">
                                     <div class="relative">
@@ -97,12 +53,11 @@ const PTTable = ({ account, isTestnet }) => {
                                     </div>
                                 </div>
                                 <div className=" ml-2 flex  items-center ">
-                                    ptStaked SUI
+                                    ytStaked SUI
                                 </div>
                             </div>
                         </td>
-                       
-                        <td scope="row" class="px-6 py-4     text-white">
+                        <td scope="row" class="px-6 py-4   text-white">
                             <div className=" flex flex-row">
                                 <div className=" flex  items-center ">
                                     <div class="relative">
@@ -116,7 +71,7 @@ const PTTable = ({ account, isTestnet }) => {
                         </td>
                         
                         <td class="px-6 py-4  text-white">
-                            {parsedAmount}{` PT`}
+                            {parsedAmount}{` YT`}
                         </td>
                         <td class="px-6 py-4  text-white">
                             {`-`}
@@ -125,9 +80,9 @@ const PTTable = ({ account, isTestnet }) => {
                     </tr>
                 )
             })}
-
         </>
     )
+
 }
 
-export default PTTable
+export default YTTable

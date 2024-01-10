@@ -298,19 +298,6 @@ const StakedSuiTable = ({ account, isTestnet, validators }) => {
                                         validatorAddress: item.validatorAddress,
                                         ...object,
                                     })} class="border-b border-gray-700 hover:border-blue-700 cursor-pointer ">
-                                        <th scope="row" class="px-6 py-4 font-medium    text-white">
-                                            {validatorInfo ? <>
-                                                <div className=" flex flex-row">
-                                                    <div className=" flex  items-center ">
-                                                        <div class="relative">
-                                                            <img class="h-5 w-5 rounded-full" src={validatorInfo.imageUrl} alt="" />
-                                                        </div>
-                                                    </div>
-                                                    <div className=" ml-2 flex  items-center ">
-                                                        <h3 class={`text-sm  text-white`}>{validatorInfo.name}</h3>
-                                                    </div>
-                                                </div></> : shortAddress(item.validatorAddress, 5, -3)}
-                                        </th>
                                         <td class="px-6 py-4  text-white">
                                             <div className=" flex flex-row">
                                                 <div className=" flex  items-center ">
@@ -323,6 +310,21 @@ const StakedSuiTable = ({ account, isTestnet, validators }) => {
                                                 </div>
                                             </div>
                                         </td>
+                                        
+                                        <td scope="row" class="px-6 py-4   text-white">
+                                            {validatorInfo ? <>
+                                                <div className=" flex flex-row">
+                                                    <div className=" flex  items-center ">
+                                                        <div class="relative">
+                                                            <img class="h-5 w-5 rounded-full" src={validatorInfo.imageUrl} alt="" />
+                                                        </div>
+                                                    </div>
+                                                    <div className=" ml-2 flex  items-center ">
+                                                        <h3 class={`text-sm  text-white`}>{validatorInfo.name}</h3>
+                                                    </div>
+                                                </div></> : shortAddress(item.validatorAddress, 5, -3)}
+                                        </td>
+                                        
                                         <td class="px-6 py-4  text-white">
                                             {parsedTotal}{` SUI`}
                                         </td>
