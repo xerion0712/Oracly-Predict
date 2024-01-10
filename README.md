@@ -110,12 +110,3 @@ Name | Address
 --- | --- 
 Package | 0xec23537e93ef41e7f82edd49d3490d1df240b4d2aa5686b044c241e0b4b6a29b
 Vault | 0xb7a8786558e1b8a305a07c8d8a0c4fc3fd28c158f953b1b7b7b03edc6294bba7
-
-## Roadmap
-
-- [x] Stake SUI to receive Staked SUI objects from validators
-- [x] Browse Staked SUI objects and unstake
-- [x] On-chain staking APY fetcher
-- [x] Basic Timelock Vault
-- [x] Marketplace for trading PT, YT
-- [x] Claim yield from the surplus
