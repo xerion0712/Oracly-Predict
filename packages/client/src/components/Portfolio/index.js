@@ -6,6 +6,7 @@ import { useWallet } from '@suiet/wallet-kit'
 import useSui from "@/hooks/useSui"
 import { CloudOff } from 'react-feather'
 import PTTable from './PTTable'
+import YTTable from './YTTable'
 
 const Portfolio = ({ mainnet, testnet }) => {
 
@@ -71,6 +72,17 @@ const Portfolio = ({ mainnet, testnet }) => {
                             </div>
                         )
                     })}
+
+                    <div onClick={() => updateTab("STAKED_SUI_TO_YT")} class={`col-span-2 ${tab === "STAKED_SUI_TO_YT" && "bg-gray-700"} flex gap-3 items-center border-2 border-gray-700  hover:border-blue-700 flex-1 p-2 px-4 mb-2 hover:cursor-pointer rounded-md`}>
+                        <div class="relative">
+                            <img class="h-8 w-8 rounded-full" src={"./sui-sui-logo.svg"} alt="" />
+                            <img src="./yt-badge.png" class="bottom-0 right-5 absolute  w-7 h-4  " />
+                        </div>
+                        <div>
+                            <h3 class={`text-md font-medium text-white`}>ytStaked SUI</h3>
+                        </div>
+                    </div>
+
                 </div>
 
                 <div className='py-3 max-h-[500px]  overflow-y-auto'>
@@ -80,11 +92,11 @@ const Portfolio = ({ mainnet, testnet }) => {
                             <thead class="text-xs  uppercase    border-b    border-gray-700   text-gray-400">
                                 <tr>
                                     <th scope="col" class="px-6 py-3">
-                                        Stakee name
-                                    </th>
-                                    <th scope="col" class="px-6 py-3">
                                         Category
                                     </th>
+                                    <th scope="col" class="px-6 py-3">
+                                        Stakee name
+                                    </th> 
                                     <th scope="col" class="px-6 py-3">
                                         Amount
                                     </th>
@@ -100,8 +112,9 @@ const Portfolio = ({ mainnet, testnet }) => {
 
                                 {connected && (
                                     <>
-                                        {(tab === "SUI_TO_STAKED_SUI" || tab === "ALL") && <StakedSuiTable account={account} isTestnet={isTestnet} validators={validators} />}
+                                        {(tab === "STAKED_SUI_TO_YT" || tab === "ALL") && <YTTable account={account} isTestnet={isTestnet} />}
                                         {(tab === "STAKED_SUI_TO_PT" || tab === "ALL") && <PTTable account={account} isTestnet={isTestnet} />}
+                                        {(tab === "SUI_TO_STAKED_SUI" || tab === "ALL") && <StakedSuiTable account={account} isTestnet={isTestnet} validators={validators} />}
                                     </>
                                 )
 

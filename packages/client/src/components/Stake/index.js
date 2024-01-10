@@ -50,7 +50,7 @@ const Stake = (props) => {
         if (connected && account && account.chains && account.chains[0] === "sui:testnet") {
             fetchSuiSystem("testnet").then(({ summary, validators, avgApy }) => {
                 updateValues({ validators, avgApy, isTestnet: true, vaults: [] })
-                fetchAllVault("testnet", summary).then((vaults) => updateValues({ vaults, summary }))
+                fetchAllVault("testnet", summary, suiPrice ).then((vaults) => updateValues({ vaults, summary }))
             })
         } else {
             updateValues({ validators: props.validators, avgApy: props.avgApy, isTestnet: false, vaults: props.vaults, summary })

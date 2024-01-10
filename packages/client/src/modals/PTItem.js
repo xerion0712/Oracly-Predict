@@ -39,9 +39,7 @@ const PTItemModal = ({ visible, close, item, isTestnet }) => {
 
 }
 
-const InfoRow = ({ name, value, link }) => {
-
-
+export const InfoRow = ({ name, value, link }) => {
 
     return (
         <div class="flex flex-row gap-2 mt-1 mb-2">

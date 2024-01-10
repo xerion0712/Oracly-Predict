@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useReducer,
 import MARKET from "../data/market.json"
 import VAULT from "../data/vault.json"
 import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
-import { TransactionBlock } from '@mysten/sui.js/transactions';
+import { TransactionBlock, Inputs } from '@mysten/sui.js/transactions'; 
 import { useWallet } from "@suiet/wallet-kit";
 import BigNumber from "bignumber.js"
 
@@ -97,7 +97,7 @@ const Provider = ({ children }) => {
     }, [connected])
 
 
-    const swap = useCallback(async (baseCurrency, pairCurrency, amount , isTestnet = false) => {
+    const swap = useCallback(async (baseCurrency, pairCurrency, amount, isTestnet = false) => {
 
         if (!connected) {
             return
@@ -149,12 +149,12 @@ const Provider = ({ children }) => {
 
         const allYT = await getTotalYT(wallet.account.address, isTestnet)
 
-        const ytObject = allYT.find( item => Number(amount) <= Number(BigNumber(item.balance).dividedBy(BigNumber(10 ** 9)) ) )
+        const ytObject = allYT.find(item => Number(amount) <= Number(BigNumber(item.balance).dividedBy(BigNumber(10 ** 9))))
         if (ytObject) {
-            const { objectId }  = ytObject
+            const { objectId } = ytObject
 
             const tx = new TransactionBlock()
-            
+
             // splitting to new object
             const [splited_coin] = tx.moveCall({
                 typeArguments: [
@@ -189,7 +189,7 @@ const Provider = ({ children }) => {
         } else {
             throw new Error("Invalid amount")
         }
-        
+
 
     }, [connected, wallet])
 
@@ -272,6 +272,42 @@ const Provider = ({ children }) => {
 
     }, [])
 
+    const claim = useCallback(async (vaultName, objectId, digest, version) => {
+
+        if (!connected) {
+            return
+        }
+
+        const { packageId, vaultType, vaultId, suiSystemStateId, ammId } = VAULT.find(item => item.name === vaultName)
+        
+        const tx = new TransactionBlock()
+
+        // console.log("version --> ", version)
+        // console.log("packageId --> ", packageId)
+        // console.log("vaultType --> ", vaultType)
+        // console.log("ammId --> ", ammId)
+
+        tx.moveCall({
+            typeArguments: [vaultType],
+            target: `${packageId}::vault::claim`,
+            arguments: [
+                tx.pure(suiSystemStateId),
+                tx.pure(vaultId),
+                tx.pure(ammId),
+                tx.object(Inputs.ObjectRef({
+                    objectId,
+                    digest,
+                    version
+                }))
+            ]
+        })
+
+        await wallet.signAndExecuteTransactionBlock({
+            transactionBlock: tx
+        })
+
+    }, [connected])
+
     const legatoContext = useMemo(
         () => ({
             market,
@@ -287,6 +323,7 @@ const Provider = ({ children }) => {
             getTotalPT,
             getTotalYT,
             swap,
+            claim
         }),
         [
             market,
@@ -296,7 +333,8 @@ const Provider = ({ children }) => {
             isTestnet,
             summary,
             mint,
-            swap
+            swap,
+            claim
         ]
     )
 

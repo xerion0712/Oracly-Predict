@@ -6,9 +6,8 @@ module legato::vault_tests {
     // use std::debug;
 
     use std::vector;
-    use std::string::{Self};
     use sui::coin::{Self, Coin };
-    use sui::object::{ID};
+    // use sui::object::{ID};
     use sui::sui::SUI;
     use sui::test_scenario::{Self as test, Scenario, next_tx, ctx };
     use sui_system::sui_system::{ Self, SuiSystemState, validator_staking_pool_id, epoch };
@@ -322,7 +321,7 @@ module legato::vault_tests {
         test::end(scenario_val);
     }
 
-    public(friend) fun set_up_sui_system_state_imbalance() {
+    fun set_up_sui_system_state_imbalance() {
         let scenario_val = test::begin(@0x0);
         let scenario = &mut scenario_val;
         let ctx = test::ctx(scenario);
@@ -338,7 +337,7 @@ module legato::vault_tests {
         test::end(scenario_val);
     }
 
-    public(friend) fun stake_and_mint(test: &mut Scenario, staker_address: address, amount : u64, validator_address: address) {
+    fun stake_and_mint(test: &mut Scenario, staker_address: address, amount : u64, validator_address: address) {
 
         next_tx(test, staker_address);
         {
@@ -361,7 +360,7 @@ module legato::vault_tests {
 
     }
 
-    public(friend) fun setup_vault(test: &mut Scenario, admin_address:address) {
+    fun setup_vault(test: &mut Scenario, admin_address:address) {
 
         next_tx(test, admin_address);
         {
@@ -379,29 +378,13 @@ module legato::vault_tests {
             let system_state = test::take_shared<SuiSystemState>(test);
             let global = test::take_shared<Global>(test);
             let managercap = test::take_from_sender<ManagerCap>(test);
-            let pools = vector::empty<ID>();
-
-            // add all pools
-            let pool_id_1 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_1);
-            let pool_id_2 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_2);
-            let pool_id_3 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_3);
-            let pool_id_4 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_4);
-
-            vector::push_back<ID>(&mut pools, pool_id_1);
-            vector::push_back<ID>(&mut pools, pool_id_2);
-            vector::push_back<ID>(&mut pools, pool_id_3);
-            vector::push_back<ID>(&mut pools, pool_id_4);
-
+            
             let maturity_epoch = epoch(&mut system_state)+VAULT_MATURE_IN;
             let initial_apy = 30000000; // APY = 3%
 
-            vault::new_vault(
-                &mut managercap, 
-                JAN_2024 {},  
-                string::utf8(b"Test Vault"), 
-                string::utf8(b"TEST"), 
+            vault::new_vault<JAN_2024>(
+                &mut managercap,  
                 initial_apy, 
-                pools, 
                 maturity_epoch,  
                 &mut global,
                 coin::mint_for_testing<SUI>(INIT_LIQUIDITY, ctx(test)),
@@ -411,6 +394,28 @@ module legato::vault_tests {
             test::return_shared(system_state);
             test::return_shared(global);
             test::return_to_sender(test, managercap);
+        };
+
+        
+        next_tx(test, admin_address);
+        {
+            let system_state = test::take_shared<SuiSystemState>(test);
+            let managercap = test::take_from_sender<ManagerCap>(test);
+            let vault = test::take_shared<Vault<JAN_2024>>(test);
+
+            let pool_id_1 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_1);
+            let pool_id_2 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_2);
+            let pool_id_3 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_3);
+            let pool_id_4 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_4);
+
+            vault::add_pool<JAN_2024>( &mut vault, &managercap, pool_id_1 );
+            vault::add_pool<JAN_2024>( &mut vault, &managercap, pool_id_2 );
+            vault::add_pool<JAN_2024>( &mut vault, &managercap, pool_id_3 );
+            vault::add_pool<JAN_2024>( &mut vault, &managercap, pool_id_4 );
+
+            test::return_to_sender(test, managercap);
+            test::return_shared(system_state);
+            test::return_shared(vault);
         };
 
     }

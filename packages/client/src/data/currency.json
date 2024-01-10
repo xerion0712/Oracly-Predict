@@ -4,7 +4,7 @@
         "name": "SUI",
         "symbol": "SUI",
         "isYT" : false,
-        "pairs" : [1],
+        "pairs" : [4],
         "image": "./sui-sui-logo.svg",
         "network": "mainnet",
         "decimals": 9
@@ -28,6 +28,17 @@
         "isYT" : true,
         "image": "./sui-sui-logo.svg",
         "network": "testnet",
+        "decimals": 9
+    },
+    {
+        "id" : 4,
+        "name": "ytStaked SUI (1-2-24)",
+        "symbol": "ytSUI 2-24",
+        "vaultId" : 4,
+        "pairs" : [1],
+        "isYT" : true,
+        "image": "./sui-sui-logo.svg",
+        "network": "mainnet",
         "decimals": 9
     }
 ]

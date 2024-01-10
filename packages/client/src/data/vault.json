@@ -2,7 +2,7 @@
     {
         "id": 1,
         "name": "October 31, 2023",
-        "image": "./vault-icon-2.png",
+        "image": "./vault-icon-3.png",
         "value": "0d",
         "network": "mainnet",
         "disabled": true
@@ -10,7 +10,7 @@
     {
         "id": 2,
         "name": "January 20, 2024",
-        "image": "./vault-icon-2.png",
+        "image": "./vault-icon-3.png",
         "value": "0d",
         "network": "testnet",
         "disabled": false,
@@ -23,7 +23,7 @@
     {
         "id": 3,
         "name": "January 10, 2024",
-        "image": "./vault-icon-2.png",
+        "image": "./vault-icon-3.png",
         "value": "0d",
         "network": "testnet",
         "disabled": false,
@@ -32,6 +32,19 @@
         "vaultId": "0x24cab32c4244a1dbec5e327e4186fd4c98b15d38570f3ead6f656b03ad93a28d",
         "suiSystemStateId": "0x0000000000000000000000000000000000000000000000000000000000000005",
         "ammId" : "0xbd8594fbbefb6c6ce07462c8a927bd8ebb9d60ccdaa59af770ea3791227f5af6"
+    },
+    {
+        "id" : 4,
+        "name": "February 1, 2024",
+        "image": "./vault-icon-3.png",
+        "value": "0d",
+        "network": "mainnet",
+        "disabled": false,
+        "packageId": "0x5019da065d03c055aad8ad983d026f7e58ad33a2440d660cdbb14afdb689eeeb",
+        "vaultType": "0x5019da065d03c055aad8ad983d026f7e58ad33a2440d660cdbb14afdb689eeeb::template::FEB_2024",
+        "vaultId": "0x23e08548e58cad3a493307d283251c0094debf109d7753b5f69d73d9bc581d85",
+        "suiSystemStateId": "0x0000000000000000000000000000000000000000000000000000000000000005",
+        "ammId" : "0x5d30e181195acc907ebad080741e050df7df700c8920bd065d611d4e49a57472"
     }
     
 ]

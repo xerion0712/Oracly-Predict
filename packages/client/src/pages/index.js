@@ -23,7 +23,7 @@ export async function getStaticProps() {
 
   const { summary, avgApy, validators } = await fetchSuiSystem()
 
-  const vaults = await fetchAllVault("mainnet", summary)
+  const vaults = await fetchAllVault("mainnet", summary, suiPrice)
 
   return {
     props: {
