@@ -24,8 +24,6 @@ const Header = () => {
     const router = useRouter()
     const wallet = useWallet();
 
-    // const accounts = wallet && wallet.connected ? wallet.getAccounts() : []
-
     const { pathname } = router
 
     return (
