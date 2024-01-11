@@ -168,7 +168,7 @@ const StakedSuiToPT = ({ isTestnet, suiPrice }) => {
                     </div>
                     <div className='flex flex-row text-lg'>
                         <img src={"./sui-sui-logo.svg"} alt="" className="h-5 w-5  mr-2  mt-auto mb-auto flex-shrink-0 rounded-full" />
-                        {parseAmount(stakedAmount)}
+                        {parseAmount(stakedAmount)}{` PT`}
                     </div>
                 </div>
                 <div className='text-right'>

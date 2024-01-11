@@ -190,7 +190,7 @@ const SuiToStakedSui = ({
                 </div>
                 <div className='text-right'>
                     <div className="block text-sm font-medium leading-6 text-gray-300">
-                        Current APY
+                        Validator APY
                     </div>
                     <div className="text-2xl">
                         {selected && selected.apy.toFixed(2)}%

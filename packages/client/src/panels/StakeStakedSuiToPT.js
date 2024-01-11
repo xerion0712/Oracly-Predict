@@ -268,7 +268,7 @@ const StakeStakedSuiToPT = ({
                     )}
                     {isEnded && (
                         <div className="w-full text-xs my-3 font-medium p-2 py-1 text-center rounded border border-yellow-300 text-yellow-300">
-                            The vault has matured
+                            This vault has matured. Redeem SUI on the portfolio page
                         </div>
                     )}
                     <hr class="h-px my-4 border-0 bg-gray-600" />
