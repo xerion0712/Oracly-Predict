@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useReducer,
 import MARKET from "../data/market.json"
 import VAULT from "../data/vault.json"
 import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
-import { TransactionBlock, Inputs } from '@mysten/sui.js/transactions'; 
+import { TransactionBlock, Inputs } from '@mysten/sui.js/transactions';
 import { useWallet } from "@suiet/wallet-kit";
 import BigNumber from "bignumber.js"
 
@@ -279,13 +279,8 @@ const Provider = ({ children }) => {
         }
 
         const { packageId, vaultType, vaultId, suiSystemStateId, ammId } = VAULT.find(item => item.name === vaultName)
-        
-        const tx = new TransactionBlock()
 
-        // console.log("version --> ", version)
-        // console.log("packageId --> ", packageId)
-        // console.log("vaultType --> ", vaultType)
-        // console.log("ammId --> ", ammId)
+        const tx = new TransactionBlock()
 
         tx.moveCall({
             typeArguments: [vaultType],
@@ -299,6 +294,32 @@ const Provider = ({ children }) => {
                     digest,
                     version
                 }))
+            ]
+        })
+
+        await wallet.signAndExecuteTransactionBlock({
+            transactionBlock: tx
+        })
+
+    }, [connected])
+
+    const redeem = useCallback(async (vaultName, objectId) => {
+
+        if (!connected) {
+            return
+        }
+
+        const { packageId, vaultType, suiSystemStateId, vaultId } = VAULT.find(item => item.name === vaultName)
+
+        const tx = new TransactionBlock()
+
+        tx.moveCall({
+            typeArguments: [vaultType],
+            target: `${packageId}::vault::redeem`,
+            arguments: [
+                tx.pure(suiSystemStateId),
+                tx.pure(vaultId),
+                tx.object(objectId)
             ]
         })
 
@@ -323,7 +344,8 @@ const Provider = ({ children }) => {
             getTotalPT,
             getTotalYT,
             swap,
-            claim
+            claim,
+            redeem
         }),
         [
             market,
@@ -334,7 +356,8 @@ const Provider = ({ children }) => {
             summary,
             mint,
             swap,
-            claim
+            claim,
+            redeem
         ]
     )
 

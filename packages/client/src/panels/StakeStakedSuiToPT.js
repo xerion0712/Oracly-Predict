@@ -65,12 +65,18 @@ const StakeStakedSuiToPT = ({
             const diffEpoch = Number(vault.maturity_epoch) - Number(summary.epoch)
             const matureDate = new Date((new Date(Number(summary.epochStartTimestampMs))).valueOf() + (Number(summary.epochDurationMs) * (diffEpoch > 0 ? diffEpoch : 0)))
 
-            const diffTime = Math.abs(matureDate - current);
+
+            const diffTime = matureDate - current
             const totals = Math.floor(diffTime / 1000)
 
-            const { days, hours, minutes, seconds } = secondsToDDHHMMSS(totals)
+            if (totals > 0) {
+                const { days, hours, minutes, seconds } = secondsToDDHHMMSS(totals)
+                setCountdown(`${days}d ${hours}h ${minutes}m ${seconds}s`)
+            } else {
+                setCountdown(`0d 0h 0m`)
+            }
 
-            setCountdown(`${days}d ${hours}h ${minutes}m ${seconds}s`)
+
         },
         1000,
     )
@@ -126,6 +132,8 @@ const StakeStakedSuiToPT = ({
 
     const ptMulfiplier = summary && vault && 1 + ((Number(`${(BigNumber(vault.vault_apy)).dividedBy(BigNumber(10 ** 9))}`)) * (Number(vault.maturity_epoch) - Number(summary.epoch)) / 365)
     const ptAmount = ptMulfiplier ? amount * ptMulfiplier : 0
+
+    const isEnded = summary && vault && Number(vault.maturity_epoch) - Number(summary.epoch) <= 0
 
     return (
         <>
@@ -253,11 +261,18 @@ const StakeStakedSuiToPT = ({
                         name={"APY to lock-in"}
                         value={`${apy}%`}
                     />
-                    <div className="w-full text-xs my-3 font-medium p-2 py-1 text-center rounded border border-blue-400 text-blue-400">
-                        The vault is in private alpha, reach out to the team for grant access
-                    </div>
+                    {!isEnded && (
+                        <div className="w-full text-xs my-3 font-medium p-2 py-1 text-center rounded border border-blue-400 text-blue-400">
+                            The vault is in private alpha, reach out to the team for grant access
+                        </div>
+                    )}
+                    {isEnded && (
+                        <div className="w-full text-xs my-3 font-medium p-2 py-1 text-center rounded border border-yellow-300 text-yellow-300">
+                            This vault has matured. Redeem SUI on the portfolio page
+                        </div>
+                    )}
                     <hr class="h-px my-4 border-0 bg-gray-600" />
-                    <button disabled={disabled} onClick={onMint} className={`py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700 ${disabled && "opacity-60"}`}>
+                    <button disabled={disabled || isEnded} onClick={onMint} className={` ${isEnded && "opacity-80"}  py-3 rounded-lg pl-10 pr-10 text-sm font-medium flex flex-row w-full justify-center bg-blue-700 ${disabled && "opacity-60"}`}>
                         {loading && <Spinner />}
                         Mint
                     </button>
@@ -298,7 +313,7 @@ const Modal = ({
     return (
         <div class="fixed inset-0 flex items-center justify-center  z-50">
             <div class="absolute inset-0 bg-gray-900 opacity-50"></div>
-            <div class={`relative   bg-gray-800 p-6 w-full ml-5 mr-7 mb-[200px]  border  border-gray-700 text-white rounded-lg`}>
+            <div class={`relative  bg-gray-800 p-6 w-full mb-[200px] max-w-lg  border  border-gray-700 text-white rounded-lg`}>
                 <h5 class="text-xl font-bold mb-2"> All Staked SUI ({totalAssets})</h5>
                 <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-400" onClick={() => dispatch({ modal: false })}>
                     <X />
