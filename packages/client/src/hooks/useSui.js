@@ -6,31 +6,32 @@ import Vault from "../data/vault.json"
 
 import { TransactionBlock } from '@mysten/sui.js/transactions';
 
-const FALLBACK_SUI_PRICE = 0.8
+const FALLBACK_SUI_PRICE = 0.9
 
 const useSui = () => {
 
     const getSuiPrice = async () => {
-        let response
-        try {
-            response = await axios.get('https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest?id=20947', {
-                headers: {
-                    'X-CMC_PRO_API_KEY': process.env.COINMARKETCAP_API
-                },
-            });
-        } catch (ex) {
-            response = null;
-            // error
-            console.log(ex);
-        }
+        return FALLBACK_SUI_PRICE
+        // let response
+        // try {
+        //     response = await axios.get('https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest?id=20947', {
+        //         headers: {
+        //             'X-CMC_PRO_API_KEY': process.env.COINMARKETCAP_API
+        //         },
+        //     });
+        // } catch (ex) {
+        //     response = null;
+        //     // error
+        //     console.log(ex);
+        // }
 
-        if (response) {
-            const { data } = response
-            const price = data.data["20947"]["quote"]["USD"]["price"]
-            return Number(price)
-        } else {
-            return FALLBACK_SUI_PRICE
-        }
+        // if (response) {
+        //     const { data } = response
+        //     const price = data.data["20947"]["quote"]["USD"]["price"]
+        //     return Number(price)
+        // } else {
+        //     return FALLBACK_SUI_PRICE
+        // }
     }
 
     const fetchSuiSystem = async (network = "mainnet") => {
@@ -112,11 +113,11 @@ const useSui = () => {
                 let { fields } = data.content
 
                 delete fields.id
- 
+
                 output.push({
                     name,
                     image,
-                    value: `$${(Number(`${(BigNumber(fields.principal_balance).plus(BigNumber(fields.debt_balance)).dividedBy(BigNumber(1000000000)).toFixed(2))}`) * suiPrice).toFixed(2)}`,
+                    value: `$${(Number(`${(BigNumber(fields.principal_balance).plus(BigNumber(fields.debt_balance)).dividedBy(BigNumber(1000000000)).toFixed(2))}`) * suiPrice).toFixed(0)}`,
                     network,
                     disabled,
                     ...fields
