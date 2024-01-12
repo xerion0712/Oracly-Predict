@@ -21,6 +21,6 @@
             "mainnet",
             "testnet"
         ],
-        "description": "Allows holders of non-fungible Staked SUI objects to lock-in the APY at today's rates for fungible ptStaked SUI tokens that can be traded on Legato's DEX, providing greater flexibility  greater flexibility and enhancing staking strategy."
+        "description": "Allows holders of non-fungible Staked SUI objects to lock-in the APY at today's rates for fungible ptStaked SUI tokens that can be traded on Legato's DEX, providing greater flexibility and enhancing staking strategy."
     }
 }
