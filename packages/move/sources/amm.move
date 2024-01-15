@@ -1,10 +1,8 @@
-
-
 // A scaled-down version of OmniBTC's Sui AMM Swap with no fees taken
 // https://github.com/OmniBTC/Sui-AMM-swap
 
 module legato::amm {
-    
+
     use std::ascii::into_bytes;
     use std::type_name::{get, into_string};
     use std::string::{Self, String}; 
@@ -19,6 +17,8 @@ module legato::amm {
 
     use legato::comparator;
     use legato::math;
+
+    friend legato::amm_interface; 
 
     /// For when Coin is zero.
     const ERR_ZERO_AMOUNT: u64 = 0;
@@ -55,6 +55,8 @@ module legato::amm {
 
     const ERR_UNAUTHORISED: u64 = 16;
     const ERR_INVALID_INDEX: u64 = 17;
+    const ERR_DUPLICATED_ENTRY: u64 = 18;
+    const ERR_NOT_FOUND: u64 = 19;
 
     /// The max value that can be held in one of the Balances of
     /// a Pool. U64 MAX / FEE_SCALE
@@ -78,30 +80,26 @@ module legato::amm {
         min_liquidity: Balance<LP<X, Y>>,
     }
 
-    /// The global config
-    struct Global has key {
+    /// The global config for AMM
+    struct AMMGlobal has key {
         id: UID,
+        admin: vector<address>,
         has_paused: bool,
         pools: Bag
-    }
-
-    struct ManagerCap has key {
-        id: UID
     }
 
     /// Init global config
     fun init(ctx: &mut TxContext) {
  
-        let global = Global {
+        let admin_list = vector::empty<address>();
+        vector::push_back<address>(&mut admin_list, tx_context::sender(ctx));
+
+        let global = AMMGlobal {
             id: object::new(ctx),
+            admin: admin_list,
             has_paused: false,
             pools: bag::new(ctx)
         };
-
-        transfer::transfer(
-            ManagerCap {id: object::new(ctx)},
-            tx_context::sender(ctx)
-        );
 
         transfer::share_object(global)
     }
@@ -110,12 +108,12 @@ module legato::amm {
         pool.global
     }
 
-    public fun id<X, Y>(global: &Global): ID {
+    public fun id<X, Y>(global: &AMMGlobal): ID {
         object::uid_to_inner(&global.id)
     }
 
     public fun get_mut_pool<X, Y>(
-        global: &mut Global,
+        global: &mut AMMGlobal,
         is_order: bool,
     ): &mut Pool<X, Y> {
         assert!(is_order, ERR_MUST_BE_ORDER);
@@ -135,22 +133,22 @@ module legato::amm {
         balance::value<Y>(&pool.coin_y)
     }
 
-    public fun has_registered<X, Y>(
-        global: &Global
-    ): bool {
+    public fun has_registered<X, Y>(global: &AMMGlobal): bool {
         let lp_name = generate_lp_name<X, Y>();
         bag::contains_with_type<String, Pool<X, Y>>(&global.pools, lp_name)
     }
 
-    public entry fun pause(_manager_cap: &mut ManagerCap, global: &mut Global) {
+    public entry fun pause(global: &mut AMMGlobal, ctx: &mut TxContext) {
+        check_admin(global, tx_context::sender(ctx));
         global.has_paused = true
     }
 
-    public entry fun resume(_manager_cap: &mut ManagerCap, global: &mut Global) {
+    public entry fun resume( global: &mut AMMGlobal, ctx: &mut TxContext) {
+        check_admin(global, tx_context::sender(ctx));
         global.has_paused = false
     }
 
-    public fun is_emergency(global: &Global): bool {
+    public fun is_emergency(global: &AMMGlobal): bool {
         global.has_paused
     }
 
@@ -184,7 +182,7 @@ module legato::amm {
 
     /// Register pool
     public fun register_pool<X, Y>(
-        global: &mut Global,
+        global: &mut AMMGlobal,
         is_order: bool
     ) {
         assert!(is_order, ERR_MUST_BE_ORDER);
@@ -317,7 +315,7 @@ module legato::amm {
     /// Swap Coin<X> for Coin<Y>
     /// Returns Coin<Y>
     public fun swap_out<X, Y>(
-        global: &mut Global,
+        global: &mut AMMGlobal,
         coin_in: Coin<X>,
         coin_out_min: u64,
         is_order: bool,
@@ -407,6 +405,77 @@ module legato::amm {
 
     }
 
+    // clone from swap_out() but return a Coin object
+    public fun swap_out_for_coin<X, Y>(
+        global: &mut AMMGlobal,
+        coin_in: Coin<X>,
+        coin_out_min: u64,
+        is_order: bool,
+        ctx: &mut TxContext
+    ): Coin<Y> {
+        assert!(coin::value<X>(&coin_in) > 0, ERR_ZERO_AMOUNT);
+
+        if (is_order) {
+            let pool = get_mut_pool<X, Y>(global, is_order);
+            let (coin_x_reserve, coin_y_reserve, _lp) = get_reserves_size(pool);
+            assert!(coin_x_reserve > 0 && coin_y_reserve > 0, ERR_RESERVES_EMPTY);
+            let coin_x_in = coin::value(&coin_in);
+
+            let coin_y_out = get_amount_out(
+                coin_x_in,
+                coin_x_reserve,
+                coin_y_reserve,
+            );
+            assert!(
+                coin_y_out >= coin_out_min,
+                ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM
+            );
+
+            let coin_x_balance = coin::into_balance(coin_in);
+            balance::join(&mut pool.coin_x, coin_x_balance);
+            let coin_out = coin::take(&mut pool.coin_y, coin_y_out, ctx);
+
+            let (new_reserve_x, new_reserve_y, _lp) = get_reserves_size(pool);
+            assert_lp_value_is_increased(
+                coin_x_reserve,
+                coin_y_reserve,
+                new_reserve_x,
+                new_reserve_y
+            );
+
+            coin_out
+        } else {
+            let pool = get_mut_pool<Y, X>(global, !is_order);
+            let (coin_x_reserve, coin_y_reserve, _lp) = get_reserves_size(pool);
+            assert!(coin_x_reserve > 0 && coin_y_reserve > 0, ERR_RESERVES_EMPTY);
+            let coin_y_in = coin::value(&coin_in);
+
+            let coin_x_out = get_amount_out(
+                coin_y_in,
+                coin_y_reserve,
+                coin_x_reserve,
+            );
+            assert!(
+                coin_x_out >= coin_out_min,
+                ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM
+            );
+
+            let coin_y_balance = coin::into_balance(coin_in);
+            balance::join(&mut pool.coin_y, coin_y_balance);
+            let coin_out = coin::take(&mut pool.coin_x, coin_x_out, ctx); 
+
+            let (new_reserve_x, new_reserve_y, _lp) = get_reserves_size(pool);
+            assert_lp_value_is_increased(
+                coin_x_reserve,
+                coin_y_reserve,
+                new_reserve_x,
+                new_reserve_y
+            );
+
+            coin_out
+        }
+    }
+
     /// Get most used values in a handy way:
     /// - amount of Coin<X>
     /// - amount of Coin<Y>
@@ -477,6 +546,26 @@ module legato::amm {
         math::mul_div_u128(coin_in_val, (reserve_out as u128), new_reserve_in)
     }
 
+    fun check_admin(global: &AMMGlobal, sender: address) {
+        let (contained, _) = vector::index_of<address>(&global.admin, &sender);
+        assert!(contained,ERR_UNAUTHORISED);
+    }
+
+    // add new admin
+    public entry fun add_admin(global: &mut AMMGlobal, user: address, ctx: &mut TxContext) {
+        check_admin(global, tx_context::sender(ctx));
+        assert!(!vector::contains(&global.admin, &user),ERR_DUPLICATED_ENTRY);
+        vector::push_back<address>(&mut global.admin, user);
+    }
+
+    // remove admin
+    public entry fun remove_admin(global: &mut AMMGlobal, user: address, ctx: &mut TxContext) {
+        check_admin(global, tx_context::sender(ctx));
+        let (contained, index) = vector::index_of<address>(&global.admin, &user);
+        assert!(contained,ERR_NOT_FOUND);
+        vector::remove<address>(&mut global.admin, index);
+    }
+
     #[test_only]
     public fun init_for_testing(
         ctx: &mut TxContext
@@ -486,7 +575,7 @@ module legato::amm {
 
     #[test_only]
     public fun add_liquidity_for_testing<X, Y>(
-        global: &mut Global,
+        global: &mut AMMGlobal,
         coin_x: Coin<X>,
         coin_y: Coin<Y>,
         ctx: &mut TxContext
@@ -509,14 +598,14 @@ module legato::amm {
     }
 
     public fun get_mut_pool_for_testing<X, Y>(
-        global: &mut Global
+        global: &mut AMMGlobal
     ): &mut Pool<X, Y> {
         get_mut_pool<X, Y>(global, is_order<X, Y>())
     }
 
     #[test_only]
     public fun swap_for_testing<X, Y>(
-        global: &mut Global,
+        global: &mut AMMGlobal,
         coin_in: Coin<X>,
         coin_out_min: u64,
         ctx: &mut TxContext
@@ -543,6 +632,5 @@ module legato::amm {
             ctx
         )
     }
-
 
 }
