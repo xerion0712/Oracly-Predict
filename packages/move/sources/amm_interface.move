@@ -10,7 +10,7 @@ module legato::amm_interface {
     use sui::tx_context::{Self, TxContext};
 
     use legato::event::{added_event, removed_event, swapped_event};
-    use legato::amm::{Self, Global, LP};
+    use legato::amm::{Self, AMMGlobal, LP};
 
     const ERR_NO_PERMISSIONS: u64 = 101;
     const ERR_EMERGENCY: u64 = 102;
@@ -21,7 +21,7 @@ module legato::amm_interface {
     /// Entrypoint for the `add_liquidity` method.
     /// Sends `LP<X,Y>` to the transaction sender.
     public entry fun add_liquidity<X, Y>(
-        global: &mut Global,
+        global: &mut AMMGlobal,
         coin_x: Coin<X>,
         coin_x_min: u64,
         coin_y: Coin<Y>,
@@ -71,7 +71,7 @@ module legato::amm_interface {
     /// Entrypoint for the `remove_liquidity` method.
     /// Transfers Coin<X> and Coin<Y> to the sender.
     public entry fun remove_liquidity<X, Y>(
-        global: &mut Global,
+        global: &mut AMMGlobal,
         lp_coin: Coin<LP<X, Y>>,
         ctx: &mut TxContext
     ) {
@@ -109,7 +109,7 @@ module legato::amm_interface {
     /// Entry point for the `swap` method.
     /// Sends swapped Coin to the sender.
     public entry fun swap<X, Y>(
-        global: &mut Global,
+        global: &mut AMMGlobal,
         coin_in: Coin<X>,
         coin_out_min: u64,
         ctx: &mut TxContext
@@ -144,7 +144,7 @@ module legato::amm_interface {
     }
 
     public entry fun multi_add_liquidity<X, Y>(
-        global: &mut Global,
+        global: &mut AMMGlobal,
         coins_x: vector<Coin<X>>,
         coins_x_value: u64,
         coin_x_min: u64,
@@ -199,7 +199,7 @@ module legato::amm_interface {
     }
 
     public entry fun multi_remove_liquidity<X, Y>(
-        global: &mut Global,
+        global: &mut AMMGlobal,
         lp_coin: vector<Coin<LP<X, Y>>>,
         ctx: &mut TxContext
     ) {
@@ -219,7 +219,7 @@ module legato::amm_interface {
     }
 
     public entry fun multi_swap<X, Y>(
-        global: &mut Global,
+        global: &mut AMMGlobal,
         coins_in: vector<Coin<X>>,
         coins_in_value: u64,
         coin_out_min: u64,

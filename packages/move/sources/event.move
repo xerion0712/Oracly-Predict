@@ -5,7 +5,7 @@ module legato::event {
     use sui::event::emit;
     use sui::object::ID;
 
-    friend legato::vault;
+    friend legato::legato;
     friend legato::amm_interface;
 
     /// Liquidity pool added event.
@@ -76,6 +76,21 @@ module legato::event {
         vault_name: String,
         pt_burned: u64,
         sui_amount: u64,
+        sender: address,
+        epoch: u64,
+        principal_balance: u64,
+        debt_balance: u64,
+        earning_balance: u64,
+        pending_balance: u64
+    }
+
+    struct ExitEvent has copy, drop {
+        global: ID,
+        vault_name: String,
+        deposit_id: u64,
+        asset_object_id: ID,
+        pt_burned: u64,
+        yt_received: u64,
         sender: address,
         epoch: u64,
         principal_balance: u64,
@@ -234,6 +249,38 @@ module legato::event {
                 vault_name,
                 pt_burned,
                 sui_amount,
+                sender,
+                epoch,
+                principal_balance,
+                debt_balance,
+                earning_balance,
+                pending_balance
+            }
+        )
+    }
+
+    public(friend) fun exit_event(
+        global: ID,
+        vault_name: String,
+        deposit_id: u64,
+        asset_object_id: ID,
+        pt_burned: u64,
+        yt_received: u64,
+        sender: address,
+        epoch: u64,
+        principal_balance: u64,
+        debt_balance: u64,
+        earning_balance: u64,
+        pending_balance: u64
+    ) {
+        emit(
+            ExitEvent {
+                global,
+                vault_name,
+                deposit_id,
+                asset_object_id,
+                pt_burned,
+                yt_received,
                 sender,
                 epoch,
                 principal_balance,

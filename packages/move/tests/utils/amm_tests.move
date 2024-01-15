@@ -13,7 +13,7 @@ module legato::amm_tests {
     use sui::sui::SUI;
     use sui::test_scenario::{Self, Scenario, next_tx, ctx, end};
 
-    use legato::amm::{Self, Global};
+    use legato::amm::{Self, AMMGlobal};
     use legato::math::{sqrt, mul_to_u128};
 
     const XBTC_AMOUNT: u64 = 100000000;
@@ -76,7 +76,7 @@ module legato::amm_tests {
 
         next_tx(test, owner);
         {
-            let global = test_scenario::take_shared<Global>(test);
+            let global = test_scenario::take_shared<AMMGlobal>(test);
 
             let (lp, _pool_id) = amm::add_liquidity_for_testing<USDT, XBTC>(
                 &mut global,
@@ -93,7 +93,7 @@ module legato::amm_tests {
 
         next_tx(test, owner);
         {
-            let global = test_scenario::take_shared<Global>(test);
+            let global = test_scenario::take_shared<AMMGlobal>(test);
             let pool = amm::get_mut_pool_for_testing<USDT, XBTC>(&mut global);
 
             let (reserve_usdt, reserve_xbtc, lp_supply) = amm::get_reserves_size(pool);
@@ -114,7 +114,7 @@ module legato::amm_tests {
 
         next_tx(test, theguy);
         {
-            let global = test_scenario::take_shared<Global>(test);
+            let global = test_scenario::take_shared<AMMGlobal>(test);
             let pool = amm::get_mut_pool_for_testing<USDT, XBTC>(&mut global);
 
             let (reserve_usdt, reserve_xbtc, _lp_supply) = amm::get_reserves_size<USDT, XBTC>(pool);
@@ -140,7 +140,7 @@ module legato::amm_tests {
 
         next_tx(test, the_guy);
         {
-            let global = test_scenario::take_shared<Global>(test);
+            let global = test_scenario::take_shared<AMMGlobal>(test);
             let pool = amm::get_mut_pool_for_testing<USDT, XBTC>(&mut global);
             let (reserve_usdt, reserve_xbtc, _lp_supply) = amm::get_reserves_size<USDT, XBTC>(pool);
 
@@ -172,7 +172,7 @@ module legato::amm_tests {
 
         next_tx(test, owner);
         {
-            let global = test_scenario::take_shared<Global>(test);
+            let global = test_scenario::take_shared<AMMGlobal>(test);
             let pool = amm::get_mut_pool_for_testing<USDT, XBTC>(&mut global);
             let (reserve_usdt, reserve_xbtc, _lp_supply) = amm::get_reserves_size<USDT, XBTC>(pool);
 
