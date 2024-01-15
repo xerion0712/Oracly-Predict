@@ -6,6 +6,7 @@ module legato::legato {
  
     // use std::debug;
 
+    use sui::math;
     use sui::tx_context::{Self, TxContext};
     use sui::table::{ Self, Table};
     use sui::balance::{ Self, Supply , Balance };
@@ -254,18 +255,11 @@ module legato::legato {
         if (input_yt_amount == needed_yt_amount) { 
             let vt = amm::swap_out_for_coin<TOKEN<P,YT>, LEGATO>(amm_global, yt, 1, false, ctx);
             transfer::public_transfer(vt, treasury_address);
-
-            // balance::decrease_supply(&mut global.token_supply, coin::into_balance(vt));
         } else {
             let burned_coin = coin::split(&mut yt, input_yt_amount, ctx);
             let vt = amm::swap_out_for_coin<TOKEN<P,YT>, LEGATO>(amm_global, burned_coin, 1, false, ctx);
-            // let admin_address = *vector::borrow<address>(&global.admin, 0);
             transfer::public_transfer(vt, treasury_address);
-            // balance::decrease_supply(&mut global.token_supply, coin::into_balance(vt));
-            transfer::public_transfer(
-                yt,
-                tx_context::sender(ctx)
-            );
+            transfer::public_transfer(yt, tx_context::sender(ctx));
         };
 
         // send out Staked SUI
@@ -561,6 +555,53 @@ module legato::legato {
     }
 
     // ======== Test-related Functions =========
+
+    #[test_only]
+    public fun median_apy<P>(wrapper: &mut SuiSystemState, global: &mut Global, epoch: u64): u64 {
+        let vault = get_vault<P>(global);
+
+        let count = vector::length(&vault.pools);
+        let i = 0;
+        let total_sum = 0;
+        while (i < count) {
+            let pool_id = vector::borrow(&vault.pools, i);
+            total_sum = total_sum+apy_reader::pool_apy(wrapper, pool_id, epoch);
+            i = i + 1;
+        };
+        total_sum / i
+    }
+
+    #[test_only]
+    public fun ceil_apy<P>(wrapper: &mut SuiSystemState, global: &mut Global, epoch: u64): u64 {
+        let vault = get_vault<P>(global);
+        
+        let count = vector::length(&vault.pools);
+        let i = 0;
+        let output = 0;
+        while (i < count) {
+            let pool_id = vector::borrow(&vault.pools, i);
+            output = math::max( output, apy_reader::pool_apy(wrapper, pool_id, epoch) );
+            i = i + 1;
+        };
+        output
+    }
+
+    #[test_only]
+    public fun floor_apy<P>(wrapper: &mut SuiSystemState, global: &mut Global, epoch: u64): u64 {
+        let vault = get_vault<P>(global);
+        
+        let count = vector::length(&vault.pools);
+        let i = 0;
+        let output = 0;
+        while (i < count) {
+            let pool_id = vector::borrow(&vault.pools, i);
+            if (output == 0)
+                    output = apy_reader::pool_apy(wrapper, pool_id, epoch)
+                else output = math::min( output, apy_reader::pool_apy(wrapper, pool_id, epoch) );
+            i = i + 1;
+        };
+        output
+    }
 
     #[test_only]
     public fun test_init(ctx: &mut TxContext) {
