@@ -3,13 +3,11 @@
 #[test_only]
 module legato::amm_tests {
 
-    use std::vector;
-    // use std::ascii::into_bytes;
-    // use std::bcs;
-    // use std::string::utf8;
-    // use std::type_name::{get, into_string};
+    // use std::debug;
 
-    use sui::coin::{mint_for_testing as mint, burn_for_testing as burn};
+    use std::vector;
+
+    use sui::coin::{Self, Coin, mint_for_testing as mint, burn_for_testing as burn};
     use sui::sui::SUI;
     use sui::test_scenario::{Self, Scenario, next_tx, ctx, end};
 
@@ -18,8 +16,14 @@ module legato::amm_tests {
 
     const XBTC_AMOUNT: u64 = 100000000;
     const USDT_AMOUNT: u64 = 1900000000000;
+
+    const XXX_AMOUNT: u64 = 38000000000000;
+    const ZZZ_AMOUNT: u64 = 64000000000000;
+
     const MINIMAL_LIQUIDITY: u64 = 1000;
     const MAX_U64: u64 = 18446744073709551615;
+
+    const ONE: u64 = 1_000_000_000;
 
     // test coins
 
@@ -28,6 +32,10 @@ module legato::amm_tests {
     struct USDT {}
 
     struct BEEP {}
+
+    struct XXX {}
+
+    struct ZZZ {}
 
     // Tests section
 
@@ -62,6 +70,13 @@ module legato::amm_tests {
     fun test_swap_xbtc_for_usdt() {
         let scenario = scenario();
         swap_xbtc_for_usdt(&mut scenario);
+        end(scenario);
+    }
+
+    #[test]
+    fun test_router() {
+        let scenario = scenario();
+        test_router_(&mut scenario);
         end(scenario);
     }
 
@@ -104,6 +119,46 @@ module legato::amm_tests {
 
             test_scenario::return_shared(global)
         };
+    }
+
+    fun setup_multi_pool(test: &mut Scenario) {
+        let (owner, _) = people();
+
+        next_tx(test, owner);
+        {
+            amm::init_for_testing(ctx(test));
+        };
+
+        next_tx(test, owner);
+        {
+            let global = test_scenario::take_shared<AMMGlobal>(test);
+
+            let (lp, _pool_id) = amm::add_liquidity_for_testing<XXX, USDT>(
+                &mut global,
+                mint<XXX>(XXX_AMOUNT, ctx(test)),
+                mint<USDT>(USDT_AMOUNT, ctx(test)),
+                ctx(test)
+            );
+            
+            burn(lp);
+            test_scenario::return_shared(global)
+        };
+
+        next_tx(test, owner);
+        {
+            let global = test_scenario::take_shared<AMMGlobal>(test);
+
+            let (lp, _pool_id) = amm::add_liquidity_for_testing<ZZZ, USDT>(
+                &mut global,
+                mint<ZZZ>(ZZZ_AMOUNT, ctx(test)),
+                mint<USDT>(USDT_AMOUNT, ctx(test)),
+                ctx(test)
+            );
+
+            burn(lp);
+            test_scenario::return_shared(global)
+        };
+
     }
 
     /// Expect LP tokens to double in supply when the same values passed
@@ -195,6 +250,35 @@ module legato::amm_tests {
 
             test_scenario::return_shared(global);
         };
+    }
+
+    fun test_router_(test: &mut Scenario) {
+        setup_multi_pool(test);
+
+        let (_, user) = people();
+
+        next_tx(test, user);
+        {
+            let global = test_scenario::take_shared<AMMGlobal>(test);
+
+            amm::swap_xyz<XXX, USDT, ZZZ>(
+                &mut global,
+                mint<XXX>(ONE, ctx(test)),
+                1,
+                ctx(test)
+            );
+            
+            test_scenario::return_shared(global);
+        };
+
+        next_tx(test, user);
+        {
+            let zzz_token = test_scenario::take_from_sender<Coin<ZZZ>>(test);
+
+            assert!(coin::value(&zzz_token) == 1684121880, 4);
+            burn(zzz_token); 
+        };
+
     }
 
     // utilities

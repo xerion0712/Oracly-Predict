@@ -476,6 +476,39 @@ module legato::amm {
         }
     }
 
+    // a simple router works only 2 pools
+    public fun swap_xyz<X, Y, Z>(
+        global: &mut AMMGlobal,
+        coin_x_in: Coin<X>,
+        coin_z_out_min: u64,
+        ctx: &mut TxContext
+    ) : u64 {
+        let coin_y = swap_out_for_coin<X,Y>(
+            global,
+            coin_x_in,
+            1,
+            is_order<X, Y>(),
+            ctx
+        );
+
+        let coin_z = swap_out_for_coin<Y,Z>(
+            global,
+            coin_y,
+            coin_z_out_min,
+            is_order<Y, Z>(),
+            ctx
+        );
+
+        let output_amount = coin::value(&coin_z);
+
+        transfer::public_transfer(
+            coin_z,
+            tx_context::sender(ctx)
+        );
+
+        output_amount
+    }
+
     /// Get most used values in a handy way:
     /// - amount of Coin<X>
     /// - amount of Coin<Y>
