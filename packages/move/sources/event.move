@@ -7,6 +7,7 @@ module legato::event {
 
     friend legato::legato;
     friend legato::amm_interface;
+    friend legato::vault;
 
     /// Liquidity pool added event.
     struct AddedEvent has copy, drop {
@@ -55,8 +56,7 @@ module legato::event {
         earning_balance: u64
     }
 
-    struct MintEvent has copy, drop {
-        global: ID,
+    struct MintEvent has copy, drop {  
         vault_name: String,
         pool_id: ID,
         input_amount: u64,
@@ -71,8 +71,7 @@ module legato::event {
         pending_balance: u64
     }
 
-    struct RedeemEvent has copy, drop {
-        global: ID,
+    struct RedeemEvent has copy, drop {  
         vault_name: String,
         pt_burned: u64,
         sui_amount: u64,
@@ -84,8 +83,7 @@ module legato::event {
         pending_balance: u64
     }
 
-    struct ExitEvent has copy, drop {
-        global: ID,
+    struct ExitEvent has copy, drop { 
         vault_name: String,
         deposit_id: u64,
         asset_object_id: ID,
@@ -197,8 +195,7 @@ module legato::event {
         )
     }
 
-    public(friend) fun mint_event(
-        global: ID,
+    public(friend) fun mint_event( 
         vault_name: String,
         pool_id: ID,
         input_amount: u64,
@@ -213,8 +210,7 @@ module legato::event {
         pending_balance: u64
     ) {
         emit(
-            MintEvent {
-                global,
+            MintEvent { 
                 vault_name,
                 pool_id,
                 input_amount,
@@ -231,8 +227,7 @@ module legato::event {
         )
     }
 
-    public(friend) fun redeem_event(
-        global: ID,
+    public(friend) fun redeem_event(  
         vault_name: String,
         pt_burned: u64,
         sui_amount: u64,
@@ -244,8 +239,7 @@ module legato::event {
         pending_balance: u64
     ) {
         emit(
-            RedeemEvent {
-                global,
+            RedeemEvent {  
                 vault_name,
                 pt_burned,
                 sui_amount,
@@ -260,7 +254,6 @@ module legato::event {
     }
 
     public(friend) fun exit_event(
-        global: ID,
         vault_name: String,
         deposit_id: u64,
         asset_object_id: ID,
@@ -274,8 +267,7 @@ module legato::event {
         pending_balance: u64
     ) {
         emit(
-            ExitEvent {
-                global,
+            ExitEvent {  
                 vault_name,
                 deposit_id,
                 asset_object_id,
