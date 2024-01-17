@@ -1,6 +1,9 @@
 // A scaled-down version of OmniBTC's Sui AMM Swap with no fees taken
 // https://github.com/OmniBTC/Sui-AMM-swap
 
+
+// The AMM serves as the primary marketplace for trading YT <-> LEGATO and LEGATO <-> USDC. Other tokens may be routed through the orderbook system.
+
 module legato::amm {
 
     use std::ascii::into_bytes;
