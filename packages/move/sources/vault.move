@@ -3,6 +3,7 @@
 
 module legato::vault {
 
+    use sui::math;
     use sui::table::{ Self, Table};
     use sui::tx_context::{Self, TxContext};
     use sui::object::{ Self,  ID, UID };
@@ -15,7 +16,7 @@ module legato::vault {
     use std::type_name::{get, into_string};
     use std::string::{Self, String };
     use sui::bag::{Self, Bag};
-
+    
     use sui_system::staking_pool::{  Self, StakedSui};
     use sui_system::sui_system::{ Self, SuiSystemState };
 
@@ -45,6 +46,7 @@ module legato::vault {
     const E_MIN_THRESHOLD: u64 = 207;
     const E_VAULT_NOT_MATURED: u64 = 208;
     const E_INSUFFICIENT_AMOUNT: u64 = 209;
+    const E_EXIT_DISABLED: u64 = 210;
 
     // ======== Structs =========
 
@@ -162,6 +164,7 @@ module legato::vault {
     ) : (u64, u64, Coin<TOKEN<P,YT>>) {
         assert!(vault.maturity_epoch-COOLDOWN_EPOCH > tx_context::epoch(ctx), E_VAULT_MATURED);
         assert!(table::contains(&vault.deposit_items, deposit_id), E_NOT_FOUND);
+        assert!(vault.enable_exit == true, E_EXIT_DISABLED);
 
         let staked_sui = table::borrow(&vault.deposit_items, deposit_id);
         let asset_object_id = object::id(staked_sui);
@@ -441,6 +444,50 @@ module legato::vault {
         let (for_epoch, apy, input_amount) = ((for_epoch as u128), (apy as u128), (input_amount as u128));
         let result = (for_epoch*apy*input_amount) / (365_000_000_000);
         (result as u64)
+    }
+
+    // ======== Test-related Functions =========
+
+    #[test_only]
+    public fun median_apy<P>(wrapper: &mut SuiSystemState, vault: &Vault<P>, epoch: u64): u64 {
+        let count = vector::length(&vault.pools);
+        let i = 0;
+        let total_sum = 0;
+        while (i < count) {
+            let pool_id = vector::borrow(&vault.pools, i);
+            total_sum = total_sum+apy_reader::pool_apy(wrapper, pool_id, epoch);
+            i = i + 1;
+        };
+        total_sum / i
+    }
+
+    #[test_only]
+    public fun ceil_apy<P>(wrapper: &mut SuiSystemState, vault: &Vault<P>, epoch: u64): u64 {
+        let count = vector::length(&vault.pools);
+        let i = 0;
+        let output = 0;
+        while (i < count) {
+            let pool_id = vector::borrow(&vault.pools, i);
+            output = math::max( output, apy_reader::pool_apy(wrapper, pool_id, epoch) );
+            i = i + 1;
+        };
+        output
+    }
+
+    #[test_only]
+    public fun floor_apy<P>(wrapper: &mut SuiSystemState, vault: &Vault<P>, epoch: u64): u64 {
+
+        let count = vector::length(&vault.pools);
+        let i = 0;
+        let output = 0;
+        while (i < count) {
+            let pool_id = vector::borrow(&vault.pools, i);
+            if (output == 0)
+                    output = apy_reader::pool_apy(wrapper, pool_id, epoch)
+                else output = math::min( output, apy_reader::pool_apy(wrapper, pool_id, epoch) );
+            i = i + 1;
+        };
+        output
     }
 
 }

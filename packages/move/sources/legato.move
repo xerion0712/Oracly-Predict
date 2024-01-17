@@ -226,9 +226,16 @@ module legato::legato {
 
     // ======== Internal Functions =========
 
-    public(friend) fun check_admin(global: &Global, sender: address) {
+    fun check_admin(global: &Global, sender: address) {
         let (contained, _) = vector::index_of<address>(&global.admin, &sender);
         assert!(contained,E_UNAUTHORIZED_USER);
+    }
+
+    // ======== Test-related Functions =========
+ 
+    #[test_only]
+    public fun get_vault<P>(global: &mut Global) : &mut Vault<P> {
+        vault::get_mut_vault<P>(&mut global.vaults)
     }
 
     #[test_only]
