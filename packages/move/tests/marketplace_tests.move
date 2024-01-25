@@ -3,6 +3,8 @@
 #[test_only]
 module legato::marketplace_tests {
 
+    // use std::debug;
+
     use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
     use sui::sui::SUI;
     use sui::coin::{Self, Coin};
@@ -14,9 +16,12 @@ module legato::marketplace_tests {
     const USER_ADDR_1: address = @0x42;
     const USER_ADDR_2: address = @0x43;
 
-    const MOCK_MINT_AMOUNT: u64 = 100_000_000_000;
+    const MOCK_MINT_AMOUNT: u64 = 500_000_000_000;
+    const MIST_PER_SUI: u64 = 1_000_000_000;
 
     struct USDC {}
+
+    struct PT {}
 
     #[test]
     public fun test_add_balances() {
@@ -25,16 +30,23 @@ module legato::marketplace_tests {
         test::end(scenario);
     }
 
+    #[test]
+    public fun test_sell_and_buy() {
+        let scenario = scenario();
+        test_sell_and_buy_(&mut scenario);
+        test::end(scenario);
+    }
+
     fun test_add_balances_(test: &mut Scenario) {
 
-        // setup base markets
-        setup_market(test, ADMIN_ADDR);
+        // setup quote currencies
+        setup_quote(test, ADMIN_ADDR);
         
         let mock_usdc = coin::mint_for_testing<USDC>(MOCK_MINT_AMOUNT, ctx(test));
         let mock_sui = coin::mint_for_testing<SUI>(MOCK_MINT_AMOUNT, ctx(test));
 
-        add_balance(test, mock_usdc  , USER_ADDR_1);
-        add_balance(test, mock_sui , USER_ADDR_1);
+        add_balance<USDC>(test, mock_usdc  , USER_ADDR_1);
+        add_balance<SUI>(test, mock_sui , USER_ADDR_1);
 
         // test withdraw 
 
@@ -50,7 +62,50 @@ module legato::marketplace_tests {
 
     }
 
-    fun setup_market(test: &mut Scenario, admin_address: address) {
+    fun test_sell_and_buy_(test: &mut Scenario) {
+
+        // setup quote currencies
+        setup_quote(test, ADMIN_ADDR);
+
+        let mock_pt = coin::mint_for_testing<PT>(MOCK_MINT_AMOUNT, ctx(test));
+        let mock_usdc = coin::mint_for_testing<USDC>(MOCK_MINT_AMOUNT, ctx(test));
+
+        add_balance<PT>(test, mock_pt  , USER_ADDR_1);
+        add_balance<USDC>(test, mock_usdc, USER_ADDR_2);
+
+        // listing
+        next_tx(test, USER_ADDR_1);
+        {
+             let global = test::take_shared<GlobalMarketplace>(test); 
+
+             marketplace::sell_and_listing<PT, USDC>(&mut global, 100 * MIST_PER_SUI, 900_000_000 , ctx(test));
+             marketplace::sell_and_listing<PT, USDC>(&mut global, 100 * MIST_PER_SUI, 400_000_000 , ctx(test));
+             marketplace::sell_and_listing<PT, USDC>(&mut global, 100 * MIST_PER_SUI, 800_000_000 , ctx(test));
+             marketplace::sell_and_listing<PT, USDC>(&mut global, 100 * MIST_PER_SUI, 600_000_000 , ctx(test));
+             marketplace::sell_and_listing<PT, USDC>(&mut global, 100 * MIST_PER_SUI, 700_000_000 , ctx(test));
+
+             test::return_shared(global);
+        };
+
+        // buying
+        next_tx(test, USER_ADDR_2);
+        {
+            let global = test::take_shared<GlobalMarketplace>(test); 
+
+            marketplace::buy_only<USDC, PT>(&mut global, 150 * MIST_PER_SUI, 800_000_000 , ctx(test));
+
+            let pt_amount = marketplace::token_available<PT>( &mut global, USER_ADDR_2 );
+            assert!(pt_amount == 271428571428, 1);
+
+            let usdc_amount = marketplace::token_available<USDC>(&mut global, USER_ADDR_1 );
+            assert!(usdc_amount == 150000000000, 2); 
+
+            test::return_shared(global);
+        };
+
+    }
+
+    fun setup_quote(test: &mut Scenario, admin_address: address) {
         
         next_tx(test, admin_address);
         {
@@ -61,8 +116,8 @@ module legato::marketplace_tests {
         {
             let global = test::take_shared<GlobalMarketplace>(test);
 
-            marketplace::setup_market<SUI>(&mut global, ctx(test));
-            marketplace::setup_market<USDC>(&mut global, ctx(test));
+            marketplace::setup_quote<SUI>(&mut global, ctx(test));
+            marketplace::setup_quote<USDC>(&mut global, ctx(test));
 
             test::return_shared(global);
         };
