@@ -15,6 +15,7 @@ module legato::marketplace_tests {
 
     const USER_ADDR_1: address = @0x42;
     const USER_ADDR_2: address = @0x43;
+    const USER_ADDR_3: address = @0x44;
 
     const MOCK_MINT_AMOUNT: u64 = 500_000_000_000;
     const MIST_PER_SUI: u64 = 1_000_000_000;
@@ -34,6 +35,13 @@ module legato::marketplace_tests {
     public fun test_sell_and_buy() {
         let scenario = scenario();
         test_sell_and_buy_(&mut scenario);
+        test::end(scenario);
+    }
+
+    #[test]
+    public fun test_buy_and_sell() {
+        let scenario = scenario();
+        test_buy_and_sell_(&mut scenario);
         test::end(scenario);
     }
 
@@ -73,21 +81,21 @@ module legato::marketplace_tests {
         add_balance<PT>(test, mock_pt  , USER_ADDR_1);
         add_balance<USDC>(test, mock_usdc, USER_ADDR_2);
 
-        // listing
+        // listing PT for USDC
         next_tx(test, USER_ADDR_1);
         {
-             let global = test::take_shared<GlobalMarketplace>(test); 
+            let global = test::take_shared<GlobalMarketplace>(test); 
 
-             marketplace::sell_and_listing<PT, USDC>(&mut global, 100 * MIST_PER_SUI, 900_000_000 , ctx(test));
-             marketplace::sell_and_listing<PT, USDC>(&mut global, 100 * MIST_PER_SUI, 400_000_000 , ctx(test));
-             marketplace::sell_and_listing<PT, USDC>(&mut global, 100 * MIST_PER_SUI, 800_000_000 , ctx(test));
-             marketplace::sell_and_listing<PT, USDC>(&mut global, 100 * MIST_PER_SUI, 600_000_000 , ctx(test));
-             marketplace::sell_and_listing<PT, USDC>(&mut global, 100 * MIST_PER_SUI, 700_000_000 , ctx(test));
+            marketplace::sell_and_listing<PT, USDC>(&mut global, 100 * MIST_PER_SUI, 900_000_000 , ctx(test));
+            marketplace::sell_and_listing<PT, USDC>(&mut global, 100 * MIST_PER_SUI, 400_000_000 , ctx(test));
+            marketplace::sell_and_listing<PT, USDC>(&mut global, 100 * MIST_PER_SUI, 800_000_000 , ctx(test));
+            marketplace::sell_and_listing<PT, USDC>(&mut global, 100 * MIST_PER_SUI, 600_000_000 , ctx(test));
+            marketplace::sell_and_listing<PT, USDC>(&mut global, 100 * MIST_PER_SUI, 700_000_000 , ctx(test));
 
-             test::return_shared(global);
+            test::return_shared(global);
         };
 
-        // buying
+        // buying PT with USDC
         next_tx(test, USER_ADDR_2);
         {
             let global = test::take_shared<GlobalMarketplace>(test); 
@@ -99,6 +107,54 @@ module legato::marketplace_tests {
 
             let usdc_amount = marketplace::token_available<USDC>(&mut global, USER_ADDR_1 );
             assert!(usdc_amount == 150000000000, 2); 
+
+            test::return_shared(global);
+        };
+
+    }
+
+    fun test_buy_and_sell_(test: &mut Scenario) {
+        
+        // setup quote currencies
+        setup_quote(test, ADMIN_ADDR);
+
+        let mock_pt = coin::mint_for_testing<PT>(MOCK_MINT_AMOUNT, ctx(test));
+        let mock_pt_2 = coin::mint_for_testing<PT>(MOCK_MINT_AMOUNT, ctx(test));
+        let mock_usdc = coin::mint_for_testing<USDC>(MOCK_MINT_AMOUNT, ctx(test));
+
+        add_balance<PT>(test, mock_pt, USER_ADDR_1);
+        add_balance<USDC>(test, mock_usdc, USER_ADDR_2);
+        add_balance<PT>(test, mock_pt_2, USER_ADDR_3);
+
+        // listing PT for USDC
+        next_tx(test, USER_ADDR_1);
+        {
+            let global = test::take_shared<GlobalMarketplace>(test); 
+
+            marketplace::sell_and_listing<PT, USDC>(&mut global, 10 * MIST_PER_SUI, 900_000_000 , ctx(test));
+
+            test::return_shared(global);
+        };
+
+        // buying PT for 10 USDC and listing the remaining
+        next_tx(test, USER_ADDR_2);
+        {
+            let global = test::take_shared<GlobalMarketplace>(test); 
+
+            marketplace::buy_and_listing<USDC, PT>(&mut global, 100 * MIST_PER_SUI, 950_000_000 , ctx(test));
+
+            test::return_shared(global);
+        };
+
+        // selling PT for USDC
+        next_tx(test, USER_ADDR_3);
+        {
+            let global = test::take_shared<GlobalMarketplace>(test); 
+
+            marketplace::sell_only<PT, USDC>(&mut global, 20 * MIST_PER_SUI, 940_000_000 , ctx(test));
+
+            let usdc_amount = marketplace::token_available<USDC>(&mut global, USER_ADDR_3 );
+            assert!(usdc_amount == 19_000_000_000, 3); 
 
             test::return_shared(global);
         };

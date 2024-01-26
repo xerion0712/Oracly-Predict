@@ -3,7 +3,7 @@
 
 module legato::marketplace {
 
-    use std::debug;
+    // use std::debug;
 
     use sui::object::{ Self, ID, UID };
     use sui::balance::{ Self, Balance };
@@ -99,6 +99,26 @@ module legato::marketplace {
         sender: address
     }
 
+    struct TradeEvent has copy, drop {
+        global: ID,
+        from_token: String,
+        to_token: String,
+        input_amount: u64,
+        output_amount: u64,
+        sender: address
+    }
+
+    struct NewOrderEvent has copy, drop {
+        global: ID,
+        is_bid: bool,
+        base_token: String,
+        quote_token: String,
+        amount: u64,
+        unit_price: u64, // per 1 unit
+        owner: address
+    }
+
+
     fun init(ctx: &mut TxContext) {
 
         let admin_list = vector::empty<address>();
@@ -119,17 +139,17 @@ module legato::marketplace {
     // ======== Public Functions =========
 
     // pt -> usdc
-    public entry fun sell_only<X, Y>(global :&mut GlobalMarketplace, _ask_price: u64) {
+    public entry fun sell_only<X, Y>(global :&mut GlobalMarketplace, base_token_amount: u64, ask_price: u64, ctx: &mut TxContext) {
         check_quote<Y>(global);
 
-        // locate_buy_orders();
+        matching_orders<X,Y>(global, base_token_amount, ask_price, false , ctx);
     }
 
+    // pt -> usdc
     public entry fun sell_and_listing<X, Y>(global :&mut GlobalMarketplace, base_token_amount: u64, ask_price: u64, ctx: &mut TxContext) {
         check_quote<Y>(global);
 
         let remaining_amount = matching_orders<X,Y>(global, base_token_amount, ask_price, false , ctx);
-
         add_order<X, Y>(global, remaining_amount, ask_price, false, ctx);
     }
 
@@ -138,8 +158,14 @@ module legato::marketplace {
         check_quote<X>(global);
 
         matching_orders<X,Y>(global, quote_token_amount, bid_price, true , ctx);
-    
+    }
 
+    // usdt -> pt
+    public entry fun buy_and_listing<X,Y>(global :&mut GlobalMarketplace, quote_token_amount: u64, bid_price: u64, ctx: &mut TxContext) {
+        check_quote<X>(global);
+
+        let remaining_amount = matching_orders<X,Y>(global, quote_token_amount, bid_price, true , ctx);
+        add_order<X,Y>(global, remaining_amount, bid_price, true, ctx);
     }
 
     public entry fun deposit<T>(global :&mut GlobalMarketplace, input_coin: Coin<T>, ctx: &mut TxContext) {
@@ -308,61 +334,81 @@ module legato::marketplace {
             assert!(available_amount >= amount, E_INSUFFICIENT_BALANCE);
 
             let market = bag::borrow_mut<String, QuoteMarket<X>>(&mut global.markets, token_to_name<X>());
-            assert!(bag::contains_with_type<String, Orders>(&market.orders, token_to_name<Y>()), E_INVALID_BASE );
+            check_base_market<X>(market, token_to_name<Y>());
 
             let orders_set = bag::borrow_mut<String, Orders>(&mut market.orders, token_to_name<Y>());
-            assert!(vector::length(&orders_set.ask_orders) > 0, E_NO_ORDER_LISTING );
-            sort_orders(&mut orders_set.ask_orders);
 
-            let order_ids = eligible_orders(&orders_set.ask_orders, from_price, false);
-            let transfer_list_x = vector::empty<TransferRequest<X>>();
-            let transfer_list_y = vector::empty<TransferRequest<Y>>();
-            let reducer_list = vector::empty<ReductionRequest<Y>>(); 
+            if (vector::length(&orders_set.ask_orders) > 0) {
+                sort_orders(&mut orders_set.ask_orders);
 
-            while (vector::length(&order_ids) > 0) {
-                let order_id = vector::remove( &mut order_ids, 0);
-                let order = vector::borrow_mut(&mut orders_set.ask_orders, order_id);
-                let available_base_in_quote = mul_div(order.amount, order.unit_price, MIST_PER_SUI);
+                let order_ids = eligible_orders(&orders_set.ask_orders, from_price, false);
+                let transfer_list_x = vector::empty<TransferRequest<X>>();
+                let transfer_list_y = vector::empty<TransferRequest<Y>>();
+                let reducer_list = vector::empty<ReductionRequest<Y>>(); 
 
-                if (amount >= available_base_in_quote) {
-                    vector::push_back<TransferRequest<X>>(&mut transfer_list_x, TransferRequest { amount: available_base_in_quote, from_address: sender, to_address: order.owner });
-                    vector::push_back<TransferRequest<Y>>(&mut transfer_list_y, TransferRequest { amount: order.amount, from_address: order.owner, to_address: sender });
-                    vector::push_back<ReductionRequest<Y>>(&mut reducer_list, ReductionRequest { amount: order.amount, owner_address: order.owner });
+                let input_amount = 0;
+                let output_amount = 0;
 
-                    amount = 
-                            if (amount >= available_base_in_quote) 
-                                amount-available_base_in_quote
-                            else 0;
-                    order.amount = 0;
-                    
-                } else {
-                    let amount_in_base = mul_div(amount, MIST_PER_SUI, order.unit_price);
-                    vector::push_back<TransferRequest<X>>(&mut transfer_list_x, TransferRequest { amount, from_address: sender, to_address: order.owner });
-                    vector::push_back<TransferRequest<Y>>(&mut transfer_list_y, TransferRequest { amount: amount_in_base, from_address: order.owner, to_address: sender });
-                    vector::push_back<ReductionRequest<Y>>(&mut reducer_list, ReductionRequest { amount: amount_in_base, owner_address: order.owner });
-                    
-                    order.amount = 
-                            if (order.amount >= amount_in_base) 
-                                order.amount-amount_in_base
-                            else 0;
-                    amount = 0;
+                while (vector::length(&order_ids) > 0) {
+                    let order_id = vector::remove( &mut order_ids, 0);
+                    let order = vector::borrow_mut(&mut orders_set.ask_orders, order_id);
+                    let available_base_in_quote = mul_div(order.amount, order.unit_price, MIST_PER_SUI);
+
+                    if (amount >= available_base_in_quote) {
+                        vector::push_back<TransferRequest<X>>(&mut transfer_list_x, TransferRequest { amount: available_base_in_quote, from_address: sender, to_address: order.owner });
+                        vector::push_back<TransferRequest<Y>>(&mut transfer_list_y, TransferRequest { amount: order.amount, from_address: order.owner, to_address: sender });
+                        vector::push_back<ReductionRequest<Y>>(&mut reducer_list, ReductionRequest { amount: order.amount, owner_address: order.owner });
+
+                        input_amount = input_amount+available_base_in_quote;
+                        output_amount = output_amount+order.amount;
+
+                        amount = 
+                                if (amount >= available_base_in_quote) 
+                                    amount-available_base_in_quote
+                                else 0;
+                        order.amount = 0;
+                    } else {
+                        let amount_in_base = mul_div(amount, MIST_PER_SUI, order.unit_price);
+                        vector::push_back<TransferRequest<X>>(&mut transfer_list_x, TransferRequest { amount, from_address: sender, to_address: order.owner });
+                        vector::push_back<TransferRequest<Y>>(&mut transfer_list_y, TransferRequest { amount: amount_in_base, from_address: order.owner, to_address: sender });
+                        vector::push_back<ReductionRequest<Y>>(&mut reducer_list, ReductionRequest { amount: amount_in_base, owner_address: order.owner });
+                        
+                        input_amount = input_amount+amount;
+                        output_amount = output_amount+amount_in_base;
+
+                        order.amount = 
+                                if (order.amount >= amount_in_base) 
+                                    order.amount-amount_in_base
+                                else 0;
+                        amount = 0;
+                    };
+
+                    // remove the order
+                    if (order.amount == 0) {
+                        vector::swap_remove(&mut orders_set.ask_orders, order_id);
+                        // todo: emit event
+                    };
+
+                    if (amount == 0) break
                 };
 
-                // remove the order
-                if (order.amount == 0) {
-                    vector::swap_remove(&mut orders_set.ask_orders, order_id);
-                };
+                // clearing
+                transfer_balance<X>(global, transfer_list_x );
+                transfer_balance<Y>(global, transfer_list_y );
+                reduce_listing_token<Y>(global, reducer_list);
 
-                if (amount == 0) break
+                // emit event
+                event::emit( 
+                    TradeEvent { 
+                        global : object::id(global),
+                        from_token: token_to_name<X>(),
+                        to_token: token_to_name<Y>(),
+                        input_amount,
+                        output_amount,
+                        sender: tx_context::sender(ctx) 
+                    });
+
             };
-
-            // clearing
-            transfer_balance<X>(global, transfer_list_x );
-            transfer_balance<Y>(global, transfer_list_y );
-            reduce_listing_token<Y>(global, reducer_list);
-
-            // emit event
-
 
 
         } else {
@@ -370,11 +416,81 @@ module legato::marketplace {
             let available_base_amount = token_available<X>(global, sender);
             assert!(available_base_amount >= amount, E_INSUFFICIENT_AMOUNT);
             
-            // emit event
+            let market = bag::borrow_mut<String, QuoteMarket<Y>>(&mut global.markets, token_to_name<Y>());
+            check_base_market<Y>(market, token_to_name<X>());
+
+            let orders_set = bag::borrow_mut<String, Orders>(&mut market.orders, token_to_name<X>());
+
+            if (vector::length(&orders_set.bid_orders) > 0) {
+                sort_orders(&mut orders_set.bid_orders);
+
+                let order_ids = eligible_orders(&orders_set.bid_orders, from_price, true);
+                let transfer_list_x = vector::empty<TransferRequest<X>>();
+                let transfer_list_y = vector::empty<TransferRequest<Y>>();
+                let reducer_list = vector::empty<ReductionRequest<Y>>(); 
+
+                let input_amount = 0;
+                let output_amount = 0;
+
+                while (vector::length(&order_ids) > 0) {
+                    let order_id = vector::remove( &mut order_ids, 0);
+                    let order = vector::borrow_mut(&mut orders_set.bid_orders, order_id);
+                    let available_base_in_quote = mul_div(order.amount, order.unit_price, MIST_PER_SUI);
+                    
+                    if (amount >= order.amount) {
+                        vector::push_back<TransferRequest<X>>(&mut transfer_list_x, TransferRequest { amount: order.amount, from_address: sender, to_address: order.owner });
+                        vector::push_back<TransferRequest<Y>>(&mut transfer_list_y, TransferRequest { amount: available_base_in_quote, from_address: order.owner, to_address: sender });
+                        vector::push_back<ReductionRequest<Y>>(&mut reducer_list, ReductionRequest { amount: available_base_in_quote, owner_address: order.owner });
+
+                        input_amount = input_amount+order.amount;
+                        output_amount = output_amount+available_base_in_quote;
+
+                        amount = amount-order.amount;
+                        order.amount = 0;
+                    } else {
+                        let amount_in_quote = mul_div(amount, order.unit_price, MIST_PER_SUI);
+                        vector::push_back<TransferRequest<X>>(&mut transfer_list_x, TransferRequest { amount, from_address: sender, to_address: order.owner });
+                        vector::push_back<TransferRequest<Y>>(&mut transfer_list_y, TransferRequest { amount: amount_in_quote, from_address: order.owner, to_address: sender });
+                        vector::push_back<ReductionRequest<Y>>(&mut reducer_list, ReductionRequest { amount: order.amount, owner_address: order.owner });
+
+                        input_amount = input_amount+amount;
+                        output_amount = output_amount+amount_in_quote;
+                        
+                        order.amount = order.amount-amount;
+                        amount = 0;
+                    };
+
+                    // remove the order
+                    if (order.amount == 0) {
+                        vector::swap_remove(&mut orders_set.bid_orders, order_id);
+                        // todo: emit event
+                    };
+
+                    if (amount == 0) break
+                };
+
+                // clearing
+                transfer_balance<X>(global, transfer_list_x );
+                transfer_balance<Y>(global, transfer_list_y );
+                reduce_listing_token<Y>(global, reducer_list);
+
+                // emit event
+                event::emit( 
+                    TradeEvent { 
+                        global : object::id(global),
+                        from_token: token_to_name<X>(),
+                        to_token: token_to_name<Y>(),
+                        input_amount,
+                        output_amount,
+                        sender: tx_context::sender(ctx) 
+                    });
+
+            };
+
+            
 
         };
 
-        
         amount
     }
 
@@ -383,13 +499,8 @@ module legato::marketplace {
         
         let sender = tx_context::sender(ctx);
         let new_order = Order { created_epoch: tx_context::epoch(ctx), amount, unit_price, owner: sender };
-
-        if (is_buy) {
-
-            debug::print(&(333)); 
-
-            // emit event
-        } else {
+        
+        if (!is_buy) {
 
             let token_name = token_to_name<X>();
             let market = bag::borrow_mut<String, QuoteMarket<Y>>(&mut global.markets, token_to_name<Y>());
@@ -420,6 +531,56 @@ module legato::marketplace {
 
             // emit event
 
+            event::emit( 
+                NewOrderEvent { 
+                    global: object::id(global),
+                    is_bid: false,
+                    base_token: token_to_name<X>(),
+                    quote_token: token_to_name<Y>(),
+                    amount,
+                    unit_price,
+                    owner: sender
+                });
+        } else {
+            // usdc -> pt
+            let token_name = token_to_name<Y>();
+            let market = bag::borrow_mut<String, QuoteMarket<X>>(&mut global.markets, token_to_name<X>());
+            let has_registered = bag::contains_with_type<String, Orders>(&market.orders, token_name);
+
+            if (!has_registered) {
+                let bid_orders = vector::empty<Order>();
+                let ask_orders = vector::empty<Order>();
+                
+                vector::push_back<Order>(&mut bid_orders, new_order);
+
+                let new_orders_set = Orders {
+                    token_name,
+                    bid_orders,
+                    ask_orders
+                };
+            
+                bag::add(&mut market.orders, token_name, new_orders_set);
+
+            } else {
+                let orders_set = bag::borrow_mut<String, Orders>(&mut market.orders, token_name);
+                vector::push_back<Order>(&mut orders_set.bid_orders, new_order);
+            };
+
+            // increase listing balance
+            let token_deposit = bag::borrow_mut<String, TokenDeposit<X>>(&mut global.user_balances, token_to_name<X>());
+            *table::borrow_mut(&mut token_deposit.listing, tx_context::sender(ctx)) = *table::borrow(&token_deposit.listing, tx_context::sender(ctx))+amount;
+
+            // emit event
+            event::emit( 
+                NewOrderEvent { 
+                    global: object::id(global),
+                    is_bid: true,
+                    base_token: token_to_name<Y>(),
+                    quote_token: token_to_name<X>(),
+                    amount,
+                    unit_price,
+                    owner: sender
+                });
 
         };
 
@@ -467,6 +628,13 @@ module legato::marketplace {
         
         };
 
+    }
+
+    fun check_base_market<T>(market: &mut QuoteMarket<T>, base_token_name: String) {
+        if (!bag::contains_with_type<String, Orders>(&market.orders, base_token_name)) { 
+            let new_orders_set = Orders { token_name: base_token_name, bid_orders: vector::empty<Order>(), ask_orders: vector::empty<Order>() };
+            bag::add(&mut market.orders, base_token_name, new_orders_set);
+        };
     }
 
     // ======== Test-related Functions =========
