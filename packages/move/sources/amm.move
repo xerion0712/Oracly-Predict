@@ -1,6 +1,9 @@
 // A scaled-down version of OmniBTC's Sui AMM Swap with no fees taken
 // https://github.com/OmniBTC/Sui-AMM-swap
 
+
+// The AMM serves as the primary marketplace for trading YT <-> LEGATO and LEGATO <-> USDC. Other tokens may be routed through the orderbook system.
+
 module legato::amm {
 
     use std::ascii::into_bytes;
@@ -84,6 +87,7 @@ module legato::amm {
     struct AMMGlobal has key {
         id: UID,
         admin: vector<address>,
+        treasury: address,
         has_paused: bool,
         pools: Bag
     }
@@ -97,6 +101,7 @@ module legato::amm {
         let global = AMMGlobal {
             id: object::new(ctx),
             admin: admin_list,
+            treasury: tx_context::sender(ctx),
             has_paused: false,
             pools: bag::new(ctx)
         };
@@ -476,6 +481,39 @@ module legato::amm {
         }
     }
 
+    // swap across 2 pools
+    public fun swap_xyz<X, Y, Z>(
+        global: &mut AMMGlobal,
+        coin_x_in: Coin<X>,
+        coin_z_out_min: u64,
+        ctx: &mut TxContext
+    ) : u64 {
+        let coin_y = swap_out_for_coin<X,Y>(
+            global,
+            coin_x_in,
+            1,
+            is_order<X, Y>(),
+            ctx
+        );
+
+        let coin_z = swap_out_for_coin<Y,Z>(
+            global,
+            coin_y,
+            coin_z_out_min,
+            is_order<Y, Z>(),
+            ctx
+        );
+
+        let output_amount = coin::value(&coin_z);
+
+        transfer::public_transfer(
+            coin_z,
+            tx_context::sender(ctx)
+        );
+
+        output_amount
+    }
+
     /// Get most used values in a handy way:
     /// - amount of Coin<X>
     /// - amount of Coin<Y>
@@ -564,6 +602,11 @@ module legato::amm {
         let (contained, index) = vector::index_of<address>(&global.admin, &user);
         assert!(contained,ERR_NOT_FOUND);
         vector::remove<address>(&mut global.admin, index);
+    }
+
+    public entry fun update_treasury(global: &mut AMMGlobal, new_address:address, ctx: &mut TxContext) {
+        check_admin(global, tx_context::sender(ctx));
+        global.treasury = new_address;
     }
 
     #[test_only]

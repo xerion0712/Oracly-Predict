@@ -143,6 +143,36 @@ module legato::amm_interface {
         )
     }
 
+    public entry fun swap_xyz<X, Y, Z>(
+        global: &mut AMMGlobal,
+        coin_x_in: Coin<X>,
+        coin_z_out_min: u64,
+        ctx: &mut TxContext
+    ) {
+        assert!(!amm::is_emergency(global), ERR_EMERGENCY);
+
+        let input_amount = value(&coin_x_in);
+
+        let output_amount = amm::swap_xyz<X, Y, Z>(
+            global,
+            coin_x_in,
+            coin_z_out_min,
+            ctx
+        );
+
+        let global = amm::id<X, Z>(global);
+        let lp_name = amm::generate_lp_name<X, Z>();
+
+        swapped_event(
+            global,
+            lp_name,
+            input_amount,
+            0,
+            0,
+            output_amount
+        )
+    }
+
     public entry fun multi_add_liquidity<X, Y>(
         global: &mut AMMGlobal,
         coins_x: vector<Coin<X>>,

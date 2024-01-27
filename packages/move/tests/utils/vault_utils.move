@@ -18,8 +18,7 @@ module legato::vault_utils {
     use legato::amm::{Self, AMMGlobal };
     use legato::vault_template::{JAN_2024};
 
-    friend legato::vault_balanced_tests;
-    friend legato::vault_deficit_tests;
+    friend legato::vault_basic_tests;
 
     const VAULT_MATURE_IN : u64 = 60;
 
@@ -82,10 +81,10 @@ module legato::vault_utils {
             let pool_id_3 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_3);
             let pool_id_4 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_4);
 
-            legato::add_pool<JAN_2024>( &mut global, pool_id_1, ctx(test));
-            legato::add_pool<JAN_2024>( &mut global, pool_id_2, ctx(test));
-            legato::add_pool<JAN_2024>( &mut global, pool_id_3, ctx(test));
-            legato::add_pool<JAN_2024>( &mut global, pool_id_4, ctx(test));
+            legato::add_vault_pool<JAN_2024>( &mut global, pool_id_1, ctx(test));
+            legato::add_vault_pool<JAN_2024>( &mut global, pool_id_2, ctx(test));
+            legato::add_vault_pool<JAN_2024>( &mut global, pool_id_3, ctx(test));
+            legato::add_vault_pool<JAN_2024>( &mut global, pool_id_4, ctx(test));
 
             test::return_shared(global);
             test::return_shared(system_state);
