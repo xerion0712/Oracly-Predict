@@ -32,6 +32,13 @@ module legato::marketplace_tests {
     }
 
     #[test]
+    public fun test_modify_orders() {
+        let scenario = scenario();
+        test_modify_orders_(&mut scenario);
+        test::end(scenario);
+    }
+
+    #[test]
     public fun test_sell_and_buy() {
         let scenario = scenario();
         test_sell_and_buy_(&mut scenario);
@@ -65,6 +72,33 @@ module legato::marketplace_tests {
             marketplace::withdraw<USDC>(&mut global, MOCK_MINT_AMOUNT/2 , ctx(test));
             marketplace::withdraw<USDC>(&mut global, MOCK_MINT_AMOUNT/2 , ctx(test));
 
+            test::return_shared(global);
+        };
+
+    }
+
+    fun test_modify_orders_(test: &mut Scenario) {
+        // setup quote currencies
+        setup_quote(test, ADMIN_ADDR);
+
+        let mock_pt = coin::mint_for_testing<PT>(MOCK_MINT_AMOUNT, ctx(test));
+
+        add_balance<PT>(test, mock_pt  , USER_ADDR_1);
+
+        // listing PT for USDC
+        next_tx(test, USER_ADDR_1);
+        {
+            let global = test::take_shared<GlobalMarketplace>(test); 
+            marketplace::sell_and_listing<PT, USDC>(&mut global, 100 * MIST_PER_SUI, 900_000_000 , ctx(test));
+            test::return_shared(global);
+        };
+
+        // updating & deleting order
+        next_tx(test, USER_ADDR_1);
+        {
+            let global = test::take_shared<GlobalMarketplace>(test); 
+            marketplace::update_order<PT, USDC>(&mut global, 1, 950_000_000 , ctx(test));
+            marketplace::cancel_order<PT, USDC>(&mut global, 1, ctx(test));
             test::return_shared(global);
         };
 

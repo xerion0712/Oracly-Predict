@@ -34,6 +34,7 @@ module legato::marketplace {
     const E_INVALID_BASE: u64 = 307;
     const E_NO_ORDER_LISTING: u64 = 306;
     const E_INSUFFICIENT_BALANCE: u64 = 306;
+    const E_INVALID_ORDER_ID: u64 = 307;
 
     // ======== Structs =========
 
@@ -48,7 +49,8 @@ module legato::marketplace {
         owner_address: address
     }
 
-    struct Order has  drop, store { 
+    struct Order has  drop, store {
+        order_id: u64,
         created_epoch: u64,
         amount: u64,
         unit_price: u64, // per 1 unit
@@ -82,7 +84,8 @@ module legato::marketplace {
         treasury: address,
         has_paused: bool,
         user_balances: Bag,
-        markets: Bag
+        markets: Bag,
+        order_count: u64
     }
 
     struct DepositEvent has copy, drop {
@@ -110,11 +113,18 @@ module legato::marketplace {
 
     struct NewOrderEvent has copy, drop {
         global: ID,
+        order_id: u64,
         is_bid: bool,
         base_token: String,
         quote_token: String,
         amount: u64,
         unit_price: u64, // per 1 unit
+        owner: address
+    }
+
+    struct RemoveOrderEvent has copy, drop {
+        global: ID,
+        order_id: u64,
         owner: address
     }
 
@@ -130,7 +140,8 @@ module legato::marketplace {
             treasury: tx_context::sender(ctx),
             has_paused: false,
             user_balances: bag::new(ctx),
-            markets: bag::new(ctx)
+            markets: bag::new(ctx),
+            order_count: 0
         };
 
         transfer::share_object(global)
@@ -215,6 +226,80 @@ module legato::marketplace {
 
         // emit event
         event::emit(WithdrawEvent { global : object::id(global), token_name, withdraw_amount, sender: tx_context::sender(ctx) })
+    }
+
+    public entry fun update_order<X, Y>(global : &mut GlobalMarketplace, order_id: u64, unit_price: u64, ctx: &mut TxContext) {
+
+        let market = bag::borrow_mut<String, QuoteMarket<Y>>(&mut global.markets, token_to_name<Y>());
+        assert!( bag::contains_with_type<String, Orders>(&market.orders, token_to_name<X>()), E_INVALID_BASE );
+        let orders_set = bag::borrow_mut<String, Orders>(&mut market.orders, token_to_name<X>());
+
+        let count = vector::length(&orders_set.ask_orders);
+        let i = 0;
+        while (i < count) {
+            let order = vector::borrow_mut(&mut orders_set.ask_orders, i);
+            if (order.order_id == order_id) {
+                assert!( order.owner == tx_context::sender(ctx), E_UNAUTHORIZED_USER );
+                order.unit_price = unit_price;
+                break
+            };
+            i = i + 1;
+        };
+
+        count = vector::length(&orders_set.bid_orders);
+        i = 0;
+        while (i < count) {
+            let order = vector::borrow_mut(&mut orders_set.bid_orders, i);
+            assert!( order.owner == tx_context::sender(ctx), E_UNAUTHORIZED_USER );
+            if (order.order_id == order_id) {
+                order.unit_price = unit_price;
+                break
+            };
+            i = i + 1;
+        };
+    }
+
+    public entry fun cancel_order<X, Y>(global : &mut GlobalMarketplace, order_id: u64, ctx: &mut TxContext) {
+
+        let global_id = object::id(global); 
+        let market = bag::borrow_mut<String, QuoteMarket<Y>>(&mut global.markets, token_to_name<Y>());
+        assert!( bag::contains_with_type<String, Orders>(&market.orders, token_to_name<X>()), E_INVALID_BASE );
+        let orders_set = bag::borrow_mut<String, Orders>(&mut market.orders, token_to_name<X>());
+
+        let count = vector::length(&orders_set.ask_orders);
+        let i = 0;
+        while (i < count) {
+            let order = vector::borrow(&orders_set.ask_orders, i);
+            if (order.order_id == order_id) {
+                assert!( order.owner == tx_context::sender(ctx), E_UNAUTHORIZED_USER );
+                vector::swap_remove(&mut orders_set.ask_orders, i);
+                break
+            };
+            i = i + 1;
+        };
+
+        count = vector::length(&orders_set.bid_orders);
+        i = 0;
+        while (i < count) {
+            let order = vector::borrow(&orders_set.bid_orders, i);
+            if (order.order_id == order_id) {
+                assert!( order.owner == tx_context::sender(ctx), E_UNAUTHORIZED_USER );
+                vector::swap_remove(&mut orders_set.bid_orders, i);
+                break
+            };
+            i = i + 1;
+        };
+
+        // emit event
+
+        event::emit(
+            RemoveOrderEvent {
+                global : global_id,
+                order_id,
+                owner: tx_context::sender(ctx)
+            }
+        )
+
     }
 
     public fun token_to_name<T>(): String {
@@ -325,7 +410,7 @@ module legato::marketplace {
     }
 
     fun matching_orders<X, Y>(global : &mut GlobalMarketplace, amount: u64, from_price: u64, is_buy: bool, ctx: &mut TxContext ): u64 {
-
+        let global_id = object::id(global);
         let sender = tx_context::sender(ctx);
 
         if (is_buy) {
@@ -352,6 +437,8 @@ module legato::marketplace {
                 while (vector::length(&order_ids) > 0) {
                     let order_id = vector::remove( &mut order_ids, 0);
                     let order = vector::borrow_mut(&mut orders_set.ask_orders, order_id);
+                    let order_id_for_update = order.order_id;
+                    let order_owner = order.owner;
                     let available_base_in_quote = mul_div(order.amount, order.unit_price, MIST_PER_SUI);
 
                     if (amount >= available_base_in_quote) {
@@ -386,7 +473,15 @@ module legato::marketplace {
                     // remove the order
                     if (order.amount == 0) {
                         vector::swap_remove(&mut orders_set.ask_orders, order_id);
-                        // todo: emit event
+                        // emit event
+
+                        event::emit(
+                            RemoveOrderEvent {
+                                global : global_id,
+                                order_id: order_id_for_update,
+                                owner: order_owner
+                            }
+                        )
                     };
 
                     if (amount == 0) break
@@ -400,7 +495,7 @@ module legato::marketplace {
                 // emit event
                 event::emit( 
                     TradeEvent { 
-                        global : object::id(global),
+                        global : global_id,
                         from_token: token_to_name<X>(),
                         to_token: token_to_name<Y>(),
                         input_amount,
@@ -477,7 +572,7 @@ module legato::marketplace {
                 // emit event
                 event::emit( 
                     TradeEvent { 
-                        global : object::id(global),
+                        global : global_id,
                         from_token: token_to_name<X>(),
                         to_token: token_to_name<Y>(),
                         input_amount,
@@ -498,7 +593,8 @@ module legato::marketplace {
     fun add_order<X, Y>(global : &mut GlobalMarketplace, amount: u64, unit_price: u64, is_buy: bool, ctx: &mut TxContext) {
         
         let sender = tx_context::sender(ctx);
-        let new_order = Order { created_epoch: tx_context::epoch(ctx), amount, unit_price, owner: sender };
+        let order_id = global.order_count+1;
+        let new_order = Order { order_id, created_epoch: tx_context::epoch(ctx), amount, unit_price, owner: sender };
         
         if (!is_buy) {
 
@@ -534,6 +630,7 @@ module legato::marketplace {
             event::emit( 
                 NewOrderEvent { 
                     global: object::id(global),
+                    order_id,
                     is_bid: false,
                     base_token: token_to_name<X>(),
                     quote_token: token_to_name<Y>(),
@@ -574,6 +671,7 @@ module legato::marketplace {
             event::emit( 
                 NewOrderEvent { 
                     global: object::id(global),
+                    order_id,
                     is_bid: true,
                     base_token: token_to_name<Y>(),
                     quote_token: token_to_name<X>(),
