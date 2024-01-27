@@ -6,7 +6,7 @@ module legato::event {
     use sui::object::ID;
 
     friend legato::legato;
-    friend legato::amm_interface;
+    friend legato::amm;
     friend legato::vault;
 
     /// Liquidity pool added event.

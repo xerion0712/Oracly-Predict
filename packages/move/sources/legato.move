@@ -128,7 +128,7 @@ module legato::legato {
         amm::register_pool<LEGATO, TOKEN<P,YT>>(amm_global, is_order);
         let pool = amm::get_mut_pool<LEGATO, TOKEN<P,YT>>(amm_global, is_order);
 
-        let (lp, _) = amm::add_liquidity<LEGATO, TOKEN<P,YT>>( pool, initial_liquidity, 1, coin::from_balance(minted_yt, ctx), 1, is_order, ctx);
+        let (lp, _) = amm::add_liquidity_non_entry<LEGATO, TOKEN<P,YT>>( pool, initial_liquidity, 1, coin::from_balance(minted_yt, ctx), 1, is_order, ctx);
 
         transfer::public_transfer( lp , global.treasury);
 
