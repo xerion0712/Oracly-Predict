@@ -4,10 +4,10 @@ module legato::event {
 
     use sui::event::emit;
     use sui::object::ID;
-
-    friend legato::legato;
+ 
     friend legato::amm;
     friend legato::vault;
+    friend legato::vault_lib;
 
     /// Liquidity pool added event.
     struct AddedEvent has copy, drop {

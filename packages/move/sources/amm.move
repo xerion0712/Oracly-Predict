@@ -2,7 +2,7 @@
 // https://github.com/OmniBTC/Sui-AMM-swap
 
 
-// The AMM serves as the primary marketplace for trading YT <-> LEGATO and LEGATO <-> USDC. Other tokens may be routed through the orderbook system.
+// The AMM serves as the primary marketplace for trading YT <-> VT and VT <-> USDC. Other tokens may be routed through the orderbook system.
 
 module legato::amm {
 
