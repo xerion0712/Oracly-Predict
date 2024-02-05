@@ -21,6 +21,7 @@ module legato::marketplace {
    
     use legato::math::{mul_div};
     use legato::vault_lib::{token_to_name};
+    use legato::event::{remove_order_event, update_order_event, new_order_event, trade_event};
 
     // ======== Constants ========
 
@@ -212,7 +213,13 @@ module legato::marketplace {
 
         assert!( updated,  E_INVALID_ORDER_ID);
 
-        // TODO: emit event
+        // emit event
+        update_order_event(
+            object::id(global),
+            order_id,
+            unit_price,
+            tx_context::sender(ctx)
+        );
     }
 
     public entry fun cancel_order<X, Y>(global : &mut Marketplace, order_id: u64, ctx: &mut TxContext) {
@@ -253,7 +260,12 @@ module legato::marketplace {
 
         assert!( updated,  E_INVALID_ORDER_ID);
 
-        // TODO: emit event
+        // emit event
+        remove_order_event(
+            object::id(global),
+            order_id,
+            tx_context::sender(ctx)
+        );
     }
 
     public fun order_balance<T>(orders: &vector<Order<T>>, order_id: u64): u64 {
@@ -296,10 +308,12 @@ module legato::marketplace {
 
     // base -> quote
     fun add_ask_order<X, Y>(global:  &mut Marketplace, coin_in: Coin<X>, unit_price: u64, ctx: &mut TxContext) {
-
+        
         let sender = tx_context::sender(ctx);
         global.order_count = global.order_count+1;
         let order_id = global.order_count;
+        let listing_amount = coin::value(&coin_in);
+
         let new_order = Order { order_id, created_epoch: tx_context::epoch(ctx),balance: coin::into_balance(coin_in), unit_price, owner: sender };
 
         let token_name = token_to_name<X>();
@@ -325,7 +339,17 @@ module legato::marketplace {
             vector::push_back<Order<X>>(&mut orders_set.ask_orders, new_order);
         };
 
-        // TODO: emit event
+        // emit event
+        new_order_event(
+            object::id(global),
+            order_id,
+            false,
+            token_name,
+            token_to_name<Y>(),
+            listing_amount,
+            unit_price,
+            sender
+        );
 
     }
 
@@ -335,6 +359,8 @@ module legato::marketplace {
         let sender = tx_context::sender(ctx);
         global.order_count = global.order_count+1;
         let order_id = global.order_count;
+        let listing_amount = coin::value(&coin_in);
+
         let new_order = Order { order_id, created_epoch: tx_context::epoch(ctx),balance: coin::into_balance(coin_in), unit_price, owner: sender };
 
         let token_name = token_to_name<Y>();
@@ -359,13 +385,24 @@ module legato::marketplace {
             vector::push_back<Order<X>>(&mut orders_set.bid_orders, new_order);
         };
 
-        // TODO: emit event
+        // emit event
+        new_order_event(
+            object::id(global),
+            order_id,
+            true,
+            token_name,
+            token_to_name<X>(),
+            listing_amount,
+            unit_price,
+            sender
+        );
     }
 
     // matching with ask orders
     // quote -> base
     fun matching_ask_orders<X,Y>(global: &mut Marketplace, coin_in: Coin<X>, from_price: u64, ctx: &mut TxContext ): (Coin<X>, Coin<Y>) {
         
+        let global_id = object::id(global);
         let token_name = token_to_name<Y>();
         let market = bag::borrow_mut<String, QuoteMarket<X>>(&mut global.markets, token_to_name<X>());
         if (!bag::contains_with_type<String, Orders<Y,X>>(&market.orders, token_name)) {
@@ -377,6 +414,9 @@ module legato::marketplace {
 
         let remaining_token = coin::into_balance(coin_in);
         let base_token = balance::zero<Y>();
+
+        let input_amount = 0;
+        let output_amount = 0;
 
         if (vector::length(&orders_set.ask_orders) > 0) {
             sort_orders<Y>(&mut orders_set.ask_orders);
@@ -393,16 +433,24 @@ module legato::marketplace {
 
                 if (balance::value<X>(&remaining_token) >= available_base_in_quote) {
                         // input value >= order value, then we close the order entirely
-                        let Order<Y> { order_id: _, created_epoch: _, balance, unit_price:_, owner} = vector::swap_remove(&mut orders_set.ask_orders, order_id);
+                        let Order<Y> { order_id, created_epoch: _, balance, unit_price:_, owner} = vector::swap_remove(&mut orders_set.ask_orders, order_id);
                         let quote_to_transfer =
                             if  (balance::value(&remaining_token) >= available_base_in_quote)
                                 available_base_in_quote
                             else balance::value(&remaining_token);
 
+                        input_amount = input_amount+quote_to_transfer;
+                        output_amount = output_amount+balance::value(&balance);
+                        
                         transfer::public_transfer(coin::from_balance( balance::split(&mut remaining_token, quote_to_transfer), ctx), owner);
                         balance::join(&mut base_token, balance);
 
-                        // TODO: emit remove event
+                        // emit remove event
+                        remove_order_event(
+                            global_id,
+                            order_id,
+                            owner
+                        );
 
                 } else {
                         // order value > input value, 
@@ -417,12 +465,29 @@ module legato::marketplace {
                                 amount_in_base
                             else balance::value(&order_mut.balance);
                         
+                        input_amount = input_amount+amount;
+                        output_amount = output_amount+base_to_transfer;
+
                         balance::join(&mut base_token, balance::split(&mut order_mut.balance, base_to_transfer ) );
 
                 };
                 if (balance::value<X>(&remaining_token) == 0) break
             };
 
+
+
+        };
+
+        if (output_amount > 0) {
+            // emit event
+            trade_event(
+                global_id,
+                token_to_name<X>(),
+                token_to_name<Y>(),
+                input_amount,
+                output_amount,
+                tx_context::sender(ctx)
+            );
         };
 
         (coin::from_balance(remaining_token, ctx), coin::from_balance(base_token, ctx))
@@ -432,6 +497,7 @@ module legato::marketplace {
     // base -> quote
     fun matching_bid_orders<X,Y>(global: &mut Marketplace, coin_in: Coin<X>, from_price: u64, ctx: &mut TxContext ): (Coin<X>, Coin<Y>) {
         
+        let global_id = object::id(global);
         let token_name = token_to_name<X>();
         let market = bag::borrow_mut<String, QuoteMarket<Y>>(&mut global.markets, token_to_name<Y>());
         if (!bag::contains_with_type<String, Orders<X,Y>>(&market.orders, token_name)) {
@@ -443,6 +509,9 @@ module legato::marketplace {
 
         let remaining_token = coin::into_balance(coin_in);
         let quote_token = balance::zero<Y>();
+
+        let input_amount = 0;
+        let output_amount = 0;
 
         if (vector::length(&orders_set.bid_orders) > 0) {
             sort_orders(&mut orders_set.bid_orders);
@@ -463,7 +532,7 @@ module legato::marketplace {
 
                 if (available_remaining_in_quote >= order_balance) {
                     // input value >= order value, close the order entirely
-                    let Order<Y> { order_id: _, created_epoch: _, balance, unit_price:_, owner} = vector::swap_remove(&mut orders_set.bid_orders, order_id);
+                    let Order<Y> { order_id, created_epoch: _, balance, unit_price:_, owner} = vector::swap_remove(&mut orders_set.bid_orders, order_id);
                     let order_balance_in_base = mul_div(order_balance, MIST_PER_SUI, order_unit_price);
 
                     let base_to_transfer =
@@ -471,10 +540,18 @@ module legato::marketplace {
                                 order_balance_in_base
                             else balance::value(&remaining_token);
                     
+                    input_amount = input_amount+base_to_transfer;
+                    output_amount = output_amount+balance::value(&balance);
+
                     transfer::public_transfer(coin::from_balance( balance::split(&mut remaining_token, base_to_transfer ), ctx), owner);
                     balance::join(&mut quote_token, balance);
 
-                    // TODO: emit remove event
+                    // emit remove event
+                        remove_order_event(
+                            global_id,
+                            order_id,
+                            owner
+                        );
                 } else {
                     // order value > input value
                     let order_mut = vector::borrow_mut(&mut orders_set.bid_orders, order_id);
@@ -486,12 +563,27 @@ module legato::marketplace {
                                 available_remaining_in_quote
                             else balance::value(&order_mut.balance);
                     
+                    input_amount = input_amount+amount;
+                    output_amount = output_amount+quote_to_transfer;
+
                     balance::join(&mut quote_token, balance::split(&mut order_mut.balance, quote_to_transfer ) );
                 };
 
                 if (balance::value<X>(&remaining_token) == 0) break
             };
 
+        };
+
+        if (output_amount > 0) {
+            // emit event
+            trade_event(
+                global_id,
+                token_to_name<X>(),
+                token_to_name<Y>(),
+                input_amount,
+                output_amount,
+                tx_context::sender(ctx)
+            );
         };
 
         (coin::from_balance(remaining_token, ctx), coin::from_balance(quote_token, ctx))
