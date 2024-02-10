@@ -1,26 +1,23 @@
-
-
 #[test_only]
 module legato::vault_utils {
 
-    use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
-    use sui::coin::{Self };
+    use sui::test_scenario::{Self as test, Scenario , next_tx, ctx};
+    use sui::sui::SUI;
+    use sui::coin::{Self};
 
-    use sui_system::staking_pool::{  StakedSui};
-    use sui_system::sui_system::{ Self, SuiSystemState, validator_staking_pool_id, epoch };
+    use sui_system::staking_pool::{ StakedSui};
+    use sui_system::sui_system::{ Self, SuiSystemState, validator_staking_pool_id };
     use sui_system::governance_test_utils::{ 
         create_sui_system_state_for_testing,
         create_validator_for_testing,
         advance_epoch_with_reward_amounts
     };
 
-    use legato::legato::{Self, Global, LEGATO};
-    use legato::amm::{Self, AMMGlobal };
-    use legato::vault_template::{JAN_2024};
-
-    friend legato::vault_basic_tests;
-
-    const VAULT_MATURE_IN : u64 = 60;
+    // use legato::marketplace::{Self, Marketplace, ManagerCap };
+    // use legato::vusd::{Self, ReversePool};
+    use legato::vault::{Self, ManagerCap, Global}; 
+    use legato::amm::{ Self, AMMGlobal };
+    use legato::vault_template::{JAN_2024, FEB_2024, MAR_2024};
 
     const VALIDATOR_ADDR_1: address = @0x1;
     const VALIDATOR_ADDR_2: address = @0x2;
@@ -31,68 +28,14 @@ module legato::vault_utils {
 
     const STAKER_ADDR_1: address = @0x42;
     const STAKER_ADDR_2: address = @0x43;
+    const STAKER_ADDR_3: address = @0x44;
 
     const MIST_PER_SUI: u64 = 1_000_000_000;
     const INIT_LIQUIDITY: u64 = 10_000_000_000;
 
-    public(friend) fun setup_vault(test: &mut Scenario, admin_address: address) {
+    struct USDC {}
 
-        next_tx(test, admin_address);
-        {
-            legato::test_init(ctx(test));
-        };
-
-        next_tx(test, admin_address);
-        {
-            amm::init_for_testing(ctx(test));
-        };
-
-        // vault matures in 60 epochs
-        next_tx(test, admin_address);
-        {
-            let system_state = test::take_shared<SuiSystemState>(test);
-            let global = test::take_shared<Global>(test);
-            let amm_global = test::take_shared<AMMGlobal>(test);
-
-            let maturity_epoch = epoch(&mut system_state)+VAULT_MATURE_IN;
-            let initial_apy = 30000000; // APY = 3%
-
-            legato::new_vault<JAN_2024>(
-                &mut global,  
-                &mut amm_global,
-                initial_apy,
-                maturity_epoch,
-                coin::mint_for_testing<LEGATO>(INIT_LIQUIDITY, ctx(test)),
-                ctx(test)
-            );
-
-            test::return_shared(global);
-            test::return_shared(amm_global);
-            test::return_shared(system_state);
-        };
-
-        next_tx(test, admin_address);
-        {
-            let system_state = test::take_shared<SuiSystemState>(test);
-            let global = test::take_shared<Global>(test);
-
-            let pool_id_1 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_1);
-            let pool_id_2 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_2);
-            let pool_id_3 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_3);
-            let pool_id_4 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_4);
-
-            legato::add_vault_pool<JAN_2024>( &mut global, pool_id_1, ctx(test));
-            legato::add_vault_pool<JAN_2024>( &mut global, pool_id_2, ctx(test));
-            legato::add_vault_pool<JAN_2024>( &mut global, pool_id_3, ctx(test));
-            legato::add_vault_pool<JAN_2024>( &mut global, pool_id_4, ctx(test));
-
-            test::return_shared(global);
-            test::return_shared(system_state);
-        };
-
-    }
-
-    public(friend) fun advance_epoch(test: &mut Scenario, value: u64) {
+    public fun advance_epoch(test: &mut Scenario, value: u64) {
         let i = 0;
         while (i < value) {
             advance_epoch_with_reward_amounts(0, 500, test);
@@ -100,23 +43,23 @@ module legato::vault_utils {
         };
     }
 
-    public(friend) fun set_up_sui_system_state() {
-        let scenario_val = test::begin(@0x0);
-        let scenario = &mut scenario_val;
-        let ctx = test::ctx(scenario);
+    // public fun set_up_sui_system_state() {
+    //     let scenario_val = test::begin(@0x0);
+    //     let scenario = &mut scenario_val;
+    //     let ctx = test::ctx(scenario);
 
-        let validators = vector[
-            create_validator_for_testing(VALIDATOR_ADDR_1, 1000000, ctx),
-            create_validator_for_testing(VALIDATOR_ADDR_2, 1000000, ctx),
-            create_validator_for_testing(VALIDATOR_ADDR_3, 1000000, ctx),
-            create_validator_for_testing(VALIDATOR_ADDR_4, 1000000, ctx),
-        ];
-        create_sui_system_state_for_testing(validators, 40000000, 0, ctx);
+    //     let validators = vector[
+    //         create_validator_for_testing(VALIDATOR_ADDR_1, 1000000, ctx),
+    //         create_validator_for_testing(VALIDATOR_ADDR_2, 1000000, ctx),
+    //         create_validator_for_testing(VALIDATOR_ADDR_3, 1000000, ctx),
+    //         create_validator_for_testing(VALIDATOR_ADDR_4, 1000000, ctx),
+    //     ];
+    //     create_sui_system_state_for_testing(validators, 40000000, 0, ctx);
 
-        test::end(scenario_val);
-    }
+    //     test::end(scenario_val);
+    // }
 
-    public(friend) fun set_up_sui_system_state_imbalance() {
+    public fun set_up_sui_system_state() {
         let scenario_val = test::begin(@0x0);
         let scenario = &mut scenario_val;
         let ctx = test::ctx(scenario);
@@ -132,7 +75,133 @@ module legato::vault_utils {
         test::end(scenario_val);
     }
 
-    public(friend) fun stake_and_mint(test: &mut Scenario, staker_address: address, amount : u64, validator_address: address) {
+    // public fun setup_marketplace(test: &mut Scenario, admin_address: address) {
+
+    //     next_tx(test, admin_address);
+    //     {
+    //         marketplace::test_init(ctx(test));
+    //     };
+
+    //     next_tx(test, admin_address);
+    //     {
+    //         let global = test::take_shared<Marketplace>(test);
+    //         let managercap = test::take_from_sender<ManagerCap>(test);
+    //         marketplace::setup_quote<USDC>(&mut global, &mut managercap,  ctx(test));
+    //         test::return_shared(global);
+    //         test::return_to_sender(test, managercap);
+    //     };
+
+    //     // listing SUI for USDC
+    //     next_tx(test, admin_address);
+    //     {
+    //         let global = test::take_shared<Marketplace>(test); 
+    //         marketplace::sell_and_listing<SUI, USDC>(&mut global,  coin::mint_for_testing<SUI>( 300 * MIST_PER_SUI, ctx(test)), 500_000_000 , ctx(test));
+    //         marketplace::sell_and_listing<SUI, USDC>(&mut global, coin::mint_for_testing<SUI>( 200 * MIST_PER_SUI, ctx(test)), 550_000_000 , ctx(test));
+    //         marketplace::sell_and_listing<SUI, USDC>(&mut global, coin::mint_for_testing<SUI>( 100 * MIST_PER_SUI, ctx(test)), 600_000_000 , ctx(test));
+    //         marketplace::sell_and_listing<SUI, USDC>(&mut global,coin::mint_for_testing<SUI>( 50 * MIST_PER_SUI, ctx(test)), 650_000_000 , ctx(test));
+    //         test::return_shared(global);
+    //     };
+
+    // }
+
+    // public fun setup_vusd(test: &mut Scenario, admin_address: address) {
+    //     next_tx(test, admin_address);
+    //     {
+    //         vusd::test_init(ctx(test));
+    //     };
+
+    //     next_tx(test, admin_address);
+    //     { 
+    //         let system_state = test::take_shared<SuiSystemState>(test);
+    //         let global = test::take_shared<ReversePool>(test);
+    //         let managercap = test::take_from_sender<vusd::ManagerCap>(test);
+
+    //         let pool_id_1 = validator_staking_pool_id(&mut system_state,  VALIDATOR_ADDR_1);
+    //         let pool_id_2 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_2);
+    //         let pool_id_3 = validator_staking_pool_id(&mut system_state,  VALIDATOR_ADDR_3);
+    //         let pool_id_4 = validator_staking_pool_id(&mut system_state,   VALIDATOR_ADDR_4);
+
+    //         vusd::attach_pool( &mut global, &mut managercap,VALIDATOR_ADDR_1 , pool_id_1);
+    //         vusd::attach_pool( &mut global, &mut managercap, VALIDATOR_ADDR_2 , pool_id_2);
+    //         vusd::attach_pool( &mut global, &mut managercap,VALIDATOR_ADDR_3, pool_id_3 );
+    //         vusd::attach_pool( &mut global,&mut managercap, VALIDATOR_ADDR_4, pool_id_4 );
+
+    //         vusd::register_stablecoin<USDC>( &mut global, 950_000_000 , &mut managercap);
+
+    //         test::return_shared(global); 
+    //         test::return_to_sender(test, managercap);
+    //         test::return_shared(system_state);
+    //     };
+    // }
+
+    public fun setup_vault(test: &mut Scenario, admin_address: address) {
+        next_tx(test, admin_address);
+        {
+            vault::test_init(ctx(test));
+        };
+
+        next_tx(test, admin_address);
+        {
+            amm::init_for_testing(ctx(test));
+        };
+
+        next_tx(test, admin_address);
+        {
+            let managercap = test::take_from_sender<ManagerCap>(test);
+            let system_state = test::take_shared<SuiSystemState>(test);
+            let global = test::take_shared<Global>(test);
+
+            let pool_id_1 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_1);
+            let pool_id_2 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_2);
+            let pool_id_3 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_3);
+            let pool_id_4 = validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_4);
+
+            vault::attach_pool( &mut global, &mut managercap, VALIDATOR_ADDR_1, pool_id_1 );
+            vault::attach_pool( &mut global, &mut managercap, VALIDATOR_ADDR_2, pool_id_2 );
+            vault::attach_pool( &mut global, &mut managercap, VALIDATOR_ADDR_3, pool_id_3 );
+            vault::attach_pool( &mut global, &mut managercap, VALIDATOR_ADDR_4, pool_id_4 );
+
+            test::return_shared(global);
+            test::return_shared(system_state);
+            test::return_to_sender(test, managercap);
+        };
+
+        register_vault<JAN_2024>(test, admin_address, 40, 100);
+        register_vault<FEB_2024>(test, admin_address, 60, 110);
+        register_vault<MAR_2024>(test, admin_address, 80, 140);
+
+    }
+
+    fun register_vault<P>(test: &mut Scenario, admin_address: address, start_epoch: u64, end_epoch: u64) {
+
+        next_tx(test, admin_address);
+        {
+            let managercap = test::take_from_sender<ManagerCap>(test);
+            let system_state = test::take_shared<SuiSystemState>(test);
+            let global = test::take_shared<Global>(test);
+            let amm_global = test::take_shared<AMMGlobal>(test);
+            let initial_apy = 30000000; // APY = 3%
+
+            vault::new_vault<P>(
+                &mut global,  
+                &mut amm_global,
+                &mut managercap,
+                start_epoch,
+                end_epoch,
+                initial_apy,
+                coin::mint_for_testing<SUI>(INIT_LIQUIDITY, ctx(test)),
+                ctx(test)
+            );
+
+            test::return_shared(global);
+            test::return_shared(amm_global);
+            test::return_shared(system_state);
+            test::return_to_sender(test, managercap);
+        };
+ 
+    }
+
+    public fun stake_and_mint<P>(test: &mut Scenario, staker_address: address, amount : u64, validator_address: address) {
 
         next_tx(test, staker_address);
         {
@@ -147,7 +216,7 @@ module legato::vault_utils {
             let global = test::take_shared<Global>(test);
             let staked_sui = test::take_from_sender<StakedSui>(test);
 
-            legato::mint<JAN_2024>(&mut system_state, &mut global, staked_sui, ctx(test));
+            vault::mint<P>(&mut system_state, &mut global, staked_sui, ctx(test));
 
             test::return_shared(global);
             test::return_shared(system_state);
@@ -155,10 +224,6 @@ module legato::vault_utils {
 
     }
 
-    public(friend) fun validator_addrs() : vector<address> {
-        vector[VALIDATOR_ADDR_1, VALIDATOR_ADDR_2, VALIDATOR_ADDR_3, VALIDATOR_ADDR_4]
-    }
 
-    public(friend) fun scenario(): Scenario { test::begin(VALIDATOR_ADDR_1) }
-
+    public fun scenario(): Scenario { test::begin(VALIDATOR_ADDR_1) }
 }

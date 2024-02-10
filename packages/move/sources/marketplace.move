@@ -1,27 +1,30 @@
 // Copyright (c) Tamago Blockchain Labs, Inc.
 // SPDX-License-Identifier: MIT
 
+// An order-book based marketplace aims to trade underlying fungible tokens in the system 
+// with always zero fees and doesn't require upfront liquidity
+
 module legato::marketplace {
 
     // use std::debug;
 
-    use sui::object::{ Self, ID, UID };
     use sui::balance::{ Self, Balance };
+    use sui::object::{ Self,  UID };
     use sui::bag::{ Self, Bag};
-    use sui::table::{ Self, Table};
-    use sui::tx_context::{ Self, TxContext};
     use sui::transfer;
+    use sui::table::{ Table};
+    use sui::tx_context::{ Self, TxContext};
     use sui::coin::{Self, Coin};
-    use sui::event::{Self};
-
+    
     use std::vector;
-    use std::ascii::{  into_bytes};
-    use std::type_name::{get, into_string};
-    use std::string::{ Self, String };
-
+    use std::string::{  String };
+   
     use legato::math::{mul_div};
+    use legato::vault_lib::{token_to_name};
+    use legato::event::{remove_order_event, update_order_event, new_order_event, trade_event};
 
     // ======== Constants ========
+
     const MIST_PER_SUI: u64 = 1_000_000_000;
 
     // ======== Errors ========
@@ -34,103 +37,65 @@ module legato::marketplace {
     const E_INVALID_BASE: u64 = 307;
     const E_NO_ORDER_LISTING: u64 = 306;
     const E_INSUFFICIENT_BALANCE: u64 = 306;
+    const E_INVALID_ORDER_ID: u64 = 307;
+    const E_PAUSED: u64 = 308;
 
     // ======== Structs =========
 
-    struct TransferRequest<phantom T> has drop {
-        amount: u64,
-        from_address: address,
-        to_address: address
+    // The global config for Marketplace
+    struct Marketplace has key {
+        id: UID,
+        has_paused: bool,
+        user_balances: Bag,
+        markets: Bag, // a collection of QuoteMarket
+        order_count: u64 // tracks the total orders and generates unique IDs for distinct identification
     }
 
-    struct ReductionRequest<phantom T> has drop {
-        amount: u64,
-        owner_address: address
-    }
-
-    struct Order has  drop, store { 
-        created_epoch: u64,
-        amount: u64,
-        unit_price: u64, // per 1 unit
-        owner: address
-    }
-
-    struct Orders has store {
-        token_name: String,
-        bid_orders: vector<Order>,
-        ask_orders: vector<Order>
-    }
-
-    // SUI or USDC
+    // an easily referenceable currency like USDC or USDT
     struct QuoteMarket<phantom T> has store {
         id: UID,
-        global: ID,
         token_name: String,
         orders: Bag
     }
 
+    struct Orders<phantom X, phantom Y> has store {
+        token_name: String,
+        bid_orders: vector<Order<Y>>,
+        ask_orders: vector<Order<X>>
+    }
+
+    struct Order<phantom T> has store {
+        order_id: u64,
+        created_epoch: u64,
+        balance: Balance<T>,
+        unit_price: u64, // per 1 unit
+        owner: address
+    }
+
+    // before trading, the user needs to deposit tokens first
     struct TokenDeposit<phantom T> has store {
         coin: Balance<T>,
         balances: Table<address,u64>,
         listing: Table<address,u64> // that has been listing
     }
 
-    /// The global config for Marketplace
-    struct GlobalMarketplace has key {
-        id: UID,
-        admin: vector<address>,
-        treasury: address,
-        has_paused: bool,
-        user_balances: Bag,
-        markets: Bag
+    struct ManagerCap has key {
+        id: UID
     }
-
-    struct DepositEvent has copy, drop {
-        global: ID,
-        token_name: String,
-        input_amount: u64,
-        sender: address
-    }
-
-    struct WithdrawEvent has copy, drop {
-        global: ID,
-        token_name: String,
-        withdraw_amount: u64,
-        sender: address
-    }
-
-    struct TradeEvent has copy, drop {
-        global: ID,
-        from_token: String,
-        to_token: String,
-        input_amount: u64,
-        output_amount: u64,
-        sender: address
-    }
-
-    struct NewOrderEvent has copy, drop {
-        global: ID,
-        is_bid: bool,
-        base_token: String,
-        quote_token: String,
-        amount: u64,
-        unit_price: u64, // per 1 unit
-        owner: address
-    }
-
 
     fun init(ctx: &mut TxContext) {
 
-        let admin_list = vector::empty<address>();
-        vector::push_back<address>(&mut admin_list, tx_context::sender(ctx));
+        transfer::transfer(
+            ManagerCap {id: object::new(ctx)},
+            tx_context::sender(ctx)
+        );
 
-        let global = GlobalMarketplace {
-            id: object::new(ctx),
-            admin: admin_list, 
-            treasury: tx_context::sender(ctx),
+        let global = Marketplace {
+            id: object::new(ctx),  
             has_paused: false,
             user_balances: bag::new(ctx),
-            markets: bag::new(ctx)
+            markets: bag::new(ctx),
+            order_count: 0
         };
 
         transfer::share_object(global)
@@ -138,152 +103,493 @@ module legato::marketplace {
 
     // ======== Public Functions =========
 
-    // pt -> usdc
-    public entry fun sell_only<X, Y>(global :&mut GlobalMarketplace, base_token_amount: u64, ask_price: u64, ctx: &mut TxContext) {
+    // selling base token X for quote token Y. If no bid orders match, then a new ask order will be created
+    public entry fun sell_and_listing<X, Y>(global :&mut Marketplace, base_token: Coin<X>, ask_price: u64, ctx: &mut TxContext) {
+        check_pause(global);
         check_quote<Y>(global);
 
-        matching_orders<X,Y>(global, base_token_amount, ask_price, false , ctx);
-    }
-
-    // pt -> usdc
-    public entry fun sell_and_listing<X, Y>(global :&mut GlobalMarketplace, base_token_amount: u64, ask_price: u64, ctx: &mut TxContext) {
-        check_quote<Y>(global);
-
-        let remaining_amount = matching_orders<X,Y>(global, base_token_amount, ask_price, false , ctx);
-        add_order<X, Y>(global, remaining_amount, ask_price, false, ctx);
-    }
-
-    // usdt -> pt
-    public entry fun buy_only<X, Y>(global :&mut GlobalMarketplace, quote_token_amount: u64, bid_price: u64, ctx: &mut TxContext) {
-        check_quote<X>(global);
-
-        matching_orders<X,Y>(global, quote_token_amount, bid_price, true , ctx);
-    }
-
-    // usdt -> pt
-    public entry fun buy_and_listing<X,Y>(global :&mut GlobalMarketplace, quote_token_amount: u64, bid_price: u64, ctx: &mut TxContext) {
-        check_quote<X>(global);
-
-        let remaining_amount = matching_orders<X,Y>(global, quote_token_amount, bid_price, true , ctx);
-        add_order<X,Y>(global, remaining_amount, bid_price, true, ctx);
-    }
-
-    public entry fun deposit<T>(global :&mut GlobalMarketplace, input_coin: Coin<T>, ctx: &mut TxContext) {
+        let (remaining_token, quote_token) = matching_bid_orders<X,Y>(global, base_token, ask_price , ctx);
         
-        let token_name = token_to_name<T>();
-        let input_amount = coin::value(&input_coin);
-        let has_registered = bag::contains_with_type<String, TokenDeposit<T>>(&global.user_balances, token_name);
+        if (coin::value(&quote_token) > 0)
+            transfer::public_transfer(quote_token, tx_context::sender(ctx))
+            else coin::destroy_zero(quote_token);
 
-        if (!has_registered) {
-            let init_coin = balance::zero<T>();
-            balance::join<T>(&mut init_coin, coin::into_balance(input_coin));
+        add_ask_order<X,Y>(global, remaining_token, ask_price, ctx);
+    }
 
-            let new_token_deposit = TokenDeposit { coin: init_coin, balances: init_balance_table(input_amount, ctx), listing: init_balance_table(0, ctx)};
-            bag::add(&mut global.user_balances, token_name, new_token_deposit);
-        } else {
-            let token_deposit = bag::borrow_mut<String, TokenDeposit<T>>(&mut global.user_balances, token_name);
-            balance::join<T>(&mut token_deposit.coin, coin::into_balance(input_coin));
+    // buying base token Y with quote token X. if no ask orders match, then a new bid order will be created
+    public entry fun buy_and_listing<X,Y>(global :&mut Marketplace, quote_token: Coin<X>, bid_price: u64, ctx: &mut TxContext) {
+        check_pause(global);
+        check_quote<X>(global);
 
-            if (table::contains(&token_deposit.balances, tx_context::sender(ctx))) {
-                *table::borrow_mut( &mut token_deposit.balances, tx_context::sender(ctx) ) = *table::borrow( &token_deposit.balances, tx_context::sender(ctx) )+input_amount;
-            } else {
-                table::add(&mut token_deposit.balances, tx_context::sender(ctx), input_amount);
+        let (remaining_token, base_token) = matching_ask_orders<X,Y>(global, quote_token, bid_price , ctx);
+
+        if (coin::value(&base_token) > 0)
+            transfer::public_transfer(base_token, tx_context::sender(ctx))
+            else coin::destroy_zero(base_token);
+
+
+        add_bid_order<X,Y>(global, remaining_token, bid_price, ctx);
+    }
+
+    // buying base token Y with quote token X.
+    public entry fun buy_only<X,Y>(global :&mut Marketplace, quote_token: Coin<X>, bid_price: u64, ctx: &mut TxContext) {
+        check_pause(global);
+        check_quote<X>(global);
+
+        let (remaining_token, base_token) = matching_ask_orders<X,Y>(global, quote_token, bid_price , ctx);
+
+        if (coin::value(&remaining_token) > 0)
+                transfer::public_transfer(remaining_token, tx_context::sender(ctx))
+            else coin::destroy_zero(remaining_token);
+
+        if (coin::value(&base_token) > 0)
+            transfer::public_transfer(base_token, tx_context::sender(ctx))
+            else coin::destroy_zero(base_token);
+        
+    }
+
+    public entry fun sell_only<X, Y>(global :&mut Marketplace, base_token: Coin<X>, ask_price: u64, ctx: &mut TxContext) {
+        check_pause(global);
+        check_quote<Y>(global);
+
+        let (remaining_token, quote_token) = matching_bid_orders<X,Y>(global, base_token, ask_price , ctx);
+
+        if (coin::value(&remaining_token) > 0)
+                transfer::public_transfer(remaining_token, tx_context::sender(ctx))
+            else coin::destroy_zero(remaining_token);
+
+        if (coin::value(&quote_token) > 0)
+            transfer::public_transfer(quote_token, tx_context::sender(ctx))
+            else coin::destroy_zero(quote_token);
+    }
+
+    public fun buy<X,Y>(global :&mut Marketplace, quote_token: Coin<X>, bid_price: u64, ctx: &mut TxContext) : (Coin<X>, Coin<Y>) {
+        matching_ask_orders<X,Y>(global, quote_token, bid_price, ctx)
+    }
+
+    public fun sell<X,Y>(global :&mut Marketplace, base_token: Coin<X>, ask_price: u64, ctx: &mut TxContext) : (Coin<X>, Coin<Y>)  {
+        matching_bid_orders<X,Y>(global, base_token, ask_price , ctx)
+    }
+
+    // checking if the quote token T exists
+    public fun check_quote<T>(global: &Marketplace) {
+        assert!(bag::contains_with_type<String, QuoteMarket<T>>(&global.markets, token_to_name<T>()), E_INVALID_QUOTE);
+    }
+
+    public entry fun update_order<X, Y>(global : &mut Marketplace, order_id: u64, unit_price: u64, ctx: &mut TxContext) {
+        check_quote<Y>(global); 
+
+        let market = bag::borrow_mut<String, QuoteMarket<Y>>(&mut global.markets, token_to_name<Y>());
+        assert!( bag::contains_with_type<String, Orders<X,Y>>(&market.orders, token_to_name<X>()), E_INVALID_BASE );
+        let orders_set = bag::borrow_mut<String, Orders<X,Y>>(&mut market.orders, token_to_name<X>());
+
+        let count = vector::length(&orders_set.ask_orders);
+        let i = 0;
+        let updated = false;
+        while (i < count) {
+            let order = vector::borrow_mut(&mut orders_set.ask_orders, i);
+            if (order.order_id == order_id) {
+                assert!( order.owner == tx_context::sender(ctx), E_UNAUTHORIZED_USER );
+                order.unit_price = unit_price;
+                updated = true;
+                break
             };
+            i = i + 1;
         };
 
-        // emit event
-        event::emit( DepositEvent { global : object::id(global), token_name, input_amount, sender: tx_context::sender(ctx) })
-    }
+        count = vector::length(&orders_set.bid_orders);
+        i = 0;
+        while (i < count) {
+            let order = vector::borrow_mut(&mut orders_set.bid_orders, i);
+            if (order.order_id == order_id) {
+                assert!( order.owner == tx_context::sender(ctx), E_UNAUTHORIZED_USER );
+                order.unit_price = unit_price;
+                updated = true;
+                break
+            };
+            i = i + 1;
+        };
 
-    public entry fun withdraw<T>(global :&mut GlobalMarketplace, withdraw_amount: u64, ctx: &mut TxContext) {
-
-        let token_name = token_to_name<T>();
-        let has_registered = bag::contains_with_type<String, TokenDeposit<T>>(&global.user_balances, token_name);
-        assert!(has_registered, E_NOT_FOUND);
-
-        let token_deposit = bag::borrow_mut<String, TokenDeposit<T>>(&mut global.user_balances, token_name);
-        assert!(table::contains(&token_deposit.balances, tx_context::sender(ctx)), E_ZERO_AMOUNT);
-        
-        let available_amount = *table::borrow(&token_deposit.balances, tx_context::sender(ctx)); 
-        let listing_amount = *table::borrow(&token_deposit.listing, tx_context::sender(ctx)); 
-        assert!((available_amount-listing_amount) >= withdraw_amount, E_INSUFFICIENT_AMOUNT);
-
-        *table::borrow_mut(&mut token_deposit.balances, tx_context::sender(ctx)) = *table::borrow(&token_deposit.balances, tx_context::sender(ctx))-withdraw_amount;
-
-        let to_sender = balance::split(&mut token_deposit.coin, withdraw_amount);
-        transfer::public_transfer( coin::from_balance(to_sender, ctx) , tx_context::sender(ctx));
+        assert!( updated,  E_INVALID_ORDER_ID);
 
         // emit event
-        event::emit(WithdrawEvent { global : object::id(global), token_name, withdraw_amount, sender: tx_context::sender(ctx) })
+        update_order_event(
+            object::id(global),
+            order_id,
+            unit_price,
+            tx_context::sender(ctx)
+        );
     }
 
-    public fun token_to_name<T>(): String {
-        string::utf8(into_bytes(into_string(get<T>())))
+    public entry fun cancel_order<X, Y>(global : &mut Marketplace, order_id: u64, ctx: &mut TxContext) {
+        check_quote<Y>(global); 
+
+        let market = bag::borrow_mut<String, QuoteMarket<Y>>(&mut global.markets, token_to_name<Y>());
+        assert!( bag::contains_with_type<String, Orders<X,Y>>(&market.orders, token_to_name<X>()), E_INVALID_BASE );
+        let orders_set = bag::borrow_mut<String, Orders<X,Y>>(&mut market.orders, token_to_name<X>());
+
+        let count = vector::length(&orders_set.ask_orders);
+        let i = 0;
+        let updated = false;
+        while (i < count) {
+            let order = vector::borrow(&orders_set.ask_orders, i);
+            if (order.order_id == order_id) {
+                assert!( order.owner == tx_context::sender(ctx), E_UNAUTHORIZED_USER );
+                let Order<X> { order_id: _, created_epoch: _, balance, unit_price:_, owner:_} = vector::swap_remove(&mut orders_set.ask_orders, i);
+                transfer::public_transfer(coin::from_balance(balance, ctx),tx_context::sender(ctx));
+                updated = true;
+                break
+            };
+            i = i + 1;
+        };
+
+        count = vector::length(&orders_set.bid_orders);
+        i = 0;
+        while (i < count) {
+            let order = vector::borrow(&orders_set.bid_orders, i);
+            if (order.order_id == order_id) {
+                assert!( order.owner == tx_context::sender(ctx), E_UNAUTHORIZED_USER );
+                let Order<Y> { order_id: _, created_epoch: _, balance, unit_price:_, owner:_} = vector::swap_remove(&mut orders_set.bid_orders, i);
+                transfer::public_transfer(coin::from_balance(balance, ctx),tx_context::sender(ctx));
+                updated = true;
+                break
+            };
+            i = i + 1;
+        };
+
+        assert!( updated,  E_INVALID_ORDER_ID);
+
+        // emit event
+        remove_order_event(
+            object::id(global),
+            order_id,
+            tx_context::sender(ctx)
+        );
     }
 
-    public fun token_available<T>(global :&mut GlobalMarketplace, user_address: address): u64 { 
-        let token_name = token_to_name<T>();
-        let has_registered = bag::contains_with_type<String, TokenDeposit<T>>(&global.user_balances, token_name);
-        assert!(has_registered, E_NOT_FOUND);
+    public fun order_balance<T>(orders: &vector<Order<T>>, order_id: u64): u64 {
+        let order = vector::borrow(orders, order_id);
+        balance::value<T>(&order.balance)
+    }
 
-        let token_deposit = bag::borrow_mut<String, TokenDeposit<T>>(&mut global.user_balances, token_name);
-        
-        if (table::contains(&token_deposit.balances, user_address)) 
-            *table::borrow(&token_deposit.balances, user_address)
-        else 0
+    public fun order_unit_price<T>(orders: &vector<Order<T>>, order_id: u64): u64 {
+        let order = vector::borrow(orders, order_id);
+        order.unit_price 
     }
 
     // ======== Only Governance =========
 
-    public entry fun setup_quote<T>( global :&mut GlobalMarketplace , ctx: &mut TxContext) {
-        check_admin(global, tx_context::sender(ctx));
-
+    public entry fun setup_quote<T>( global: &mut Marketplace, _manager_cap: &mut ManagerCap, ctx: &mut TxContext) {
         let market_name = token_to_name<T>();
         let has_registered = bag::contains_with_type<String, QuoteMarket<T>>(&global.markets, market_name);
         assert!(!has_registered, E_DUPLICATED_ENTRY);
 
-        let new_market = QuoteMarket<T> {
+        bag::add(&mut global.markets, market_name, QuoteMarket<T> {
             id: object::new(ctx),
-            token_name: market_name ,
-            global: object::id(global),
+            token_name: market_name , 
             orders: bag::new(ctx)
-        };
-        bag::add(&mut global.markets, market_name, new_market);
+        });
     }
 
-    // add new admin
-    public entry fun add_admin(global: &mut GlobalMarketplace, user: address, ctx: &mut TxContext) {
-        check_admin(global, tx_context::sender(ctx));
-        assert!(!vector::contains(&global.admin, &user),E_DUPLICATED_ENTRY);
-        vector::push_back<address>(&mut global.admin, user);
+    public entry fun pause( global: &mut Marketplace, _manager_cap: &mut ManagerCap) {
+        global.has_paused = true;
     }
 
-    // remove admin
-    public entry fun remove_admin(global: &mut GlobalMarketplace, user: address, ctx: &mut TxContext) {
-        check_admin(global, tx_context::sender(ctx));
-        let (contained, index) = vector::index_of<address>(&global.admin, &user);
-        assert!(contained,E_NOT_FOUND);
-        vector::remove<address>(&mut global.admin, index);
+    public entry fun unpause( global: &mut Marketplace, _manager_cap: &mut ManagerCap) {
+        global.has_paused = false;
     }
 
     // ======== Internal Functions =========
 
-    fun check_admin(global: &GlobalMarketplace, sender: address) {
-        let (contained, _) = vector::index_of<address>(&global.admin, &sender);
-        assert!(contained,E_UNAUTHORIZED_USER);
+    fun check_pause(global: &Marketplace) {
+        assert!( !global.has_paused, E_PAUSED );
     }
 
-    fun check_quote<T>(global: &GlobalMarketplace) {
-        assert!(bag::contains_with_type<String, QuoteMarket<T>>(&global.markets, token_to_name<T>()), E_INVALID_QUOTE);
+    // base -> quote
+    fun add_ask_order<X, Y>(global:  &mut Marketplace, coin_in: Coin<X>, unit_price: u64, ctx: &mut TxContext) {
+        
+        let sender = tx_context::sender(ctx);
+        global.order_count = global.order_count+1;
+        let order_id = global.order_count;
+        let listing_amount = coin::value(&coin_in);
+
+        let new_order = Order { order_id, created_epoch: tx_context::epoch(ctx),balance: coin::into_balance(coin_in), unit_price, owner: sender };
+
+        let token_name = token_to_name<X>();
+        let market = bag::borrow_mut<String, QuoteMarket<Y>>(&mut global.markets, token_to_name<Y>());
+        let has_registered = bag::contains_with_type<String, Orders<X,Y>>(&market.orders, token_name);
+
+        if (!has_registered) {
+                let bid_orders = vector::empty<Order<Y>>();
+                let ask_orders = vector::empty<Order<X>>();
+                
+                vector::push_back<Order<X>>(&mut ask_orders, new_order);
+
+                let new_orders_set = Orders {
+                    token_name,
+                    bid_orders,
+                    ask_orders
+                };
+            
+                bag::add(&mut market.orders, token_name, new_orders_set);
+
+        } else {
+            let orders_set = bag::borrow_mut<String, Orders<X,Y>>(&mut market.orders, token_name);
+            vector::push_back<Order<X>>(&mut orders_set.ask_orders, new_order);
+        };
+
+        // emit event
+        new_order_event(
+            object::id(global),
+            order_id,
+            false,
+            token_name,
+            token_to_name<Y>(),
+            listing_amount,
+            unit_price,
+            sender
+        );
+
     }
 
-    fun init_balance_table(amount: u64,  ctx: &mut TxContext): Table<address, u64> {
-        let init_table = table::new(ctx);
-        table::add(&mut init_table, tx_context::sender(ctx), amount);
-        init_table
+    // quote -> base
+    fun add_bid_order<X,Y>(global: &mut Marketplace, coin_in: Coin<X>, unit_price: u64, ctx: &mut TxContext) {
+
+        let sender = tx_context::sender(ctx);
+        global.order_count = global.order_count+1;
+        let order_id = global.order_count;
+        let listing_amount = coin::value(&coin_in);
+
+        let new_order = Order { order_id, created_epoch: tx_context::epoch(ctx),balance: coin::into_balance(coin_in), unit_price, owner: sender };
+
+        let token_name = token_to_name<Y>();
+        let market = bag::borrow_mut<String, QuoteMarket<X>>(&mut global.markets, token_to_name<X>());
+        let has_registered = bag::contains_with_type<String, Orders<Y,X>>(&market.orders, token_name);
+
+        if (!has_registered) {
+            let bid_orders = vector::empty<Order<X>>();
+            let ask_orders = vector::empty<Order<Y>>();
+
+            vector::push_back<Order<X>>(&mut bid_orders, new_order);
+
+            let new_orders_set = Orders {
+                token_name,
+                bid_orders,
+                ask_orders
+            };
+            
+            bag::add(&mut market.orders, token_name, new_orders_set);
+        } else {
+            let orders_set = bag::borrow_mut<String, Orders<Y,X>>(&mut market.orders, token_name);
+            vector::push_back<Order<X>>(&mut orders_set.bid_orders, new_order);
+        };
+
+        // emit event
+        new_order_event(
+            object::id(global),
+            order_id,
+            true,
+            token_name,
+            token_to_name<X>(),
+            listing_amount,
+            unit_price,
+            sender
+        );
     }
 
-    fun sort_orders(orders: &mut vector<Order>) {
+    // matching with ask orders
+    // quote -> base
+    fun matching_ask_orders<X,Y>(global: &mut Marketplace, coin_in: Coin<X>, from_price: u64, ctx: &mut TxContext ): (Coin<X>, Coin<Y>) {
+        
+        let global_id = object::id(global);
+        let token_name = token_to_name<Y>();
+        let market = bag::borrow_mut<String, QuoteMarket<X>>(&mut global.markets, token_to_name<X>());
+        if (!bag::contains_with_type<String, Orders<Y,X>>(&market.orders, token_name)) {
+            let new_orders_set = Orders { token_name, bid_orders: vector::empty<Order<X>>(), ask_orders: vector::empty<Order<Y>>() };
+            bag::add(&mut market.orders, token_name, new_orders_set);
+        };
+
+        let orders_set = bag::borrow_mut<String, Orders<Y,X>>(&mut market.orders, token_name);
+
+        let remaining_token = coin::into_balance(coin_in);
+        let base_token = balance::zero<Y>();
+
+        let input_amount = 0;
+        let output_amount = 0;
+
+        if (vector::length(&orders_set.ask_orders) > 0) {
+            sort_orders<Y>(&mut orders_set.ask_orders);
+            
+            let order_ids = eligible_orders<Y>(&orders_set.ask_orders, from_price, false);
+            let order_prices = order_unit_prices<Y>(&orders_set.ask_orders);
+            let order_balances = order_balances<Y>(&orders_set.ask_orders);
+
+            while (vector::length(&order_ids) > 0) {
+                let order_id = vector::remove( &mut order_ids, 0);
+                let order_balance = *vector::borrow(&order_balances, order_id);
+                let order_unit_price = *vector::borrow(&order_prices, order_id);
+                let available_base_in_quote = mul_div(order_balance, order_unit_price, MIST_PER_SUI);
+
+                if (balance::value<X>(&remaining_token) >= available_base_in_quote) {
+                        // input value >= order value, then we close the order entirely
+                        let Order<Y> { order_id, created_epoch: _, balance, unit_price:_, owner} = vector::swap_remove(&mut orders_set.ask_orders, order_id);
+                        let quote_to_transfer =
+                            if  (balance::value(&remaining_token) >= available_base_in_quote)
+                                available_base_in_quote
+                            else balance::value(&remaining_token);
+
+                        input_amount = input_amount+quote_to_transfer;
+                        output_amount = output_amount+balance::value(&balance);
+                        
+                        transfer::public_transfer(coin::from_balance( balance::split(&mut remaining_token, quote_to_transfer), ctx), owner);
+                        balance::join(&mut base_token, balance);
+
+                        // emit remove event
+                        remove_order_event(
+                            global_id,
+                            order_id,
+                            owner
+                        );
+
+                } else {
+                        // order value > input value, 
+                        let amount = balance::value<X>(&remaining_token);
+                        let amount_in_base = mul_div(amount, MIST_PER_SUI, order_unit_price);
+                        let order_mut = vector::borrow_mut(&mut orders_set.ask_orders, order_id);
+
+                        transfer::public_transfer(coin::from_balance( balance::split(&mut remaining_token, amount), ctx), order_mut.owner);
+                        
+                        let base_to_transfer =
+                            if  (balance::value(&order_mut.balance) >= amount_in_base)
+                                amount_in_base
+                            else balance::value(&order_mut.balance);
+                        
+                        input_amount = input_amount+amount;
+                        output_amount = output_amount+base_to_transfer;
+
+                        balance::join(&mut base_token, balance::split(&mut order_mut.balance, base_to_transfer ) );
+
+                };
+                if (balance::value<X>(&remaining_token) == 0) break
+            };
+
+
+
+        };
+
+        if (output_amount > 0) {
+            // emit event
+            trade_event(
+                global_id,
+                token_to_name<X>(),
+                token_to_name<Y>(),
+                input_amount,
+                output_amount,
+                tx_context::sender(ctx)
+            );
+        };
+
+        (coin::from_balance(remaining_token, ctx), coin::from_balance(base_token, ctx))
+    }
+
+    // matching with bid orders
+    // base -> quote
+    fun matching_bid_orders<X,Y>(global: &mut Marketplace, coin_in: Coin<X>, from_price: u64, ctx: &mut TxContext ): (Coin<X>, Coin<Y>) {
+        
+        let global_id = object::id(global);
+        let token_name = token_to_name<X>();
+        let market = bag::borrow_mut<String, QuoteMarket<Y>>(&mut global.markets, token_to_name<Y>());
+        if (!bag::contains_with_type<String, Orders<X,Y>>(&market.orders, token_name)) {
+            let new_orders_set = Orders { token_name, bid_orders: vector::empty<Order<Y>>(), ask_orders: vector::empty<Order<X>>() };
+            bag::add(&mut market.orders, token_name, new_orders_set);
+        };
+
+        let orders_set = bag::borrow_mut<String, Orders<X,Y>>(&mut market.orders, token_name);
+
+        let remaining_token = coin::into_balance(coin_in);
+        let quote_token = balance::zero<Y>();
+
+        let input_amount = 0;
+        let output_amount = 0;
+
+        if (vector::length(&orders_set.bid_orders) > 0) {
+            sort_orders(&mut orders_set.bid_orders);
+
+            let order_ids = eligible_orders(&orders_set.bid_orders, from_price, true);
+            let order_prices = order_unit_prices<Y>(&orders_set.bid_orders);
+            let order_balances = order_balances<Y>(&orders_set.bid_orders);
+
+            while (vector::length(&order_ids) > 0) {
+                let order_id = vector::remove( &mut order_ids, 0);
+                let order_balance = *vector::borrow(&order_balances, order_id);
+                let order_unit_price = *vector::borrow(&order_prices, order_id);
+                // let available_quote_in_base = mul_div(order_balance, MIST_PER_SUI, order_unit_price);
+                let available_remaining_in_quote = mul_div(balance::value<X>(&remaining_token), order_unit_price, MIST_PER_SUI);
+
+                // order_balance -> quote
+                // remaining_token -> base
+
+                if (available_remaining_in_quote >= order_balance) {
+                    // input value >= order value, close the order entirely
+                    let Order<Y> { order_id, created_epoch: _, balance, unit_price:_, owner} = vector::swap_remove(&mut orders_set.bid_orders, order_id);
+                    let order_balance_in_base = mul_div(order_balance, MIST_PER_SUI, order_unit_price);
+
+                    let base_to_transfer =
+                            if  (balance::value(&remaining_token) >= order_balance_in_base)
+                                order_balance_in_base
+                            else balance::value(&remaining_token);
+                    
+                    input_amount = input_amount+base_to_transfer;
+                    output_amount = output_amount+balance::value(&balance);
+
+                    transfer::public_transfer(coin::from_balance( balance::split(&mut remaining_token, base_to_transfer ), ctx), owner);
+                    balance::join(&mut quote_token, balance);
+
+                    // emit remove event
+                        remove_order_event(
+                            global_id,
+                            order_id,
+                            owner
+                        );
+                } else {
+                    // order value > input value
+                    let order_mut = vector::borrow_mut(&mut orders_set.bid_orders, order_id);
+                    let amount = balance::value<X>(&remaining_token);
+                    transfer::public_transfer(coin::from_balance( balance::split(&mut remaining_token, amount), ctx), order_mut.owner);
+
+                    let quote_to_transfer =
+                            if  (balance::value(&order_mut.balance) >= available_remaining_in_quote)
+                                available_remaining_in_quote
+                            else balance::value(&order_mut.balance);
+                    
+                    input_amount = input_amount+amount;
+                    output_amount = output_amount+quote_to_transfer;
+
+                    balance::join(&mut quote_token, balance::split(&mut order_mut.balance, quote_to_transfer ) );
+                };
+
+                if (balance::value<X>(&remaining_token) == 0) break
+            };
+
+        };
+
+        if (output_amount > 0) {
+            // emit event
+            trade_event(
+                global_id,
+                token_to_name<X>(),
+                token_to_name<Y>(),
+                input_amount,
+                output_amount,
+                tx_context::sender(ctx)
+            );
+        };
+
+        (coin::from_balance(remaining_token, ctx), coin::from_balance(quote_token, ctx))
+    }
+
+    fun sort_orders<T>(orders: &mut vector<Order<T>>) {
         let length = vector::length(orders);
         let i = 1;
         while (i < length) {
@@ -304,7 +610,7 @@ module legato::marketplace {
         };
     }
 
-    fun eligible_orders(orders: &vector<Order>, from_price: u64, is_bid: bool) : vector<u64> {
+    fun eligible_orders<T>(orders: &vector<Order<T>>, from_price: u64, is_bid: bool): vector<u64> {
         let count = vector::length(orders);
         let i = 0;
         let order_ids = vector::empty<u64>();
@@ -324,318 +630,31 @@ module legato::marketplace {
         order_ids
     }
 
-    fun matching_orders<X, Y>(global : &mut GlobalMarketplace, amount: u64, from_price: u64, is_buy: bool, ctx: &mut TxContext ): u64 {
-
-        let sender = tx_context::sender(ctx);
-
-        if (is_buy) {
-            // matching with ask orders
-            let available_amount = token_available<X>(global, sender);
-            assert!(available_amount >= amount, E_INSUFFICIENT_BALANCE);
-
-            let market = bag::borrow_mut<String, QuoteMarket<X>>(&mut global.markets, token_to_name<X>());
-            check_base_market<X>(market, token_to_name<Y>());
-
-            let orders_set = bag::borrow_mut<String, Orders>(&mut market.orders, token_to_name<Y>());
-
-            if (vector::length(&orders_set.ask_orders) > 0) {
-                sort_orders(&mut orders_set.ask_orders);
-
-                let order_ids = eligible_orders(&orders_set.ask_orders, from_price, false);
-                let transfer_list_x = vector::empty<TransferRequest<X>>();
-                let transfer_list_y = vector::empty<TransferRequest<Y>>();
-                let reducer_list = vector::empty<ReductionRequest<Y>>(); 
-
-                let input_amount = 0;
-                let output_amount = 0;
-
-                while (vector::length(&order_ids) > 0) {
-                    let order_id = vector::remove( &mut order_ids, 0);
-                    let order = vector::borrow_mut(&mut orders_set.ask_orders, order_id);
-                    let available_base_in_quote = mul_div(order.amount, order.unit_price, MIST_PER_SUI);
-
-                    if (amount >= available_base_in_quote) {
-                        vector::push_back<TransferRequest<X>>(&mut transfer_list_x, TransferRequest { amount: available_base_in_quote, from_address: sender, to_address: order.owner });
-                        vector::push_back<TransferRequest<Y>>(&mut transfer_list_y, TransferRequest { amount: order.amount, from_address: order.owner, to_address: sender });
-                        vector::push_back<ReductionRequest<Y>>(&mut reducer_list, ReductionRequest { amount: order.amount, owner_address: order.owner });
-
-                        input_amount = input_amount+available_base_in_quote;
-                        output_amount = output_amount+order.amount;
-
-                        amount = 
-                                if (amount >= available_base_in_quote) 
-                                    amount-available_base_in_quote
-                                else 0;
-                        order.amount = 0;
-                    } else {
-                        let amount_in_base = mul_div(amount, MIST_PER_SUI, order.unit_price);
-                        vector::push_back<TransferRequest<X>>(&mut transfer_list_x, TransferRequest { amount, from_address: sender, to_address: order.owner });
-                        vector::push_back<TransferRequest<Y>>(&mut transfer_list_y, TransferRequest { amount: amount_in_base, from_address: order.owner, to_address: sender });
-                        vector::push_back<ReductionRequest<Y>>(&mut reducer_list, ReductionRequest { amount: amount_in_base, owner_address: order.owner });
-                        
-                        input_amount = input_amount+amount;
-                        output_amount = output_amount+amount_in_base;
-
-                        order.amount = 
-                                if (order.amount >= amount_in_base) 
-                                    order.amount-amount_in_base
-                                else 0;
-                        amount = 0;
-                    };
-
-                    // remove the order
-                    if (order.amount == 0) {
-                        vector::swap_remove(&mut orders_set.ask_orders, order_id);
-                        // todo: emit event
-                    };
-
-                    if (amount == 0) break
-                };
-
-                // clearing
-                transfer_balance<X>(global, transfer_list_x );
-                transfer_balance<Y>(global, transfer_list_y );
-                reduce_listing_token<Y>(global, reducer_list);
-
-                // emit event
-                event::emit( 
-                    TradeEvent { 
-                        global : object::id(global),
-                        from_token: token_to_name<X>(),
-                        to_token: token_to_name<Y>(),
-                        input_amount,
-                        output_amount,
-                        sender: tx_context::sender(ctx) 
-                    });
-
-            };
-
-
-        } else {
-            // matching with bid orders
-            let available_base_amount = token_available<X>(global, sender);
-            assert!(available_base_amount >= amount, E_INSUFFICIENT_AMOUNT);
-            
-            let market = bag::borrow_mut<String, QuoteMarket<Y>>(&mut global.markets, token_to_name<Y>());
-            check_base_market<Y>(market, token_to_name<X>());
-
-            let orders_set = bag::borrow_mut<String, Orders>(&mut market.orders, token_to_name<X>());
-
-            if (vector::length(&orders_set.bid_orders) > 0) {
-                sort_orders(&mut orders_set.bid_orders);
-
-                let order_ids = eligible_orders(&orders_set.bid_orders, from_price, true);
-                let transfer_list_x = vector::empty<TransferRequest<X>>();
-                let transfer_list_y = vector::empty<TransferRequest<Y>>();
-                let reducer_list = vector::empty<ReductionRequest<Y>>(); 
-
-                let input_amount = 0;
-                let output_amount = 0;
-
-                while (vector::length(&order_ids) > 0) {
-                    let order_id = vector::remove( &mut order_ids, 0);
-                    let order = vector::borrow_mut(&mut orders_set.bid_orders, order_id);
-                    let available_base_in_quote = mul_div(order.amount, order.unit_price, MIST_PER_SUI);
-                    
-                    if (amount >= order.amount) {
-                        vector::push_back<TransferRequest<X>>(&mut transfer_list_x, TransferRequest { amount: order.amount, from_address: sender, to_address: order.owner });
-                        vector::push_back<TransferRequest<Y>>(&mut transfer_list_y, TransferRequest { amount: available_base_in_quote, from_address: order.owner, to_address: sender });
-                        vector::push_back<ReductionRequest<Y>>(&mut reducer_list, ReductionRequest { amount: available_base_in_quote, owner_address: order.owner });
-
-                        input_amount = input_amount+order.amount;
-                        output_amount = output_amount+available_base_in_quote;
-
-                        amount = amount-order.amount;
-                        order.amount = 0;
-                    } else {
-                        let amount_in_quote = mul_div(amount, order.unit_price, MIST_PER_SUI);
-                        vector::push_back<TransferRequest<X>>(&mut transfer_list_x, TransferRequest { amount, from_address: sender, to_address: order.owner });
-                        vector::push_back<TransferRequest<Y>>(&mut transfer_list_y, TransferRequest { amount: amount_in_quote, from_address: order.owner, to_address: sender });
-                        vector::push_back<ReductionRequest<Y>>(&mut reducer_list, ReductionRequest { amount: order.amount, owner_address: order.owner });
-
-                        input_amount = input_amount+amount;
-                        output_amount = output_amount+amount_in_quote;
-                        
-                        order.amount = order.amount-amount;
-                        amount = 0;
-                    };
-
-                    // remove the order
-                    if (order.amount == 0) {
-                        vector::swap_remove(&mut orders_set.bid_orders, order_id);
-                        // todo: emit event
-                    };
-
-                    if (amount == 0) break
-                };
-
-                // clearing
-                transfer_balance<X>(global, transfer_list_x );
-                transfer_balance<Y>(global, transfer_list_y );
-                reduce_listing_token<Y>(global, reducer_list);
-
-                // emit event
-                event::emit( 
-                    TradeEvent { 
-                        global : object::id(global),
-                        from_token: token_to_name<X>(),
-                        to_token: token_to_name<Y>(),
-                        input_amount,
-                        output_amount,
-                        sender: tx_context::sender(ctx) 
-                    });
-
-            };
-
-            
-
+    fun order_unit_prices<T>(orders: &vector<Order<T>>): vector<u64> {
+        let count = vector::length(orders);
+        let i = 0;
+        let result = vector::empty<u64>();
+        while (i < count) {
+            let order = vector::borrow(orders, i);
+            vector::push_back<u64>(&mut result, order.unit_price);
+            i = i + 1;
         };
-
-        amount
+        result
     }
 
-    // pt -> usdc
-    fun add_order<X, Y>(global : &mut GlobalMarketplace, amount: u64, unit_price: u64, is_buy: bool, ctx: &mut TxContext) {
-        
-        let sender = tx_context::sender(ctx);
-        let new_order = Order { created_epoch: tx_context::epoch(ctx), amount, unit_price, owner: sender };
-        
-        if (!is_buy) {
-
-            let token_name = token_to_name<X>();
-            let market = bag::borrow_mut<String, QuoteMarket<Y>>(&mut global.markets, token_to_name<Y>());
-            let has_registered = bag::contains_with_type<String, Orders>(&market.orders, token_name);
-
-            if (!has_registered) {
-                let bid_orders = vector::empty<Order>();
-                let ask_orders = vector::empty<Order>();
-                
-                vector::push_back<Order>(&mut ask_orders, new_order);
-
-                let new_orders_set = Orders {
-                    token_name,
-                    bid_orders,
-                    ask_orders
-                };
-            
-                bag::add(&mut market.orders, token_name, new_orders_set);
-
-            } else {
-                let orders_set = bag::borrow_mut<String, Orders>(&mut market.orders, token_name);
-                vector::push_back<Order>(&mut orders_set.ask_orders, new_order);
-            };
-
-            // increase listing balance
-            let token_deposit = bag::borrow_mut<String, TokenDeposit<X>>(&mut global.user_balances, token_name);
-            *table::borrow_mut(&mut token_deposit.listing, tx_context::sender(ctx)) = *table::borrow(&token_deposit.listing, tx_context::sender(ctx))+amount;
-
-            // emit event
-
-            event::emit( 
-                NewOrderEvent { 
-                    global: object::id(global),
-                    is_bid: false,
-                    base_token: token_to_name<X>(),
-                    quote_token: token_to_name<Y>(),
-                    amount,
-                    unit_price,
-                    owner: sender
-                });
-        } else {
-            // usdc -> pt
-            let token_name = token_to_name<Y>();
-            let market = bag::borrow_mut<String, QuoteMarket<X>>(&mut global.markets, token_to_name<X>());
-            let has_registered = bag::contains_with_type<String, Orders>(&market.orders, token_name);
-
-            if (!has_registered) {
-                let bid_orders = vector::empty<Order>();
-                let ask_orders = vector::empty<Order>();
-                
-                vector::push_back<Order>(&mut bid_orders, new_order);
-
-                let new_orders_set = Orders {
-                    token_name,
-                    bid_orders,
-                    ask_orders
-                };
-            
-                bag::add(&mut market.orders, token_name, new_orders_set);
-
-            } else {
-                let orders_set = bag::borrow_mut<String, Orders>(&mut market.orders, token_name);
-                vector::push_back<Order>(&mut orders_set.bid_orders, new_order);
-            };
-
-            // increase listing balance
-            let token_deposit = bag::borrow_mut<String, TokenDeposit<X>>(&mut global.user_balances, token_to_name<X>());
-            *table::borrow_mut(&mut token_deposit.listing, tx_context::sender(ctx)) = *table::borrow(&token_deposit.listing, tx_context::sender(ctx))+amount;
-
-            // emit event
-            event::emit( 
-                NewOrderEvent { 
-                    global: object::id(global),
-                    is_bid: true,
-                    base_token: token_to_name<Y>(),
-                    quote_token: token_to_name<X>(),
-                    amount,
-                    unit_price,
-                    owner: sender
-                });
-
+    fun order_balances<T>(orders: &vector<Order<T>>): vector<u64> {
+        let count = vector::length(orders);
+        let i = 0;
+        let result = vector::empty<u64>();
+        while (i < count) {
+            let order = vector::borrow(orders, i);
+            vector::push_back<u64>(&mut result, balance::value(&order.balance));
+            i = i + 1;
         };
-
+        result
     }
 
-    fun transfer_balance<T>( global: &mut GlobalMarketplace , transfer_list: vector<TransferRequest<T>>) {
 
-        let token_name = token_to_name<T>();
-        let token_deposit = bag::borrow_mut<String, TokenDeposit<T>>(&mut global.user_balances, token_name);
-
-        while (vector::length(&transfer_list) > 0) {
-            let transfer_request = vector::remove( &mut transfer_list, 0);
-            let from_user_balance = *table::borrow(&token_deposit.balances, transfer_request.from_address);
-
-            if (from_user_balance >= transfer_request.amount) {
-                *table::borrow_mut(&mut token_deposit.balances, transfer_request.from_address) = *table::borrow(&token_deposit.balances, transfer_request.from_address)-transfer_request.amount;
-            } else {
-                *table::borrow_mut(&mut token_deposit.balances, transfer_request.from_address) = 0;
-            };
-
-            if (table::contains(&token_deposit.balances, transfer_request.to_address)) {
-                *table::borrow_mut( &mut token_deposit.balances, transfer_request.to_address ) = *table::borrow(&token_deposit.balances, transfer_request.to_address )+transfer_request.amount;
-            } else {
-                table::add(&mut token_deposit.balances, transfer_request.to_address, transfer_request.amount);
-            };
-
-        };
-
-    }
-
-    fun reduce_listing_token<T>(global: &mut GlobalMarketplace, reduction_list: vector<ReductionRequest<T>>) {
-
-        let token_name = token_to_name<T>();
-        let token_deposit = bag::borrow_mut<String, TokenDeposit<T>>(&mut global.user_balances, token_name);
-
-        while (vector::length(&reduction_list) > 0) {
-            let request = vector::remove( &mut reduction_list, 0);
-            let owner_balance = *table::borrow(&token_deposit.balances, request.owner_address);
-
-            if (owner_balance >= request.amount) {
-                *table::borrow_mut(&mut token_deposit.balances, request.owner_address) = *table::borrow(&token_deposit.balances, request.owner_address)-request.amount;
-            } else {
-                *table::borrow_mut(&mut token_deposit.balances, request.owner_address) = 0;
-            };
-        
-        };
-
-    }
-
-    fun check_base_market<T>(market: &mut QuoteMarket<T>, base_token_name: String) {
-        if (!bag::contains_with_type<String, Orders>(&market.orders, base_token_name)) { 
-            let new_orders_set = Orders { token_name: base_token_name, bid_orders: vector::empty<Order>(), ask_orders: vector::empty<Order>() };
-            bag::add(&mut market.orders, base_token_name, new_orders_set);
-        };
-    }
 
     // ======== Test-related Functions =========
 
@@ -643,4 +662,5 @@ module legato::marketplace {
     public fun test_init(ctx: &mut TxContext) {
         init(ctx);
     }
+
 }

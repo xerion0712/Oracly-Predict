@@ -4,10 +4,11 @@ module legato::event {
 
     use sui::event::emit;
     use sui::object::ID;
-
-    friend legato::legato;
-    friend legato::amm_interface;
+ 
+    friend legato::amm;
     friend legato::vault;
+    friend legato::vault_lib;
+    friend legato::marketplace;
 
     /// Liquidity pool added event.
     struct AddedEvent has copy, drop {
@@ -41,6 +42,7 @@ module legato::event {
         global: ID,
         vault_name: String,
         created_epoch: u64,
+        started_epoch: u64,
         maturity_epoch:u64,
         initial_apy: u64
     }
@@ -49,26 +51,17 @@ module legato::event {
         global: ID,
         vault_name: String,
         vault_apy: u64,
-        epoch: u64,
-        principal_balance: u64,
-        debt_balance: u64,
-        pending_balance: u64,
-        earning_balance: u64
+        epoch: u64
     }
 
     struct MintEvent has copy, drop {  
         vault_name: String,
         pool_id: ID,
         input_amount: u64,
-        pt_issued: u64,
-        deposit_id: u64,
+        pt_issued: u64, 
         asset_object_id: ID,
         sender: address,
-        epoch: u64,
-        principal_balance: u64,
-        debt_balance: u64,
-        earning_balance: u64,
-        pending_balance: u64
+        epoch: u64
     }
 
     struct RedeemEvent has copy, drop {  
@@ -76,11 +69,7 @@ module legato::event {
         pt_burned: u64,
         sui_amount: u64,
         sender: address,
-        epoch: u64,
-        principal_balance: u64,
-        debt_balance: u64,
-        earning_balance: u64,
-        pending_balance: u64
+        epoch: u64
     }
 
     struct ExitEvent has copy, drop { 
@@ -90,11 +79,123 @@ module legato::event {
         pt_burned: u64,
         yt_received: u64,
         sender: address,
-        epoch: u64,
-        principal_balance: u64,
-        debt_balance: u64,
-        earning_balance: u64,
-        pending_balance: u64
+        epoch: u64
+    }
+
+    struct MigrateEvent has copy, drop {
+        from_vault: String,
+        from_amount: u64,
+        to_vault: String,
+        to_amount: u64,
+        sender: address,
+        epoch: u64
+    }
+
+    struct RemoveOrderEvent has copy, drop {
+        marketplace: ID,
+        order_id: u64,
+        owner: address
+    }
+
+    struct UpdateOrderEvent has copy, drop {
+        marketplace: ID,
+        order_id: u64,
+        updated_price: u64,
+        owner: address
+    }
+
+    struct TradeEvent has copy, drop {
+        marketplace: ID,
+        from_token: String,
+        to_token: String,
+        input_amount: u64,
+        output_amount: u64,
+        sender: address
+    }
+
+    struct NewOrderEvent has copy, drop {
+        marketplace: ID,
+        order_id: u64,
+        is_bid: bool,
+        base_token: String,
+        quote_token: String,
+        amount: u64,
+        unit_price: u64, // per 1 unit
+        owner: address
+    }
+
+    public(friend) fun new_order_event(
+        marketplace: ID,
+        order_id: u64,
+        is_bid: bool,
+        base_token: String,
+        quote_token: String,
+        amount: u64,
+        unit_price: u64,
+        owner: address
+    ) {
+        emit(
+            NewOrderEvent {
+                marketplace,
+                order_id,
+                is_bid,
+                base_token,
+                quote_token,
+                amount,
+                unit_price,
+                owner
+            }
+        )
+    }
+
+    public(friend) fun trade_event(
+        marketplace: ID,
+        from_token: String,
+        to_token: String,
+        input_amount: u64,
+        output_amount: u64,
+        sender: address
+    ) {
+        emit(
+            TradeEvent {
+                marketplace,
+                from_token,
+                to_token,
+                input_amount,
+                output_amount,
+                sender
+            }
+        )
+    }
+
+    public(friend) fun remove_order_event(
+        marketplace: ID,
+        order_id: u64,
+        owner: address
+    ) {
+        emit(
+            RemoveOrderEvent {
+                marketplace,
+                order_id,
+                owner
+            }
+        )
+    }
+
+    public(friend) fun update_order_event(
+        marketplace: ID,
+        order_id: u64,
+        updated_price: u64,
+        owner: address
+    ) {
+        emit(
+            UpdateOrderEvent {
+                marketplace,
+                order_id,
+                updated_price,
+                owner
+            }
+        )
     }
 
     public(friend) fun added_event(
@@ -157,6 +258,7 @@ module legato::event {
         global: ID,
         vault_name: String,
         created_epoch: u64,
+        started_epoch: u64,
         maturity_epoch: u64,
         initial_apy: u64
     ) {
@@ -165,6 +267,7 @@ module legato::event {
                 global,
                 vault_name,
                 created_epoch,
+                started_epoch,
                 maturity_epoch,
                 initial_apy
             }
@@ -175,22 +278,14 @@ module legato::event {
         global: ID,
         vault_name: String,
         vault_apy: u64,
-        epoch: u64,
-        principal_balance: u64,
-        debt_balance: u64,
-        pending_balance: u64,
-        earning_balance: u64
+        epoch: u64
     ) {
         emit(
             UpdateVaultApy {
                 global,
                 vault_name,
                 vault_apy,
-                epoch,
-                principal_balance,
-                debt_balance,
-                pending_balance,
-                earning_balance
+                epoch
             }
         )
     }
@@ -199,30 +294,20 @@ module legato::event {
         vault_name: String,
         pool_id: ID,
         input_amount: u64,
-        pt_issued: u64,
-        deposit_id: u64,
+        pt_issued: u64, 
         asset_object_id: ID,
         sender: address,
-        epoch: u64,
-        principal_balance: u64,
-        debt_balance: u64,
-        earning_balance: u64,
-        pending_balance: u64
+        epoch: u64
     ) {
         emit(
             MintEvent { 
                 vault_name,
                 pool_id,
                 input_amount,
-                pt_issued,
-                deposit_id,
+                pt_issued, 
                 asset_object_id,
                 sender,
-                epoch,
-                principal_balance,
-                debt_balance,
-                earning_balance,
-                pending_balance
+                epoch
             }
         )
     }
@@ -232,11 +317,7 @@ module legato::event {
         pt_burned: u64,
         sui_amount: u64,
         sender: address,
-        epoch: u64,
-        principal_balance: u64,
-        debt_balance: u64,
-        earning_balance: u64,
-        pending_balance: u64
+        epoch: u64
     ) {
         emit(
             RedeemEvent {  
@@ -244,11 +325,7 @@ module legato::event {
                 pt_burned,
                 sui_amount,
                 sender,
-                epoch,
-                principal_balance,
-                debt_balance,
-                earning_balance,
-                pending_balance
+                epoch
             }
         )
     }
@@ -260,11 +337,7 @@ module legato::event {
         pt_burned: u64,
         yt_received: u64,
         sender: address,
-        epoch: u64,
-        principal_balance: u64,
-        debt_balance: u64,
-        earning_balance: u64,
-        pending_balance: u64
+        epoch: u64
     ) {
         emit(
             ExitEvent {  
@@ -274,11 +347,27 @@ module legato::event {
                 pt_burned,
                 yt_received,
                 sender,
-                epoch,
-                principal_balance,
-                debt_balance,
-                earning_balance,
-                pending_balance
+                epoch
+            }
+        )
+    }
+
+    public(friend) fun migrate_event(
+        from_vault: String,
+        from_amount: u64,
+        to_vault: String,
+        to_amount: u64,
+        sender: address,
+        epoch: u64
+    ) {
+        emit(
+            MigrateEvent {
+                from_vault,
+                from_amount,
+                to_vault,
+                to_amount,
+                sender,
+                epoch
             }
         )
     }

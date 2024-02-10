@@ -2,7 +2,7 @@
 // https://github.com/OmniBTC/Sui-AMM-swap
 
 
-// The AMM serves as the primary marketplace for trading YT <-> LEGATO and LEGATO <-> USDC. Other tokens may be routed through the orderbook system.
+// The AMM serves as the primary marketplace for trading YT <-> VT and VT <-> USDC. Other tokens may be routed through the orderbook system.
 
 module legato::amm {
 
@@ -16,12 +16,24 @@ module legato::amm {
     use sui::object::{Self, ID, UID};
     use sui::tx_context::{ Self, TxContext};
     use sui::balance::{ Self, Supply, Balance};
-    use sui::coin::{Self, Coin};
+    use sui::coin::{Self, Coin, value, split, destroy_zero};
+    use sui::pay;
+    use legato::event::{added_event, removed_event, swapped_event};
 
     use legato::comparator;
     use legato::math;
 
-    friend legato::amm_interface; 
+    // ======== Constants ========
+
+    /// The max value that can be held in one of the Balances of
+    /// a Pool. U64 MAX / FEE_SCALE
+    const MAX_POOL_VALUE : u64 = 18446744073709551615;
+    /// Minimal liquidity.
+    const MINIMAL_LIQUIDITY: u64 = 1000;
+    /// Max u64 value.
+    const U64_MAX: u64 = 18446744073709551615;
+
+    // ======== Errors ========
 
     /// For when Coin is zero.
     const ERR_ZERO_AMOUNT: u64 = 0;
@@ -60,14 +72,13 @@ module legato::amm {
     const ERR_INVALID_INDEX: u64 = 17;
     const ERR_DUPLICATED_ENTRY: u64 = 18;
     const ERR_NOT_FOUND: u64 = 19;
+    const ERR_NO_PERMISSIONS: u64 = 20;
+    const ERR_EMERGENCY: u64 = 21;
+    const ERR_GLOBAL_MISMATCH: u64 = 22;
+    const ERR_UNEXPECTED_RETURN: u64 = 23;
+    const ERR_EMPTY_COINS: u64 = 24;
 
-    /// The max value that can be held in one of the Balances of
-    /// a Pool. U64 MAX / FEE_SCALE
-    const MAX_POOL_VALUE : u64 = 18446744073709551615;
-    /// Minimal liquidity.
-    const MINIMAL_LIQUIDITY: u64 = 1000;
-    /// Max u64 value.
-    const U64_MAX: u64 = 18446744073709551615;
+    // ======== Structs =========
 
     /// The Pool token that will be used to mark the pool share
     /// of a liquidity provider. The parameter `X` and `Y` is for the
@@ -108,6 +119,8 @@ module legato::amm {
 
         transfer::share_object(global)
     }
+
+    // ======== Public Functions =========
 
     public fun global_id<X, Y>(pool: &Pool<X, Y>): ID {
         pool.global
@@ -210,7 +223,7 @@ module legato::amm {
     /// Add liquidity to the `Pool`. Sender needs to provide both
     /// `Coin<X>` and `Coin<Y>`, and in exchange he gets `Coin<LP>` -
     /// liquidity provider tokens.
-    public fun add_liquidity<X, Y>(
+    public fun add_liquidity_non_entry<X, Y>(
         pool: &mut Pool<X, Y>,
         coin_x: Coin<X>,
         coin_x_min: u64,
@@ -294,7 +307,7 @@ module legato::amm {
 
     /// Remove liquidity from the `Pool` by burning `Coin<LP>`.
     /// Returns `Coin<X>` and `Coin<Y>`.
-    public fun remove_liquidity<X, Y>(
+    public fun remove_liquidity_non_entry<X, Y>(
         pool: &mut Pool<X, Y>,
         lp_coin: Coin<LP<X, Y>>,
         is_order: bool,
@@ -482,7 +495,7 @@ module legato::amm {
     }
 
     // swap across 2 pools
-    public fun swap_xyz<X, Y, Z>(
+    public fun swap_xyz_non_entry<X, Y, Z>(
         global: &mut AMMGlobal,
         coin_x_in: Coin<X>,
         coin_z_out_min: u64,
@@ -589,6 +602,273 @@ module legato::amm {
         assert!(contained,ERR_UNAUTHORISED);
     }
 
+    // ======== Entry Functions =========
+
+    /// Entrypoint for the `add_liquidity` method.
+    /// Sends `LP<X,Y>` to the transaction sender.
+    public entry fun add_liquidity<X, Y>(
+        global: &mut AMMGlobal,
+        coin_x: Coin<X>,
+        coin_x_min: u64,
+        coin_y: Coin<Y>,
+        coin_y_min: u64,
+        ctx: &mut TxContext
+    ) {
+        assert!(is_emergency(global), ERR_EMERGENCY);
+        let is_order = is_order<X, Y>();
+
+        if (!has_registered<X, Y>(global)) {
+            register_pool<X, Y>(global, is_order)
+        };
+        let pool = get_mut_pool<X, Y>(global, is_order);
+
+        let (lp, return_values) = add_liquidity_non_entry(
+            pool,
+            coin_x,
+            coin_x_min,
+            coin_y,
+            coin_y_min,
+            is_order,
+            ctx
+        );
+        assert!(vector::length(&return_values) == 3, ERR_UNEXPECTED_RETURN);
+
+        let lp_val = vector::pop_back(&mut return_values);
+        let coin_x_val = vector::pop_back(&mut return_values);
+        let coin_y_val = vector::pop_back(&mut return_values);
+
+        transfer::public_transfer(
+            lp,
+            tx_context::sender(ctx)
+        );
+
+        let global = global_id<X, Y>(pool);
+        let lp_name = generate_lp_name<X, Y>();
+
+        added_event(
+            global,
+            lp_name,
+            coin_x_val,
+            coin_y_val,
+            lp_val
+        )
+    }
+
+    /// Entrypoint for the `remove_liquidity` method.
+    /// Transfers Coin<X> and Coin<Y> to the sender.
+    public entry fun remove_liquidity<X, Y>(
+        global: &mut AMMGlobal,
+        lp_coin: Coin<LP<X, Y>>,
+        ctx: &mut TxContext
+    ) {
+        assert!(!is_emergency(global), ERR_EMERGENCY);
+        let is_order = is_order<X, Y>();
+        let pool = get_mut_pool<X, Y>(global, is_order);
+
+        let lp_val = value(&lp_coin);
+        let (coin_x, coin_y) = remove_liquidity_non_entry(pool, lp_coin, is_order, ctx);
+        let coin_x_val = value(&coin_x);
+        let coin_y_val = value(&coin_y);
+
+        transfer::public_transfer(
+            coin_x,
+            tx_context::sender(ctx)
+        );
+
+        transfer::public_transfer(
+            coin_y,
+            tx_context::sender(ctx)
+        );
+
+        let global = global_id<X, Y>(pool);
+        let lp_name = generate_lp_name<X, Y>();
+
+        removed_event(
+            global,
+            lp_name,
+            coin_x_val,
+            coin_y_val,
+            lp_val
+        )
+    }
+
+    /// Entry point for the `swap` method.
+    /// Sends swapped Coin to the sender.
+    public entry fun swap<X, Y>(
+        global: &mut AMMGlobal,
+        coin_in: Coin<X>,
+        coin_out_min: u64,
+        ctx: &mut TxContext
+    ) {
+        assert!(!is_emergency(global), ERR_EMERGENCY);
+        let is_order = is_order<X, Y>();
+
+        let return_values = swap_out<X, Y>(
+            global,
+            coin_in,
+            coin_out_min,
+            is_order,
+            ctx
+        );
+
+        let coin_y_out = vector::pop_back(&mut return_values);
+        let coin_y_in = vector::pop_back(&mut return_values);
+        let coin_x_out = vector::pop_back(&mut return_values);
+        let coin_x_in = vector::pop_back(&mut return_values);
+
+        let global =  id<X, Y>(global);
+        let lp_name = generate_lp_name<X, Y>();
+
+        swapped_event(
+            global,
+            lp_name,
+            coin_x_in,
+            coin_x_out,
+            coin_y_in,
+            coin_y_out
+        )
+    }
+
+    public entry fun swap_xyz<X, Y, Z>(
+        global: &mut AMMGlobal,
+        coin_x_in: Coin<X>,
+        coin_z_out_min: u64,
+        ctx: &mut TxContext
+    ) {
+        assert!(! is_emergency(global), ERR_EMERGENCY);
+
+        let input_amount = value(&coin_x_in);
+
+        let output_amount =  swap_xyz_non_entry<X, Y, Z>(
+            global,
+            coin_x_in,
+            coin_z_out_min,
+            ctx
+        );
+
+        let global =  id<X, Z>(global);
+        let lp_name =  generate_lp_name<X, Z>();
+
+        swapped_event(
+            global,
+            lp_name,
+            input_amount,
+            0,
+            0,
+            output_amount
+        )
+    }
+
+    public entry fun multi_add_liquidity<X, Y>(
+        global: &mut AMMGlobal,
+        coins_x: vector<Coin<X>>,
+        coins_x_value: u64,
+        coin_x_min: u64,
+        coins_y: vector<Coin<Y>>,
+        coins_y_value: u64,
+        coin_y_min: u64,
+        ctx: &mut TxContext
+    ) {
+        assert!(!is_emergency(global), ERR_EMERGENCY);
+        assert!(
+            !vector::is_empty(&coins_x) && !vector::is_empty(&coins_y),
+            ERR_EMPTY_COINS
+        );
+
+        // 1. merge coins
+        let merged_coin_x = vector::pop_back(&mut coins_x);
+        pay::join_vec(&mut merged_coin_x, coins_x);
+        let coin_x = split(&mut merged_coin_x, coins_x_value, ctx);
+
+        let merged_coin_y = vector::pop_back(&mut coins_y);
+        pay::join_vec(&mut merged_coin_y, coins_y);
+        let coin_y = split(&mut merged_coin_y, coins_y_value, ctx);
+
+        // 2. add liquidity
+        add_liquidity<X, Y>(
+            global,
+            coin_x,
+            coin_x_min,
+            coin_y,
+            coin_y_min,
+            ctx
+        );
+
+        // 3. handle remain coins
+        if (value(&merged_coin_x) > 0) {
+            transfer::public_transfer(
+                merged_coin_x,
+                tx_context::sender(ctx)
+            )
+        } else {
+            destroy_zero(merged_coin_x)
+        };
+
+        if (value(&merged_coin_y) > 0) {
+            transfer::public_transfer(
+                merged_coin_y,
+                tx_context::sender(ctx)
+            )
+        } else {
+            destroy_zero(merged_coin_y)
+        }
+    }
+
+    public entry fun multi_remove_liquidity<X, Y>(
+        global: &mut AMMGlobal,
+        lp_coin: vector<Coin<LP<X, Y>>>,
+        ctx: &mut TxContext
+    ) {
+        assert!(!is_emergency(global), ERR_EMERGENCY);
+        assert!(!vector::is_empty(&lp_coin), ERR_EMPTY_COINS);
+
+        // 1. merge coins
+        let merged_lp = vector::pop_back(&mut lp_coin);
+        pay::join_vec(&mut merged_lp, lp_coin);
+
+        // 2. remove liquidity
+        remove_liquidity(
+            global,
+            merged_lp,
+            ctx
+        )
+    }
+
+    public entry fun multi_swap<X, Y>(
+        global: &mut AMMGlobal,
+        coins_in: vector<Coin<X>>,
+        coins_in_value: u64,
+        coin_out_min: u64,
+        ctx: &mut TxContext
+    ) {
+        assert!(!is_emergency(global), ERR_EMERGENCY);
+        assert!(!vector::is_empty(&coins_in), ERR_EMPTY_COINS);
+
+        // 1. merge coins
+        let merged_coins_in = vector::pop_back(&mut coins_in);
+        pay::join_vec(&mut merged_coins_in, coins_in);
+        let coin_in = split(&mut merged_coins_in, coins_in_value, ctx);
+
+        // 2. swap coin
+        swap<X, Y>(
+            global,
+            coin_in,
+            coin_out_min,
+            ctx
+        );
+
+        // 3. handle remain coin
+        if (value(&merged_coins_in) > 0) {
+            transfer::public_transfer(
+                merged_coins_in,
+                tx_context::sender(ctx)
+            )
+        } else {
+            destroy_zero(merged_coins_in)
+        }
+    }
+
+
     // add new admin
     public entry fun add_admin(global: &mut AMMGlobal, user: address, ctx: &mut TxContext) {
         check_admin(global, tx_context::sender(ctx));
@@ -629,7 +909,7 @@ module legato::amm {
         };
         let pool = get_mut_pool<X, Y>(global, is_order);
 
-        add_liquidity(
+        add_liquidity_non_entry(
             pool,
             coin_x,
             1,
@@ -668,7 +948,7 @@ module legato::amm {
         lp_coin: Coin<LP<X, Y>>,
         ctx: &mut TxContext
     ): (Coin<X>, Coin<Y>) {
-        remove_liquidity<X, Y>(
+        remove_liquidity_non_entry<X, Y>(
             pool,
             lp_coin,
             is_order<X, Y>(),
