@@ -156,10 +156,8 @@ module legato::marketplace_tests {
             assert!(usdc_value == 7_000_000_000, 2);
             test::return_to_sender(test, usdc_token);
         };
-
     
     }
-
 
     fun setup_quote(test: &mut Scenario, admin_address: address) {
         
@@ -176,6 +174,8 @@ module legato::marketplace_tests {
             test::return_shared(global);
             test::return_to_sender(test, managercap);
         };
+
+        
 
     }
 
