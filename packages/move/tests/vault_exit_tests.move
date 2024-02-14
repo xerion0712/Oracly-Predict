@@ -1,7 +1,7 @@
 
 // testing vault exits with a combination of YT and PT, disabled by default
 #[test_only]
-module legato::vault_exit {
+module legato::vault_exit_tests {
 
     // use std::debug;
 

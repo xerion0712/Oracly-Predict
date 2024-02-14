@@ -17,10 +17,12 @@ module legato::lp_staking {
     use sui::balance::{Self, Balance};
     use sui::coin::{Self, Coin};
 
-    use legato::vault::{ManagerCap};
+    use legato::vault::{ManagerCap, Global, Self, PT_TOKEN, YT_TOKEN};
     use legato::vault_lib::{token_to_name};
     use legato::math::{mul_div};
     use legato::event::{stake_event, unstake_event, withdraw_rewards_event, deposit_rewards_event, snapshot_event};
+
+    use sui_system::sui_system::{SuiSystemState };
 
     use std::vector;
     use std::string::{  String }; 
@@ -97,7 +99,9 @@ module legato::lp_staking {
         // add user to the list
         if (table::contains(&global.user_list, pool_name)) {
             let user_list = table::borrow_mut(&mut global.user_list, pool_name);
-            vector::push_back<address>(user_list, tx_context::sender(ctx));
+            let sender = tx_context::sender(ctx);
+            let (contained, _) = vector::index_of<address>(user_list, &sender);
+            if (!contained) vector::push_back<address>(user_list, sender);
         } else {
             let new_user_list = vector::empty<address>();
             vector::push_back<address>(&mut new_user_list, tx_context::sender(ctx));
@@ -235,7 +239,7 @@ module legato::lp_staking {
             tx_context::sender(ctx)
         );
 
-    }   
+    }
 
     // make the claimer list on the next epoch
     public entry fun snapshot<P>(global: &mut Staking, ctx: &mut TxContext) {
@@ -278,7 +282,7 @@ module legato::lp_staking {
             while (vector::length(&user_list) > 0) {
                 let user_address = vector::remove(&mut user_list, 0);
                 let user_amount = *table::borrow_mut(pool_balance, user_address);
-                let reward_amount = mul_div(total_rewards_to_spend, user_amount, total_pool_amount);
+                let reward_amount = mul_div(total_rewards_to_spend, user_amount, total_pool_amount); 
                 table::add(&mut claim_list, user_address, reward_amount);
             };
 
@@ -336,6 +340,27 @@ module legato::lp_staking {
             else table::add(reward_table, from_epoch, reward_amount);
         };
 
+    }
+
+    // take a snapshot for staking YT to get an excess yield from the surplus
+    public entry fun vault_snapshot<P>(wrapper: &mut SuiSystemState, global: &mut Staking, vault_global: &mut Global, manager_cap: &mut ManagerCap, ctx: &mut TxContext) {
+        let pool_name = token_to_name<P>();
+
+        // configure if it hasn't been set up yet
+        if ( !table::contains(&global.pool_reward, pool_name) ) {
+            set_reward_<YT_TOKEN<P>,PT_TOKEN<P>>(global);
+        };
+
+        let pt_coin = vault::mint_pt_for_claim<P>(wrapper, vault_global, manager_cap, ctx);
+
+        if (coin::value(&pt_coin) > 0) {
+            set_reward_table<YT_TOKEN<P>>(global, manager_cap, tx_context::epoch(ctx), coin::value(&pt_coin), ctx );
+            deposit_rewards<YT_TOKEN<P>, PT_TOKEN<P>>(global, pt_coin , ctx);
+            snapshot<YT_TOKEN<P>>(global, ctx );
+        } else {
+            coin::destroy_zero(pt_coin);
+        };
+        
     }
 
     // ======== Internal Functions =========

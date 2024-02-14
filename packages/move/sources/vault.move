@@ -5,6 +5,7 @@ module legato::vault {
 
     // use std::debug;
 
+    use sui::math;
     use sui::object::{ Self, ID, UID }; 
     use sui::balance::{  Self, Supply, Balance};
     use sui::table::{Self, Table};
@@ -25,7 +26,8 @@ module legato::vault {
     use legato::vault_lib::{token_to_name, calculate_pt_debt_from_epoch, sort_items};
     use legato::amm::{ Self, AMMGlobal};
     use legato::event::{new_vault_event, mint_event, migrate_event, redeem_event, exit_event};
-    use legato::apy_reader::{Self}; 
+    use legato::apy_reader::{Self};
+    use legato::math::{mul_div}; 
      
 
     // ======== Constants ========
@@ -37,6 +39,7 @@ module legato::vault {
     const MIN_PT_TO_MIGRATE : u64 = 1_000_000_000; // 1 P
     const MIN_PT_TO_REDEEM: u64 = 1_000_000_000; // 1 PT
     const MIN_YT_FOR_EXIT: u64 = 1_000_000_000; // 1 YT
+    const U64_MAX: u64 = 18446744073709551615;
 
     // ======== Errors ========
     const E_DUPLICATED_ENTRY: u64 = 1;
@@ -57,6 +60,8 @@ module legato::vault {
     const E_EXIT_DISABLED: u64 = 16;
     const E_INVALID_DEPOSIT_ID: u64 = 17;
     const E_INSUFFICIENT_AMOUNT: u64 = 18;
+    const E_CLAIM_DISABLED: u64 = 19;
+    const E_SURPLUS_ZERO: u64 = 20;
 
     // ======== Structs =========
 
@@ -69,13 +74,13 @@ module legato::vault {
         maturity_epoch: u64,
         vault_apy: u64,
         deposit_items: vector<StakedSui>,
+        debt_balance: u64,
         enable_mint: bool,
         enable_exit: bool
     }
 
     // keeps all assets for each pool
     struct PoolReserve<phantom P> has store {
-        
         pt_supply: Supply<PT_TOKEN<P>>,
         yt_supply: Supply<YT_TOKEN<P>>
     }
@@ -152,6 +157,7 @@ module legato::vault {
         // Calculate PT to send out
         let debt_amount = calculate_pt_debt_from_epoch(vault_config.vault_apy, tx_context::epoch(ctx), vault_config.maturity_epoch, principal_amount+total_earnings);
         let minted_pt_amount = principal_amount+total_earnings+debt_amount;
+        vault_config.debt_balance = vault_config.debt_balance+debt_amount;
 
         // Mint PT to the user
         mint_pt<P>(vault_reserve, minted_pt_amount, ctx);
@@ -257,6 +263,8 @@ module legato::vault {
 
     }
 
+
+    // burn PT tokens from the matured vault and mint PT on the newer vault
     public entry fun migrate<X,Y>(global: &mut Global, pt: Coin<PT_TOKEN<X>>, ctx: &mut TxContext) {
         check_vault_order<X,Y>(global);
         assert!(coin::value<PT_TOKEN<X>>(&pt) >= MIN_PT_TO_MIGRATE, E_MIN_THRESHOLD);
@@ -291,6 +299,7 @@ module legato::vault {
         );
     }
 
+
     public fun get_vault_config<P>(table: &mut Table<String, PoolConfig>): &mut PoolConfig  {
         let vault_name = token_to_name<P>();
         let has_registered = table::contains(table, vault_name);
@@ -314,6 +323,7 @@ module legato::vault {
         let pool_config = table::borrow(table, vault_name );
         (pool_config.started_epoch, pool_config.maturity_epoch)
     }
+    
 
     // ======== Only Governance =========
 
@@ -340,6 +350,7 @@ module legato::vault {
             maturity_epoch,
             vault_apy: initial_apy, 
             deposit_items: vector::empty<StakedSui>(),
+            debt_balance: 0,
             enable_exit : false,
             enable_mint: true
         };
@@ -408,6 +419,43 @@ module legato::vault {
     public entry fun disable_mint<P>(global: &mut Global, _manager_cap: &mut ManagerCap) {
         let vault_config = get_vault_config<P>( &mut global.pools);
         vault_config.enable_mint = false;
+    }
+
+    public entry fun update_vault_apy<P>(global: &mut Global, _manager_cap: &mut ManagerCap, value: u64) {
+        let vault_config = get_vault_config<P>( &mut global.pools);
+        vault_config.vault_apy = value;
+    }
+
+    public entry fun emergency_topup_redemption_pool(global: &mut Global, _manager_cap: &mut ManagerCap, coin: Coin<SUI>, _ctx: &mut TxContext) {
+        let balance = coin::into_balance(coin);
+        balance::join<SUI>(&mut global.redemption_pool.pending_withdrawal, balance);
+    }
+
+    public entry fun emergency_withdraw_redemption_pool(global: &mut Global, _manager_cap: &mut ManagerCap, amount: u64, ctx: &mut TxContext) {
+        let withdrawn_balance = balance::split<SUI>(&mut global.redemption_pool.pending_withdrawal, amount);
+        transfer::public_transfer(coin::from_balance(withdrawn_balance, ctx), tx_context::sender(ctx));
+    }
+
+    public fun mint_pt_for_claim<P>(wrapper: &mut SuiSystemState, global: &mut Global, _manager_cap: &mut ManagerCap, ctx: &mut TxContext) : Coin<PT_TOKEN<P>> {
+        let vault_config = get_vault_config<P>( &mut global.pools);
+        let vault_reserve = get_vault_reserve<P>(&mut global.pool_reserves);
+
+        let accumulated_rewards = vault_rewards(wrapper, vault_config , tx_context::epoch(ctx) );
+        let outstanding_debts = vault_config.debt_balance;
+
+        if ( vault_config.maturity_epoch > tx_context::epoch(ctx) ) {
+            outstanding_debts = mul_div(outstanding_debts, tx_context::epoch(ctx), vault_config.maturity_epoch );
+        };
+
+        let surplus = 
+            if (accumulated_rewards >= outstanding_debts)
+                accumulated_rewards - outstanding_debts
+            else 0;
+        
+        vault_config.debt_balance = vault_config.debt_balance+surplus;
+        // mint PT
+        let minted_balance = balance::increase_supply(&mut vault_reserve.pt_supply, surplus);
+        coin::from_balance(minted_balance, ctx)
     }
 
     // ======== Internal Functions =========
@@ -496,8 +544,20 @@ module legato::vault {
             
             let pool = table::borrow_mut(pools, pool_name); 
             let staked_sui = vector::swap_remove(&mut pool.deposit_items, asset_id);
+            let principal_amount = staking_pool::staked_sui_amount(&staked_sui);
             let balance_each = sui_system::request_withdraw_stake_non_entry(wrapper, staked_sui, ctx);
+            
+            let reward_amount =
+                if (balance::value(&balance_each) >= principal_amount)
+                    balance::value(&balance_each) - principal_amount
+                else 0;
+            
             balance::join<SUI>(&mut balance_sui, balance_each);
+
+            pool.debt_balance = 
+                if (pool.debt_balance >= reward_amount)
+                    pool.debt_balance - reward_amount
+                else 0;
         };
 
         balance_sui
@@ -520,11 +580,65 @@ module legato::vault {
         transfer::public_transfer(coin::from_balance(payout_balance, ctx), recipient);
     }
 
+    fun vault_rewards(wrapper: &mut SuiSystemState, vault_config: &PoolConfig, epoch: u64): u64 {
+        let count = vector::length(&vault_config.deposit_items);
+        let i = 0;
+        let total_sum = 0;
+        while (i < count) {
+            let staked_sui = vector::borrow(&vault_config.deposit_items, i);
+            let activation_epoch = staking_pool::stake_activation_epoch(staked_sui);
+            if (epoch > activation_epoch) total_sum = total_sum+apy_reader::earnings_from_staked_sui(wrapper, staked_sui, epoch);
+            i = i + 1;
+        };
+        total_sum
+    }
+
     // ======== Test-related Functions =========
 
     #[test_only]
     public fun test_init(ctx: &mut TxContext) {
         init(ctx);
+    }
+
+    #[test_only]
+    public fun median_apy(wrapper: &mut SuiSystemState, global: &Global, epoch: u64): u64 {
+        let count = vector::length(&global.staking_pools);
+        let i = 0;
+        let total_sum = 0;
+        while (i < count) {
+            let pool_id = vector::borrow(&global.staking_pool_ids, i);
+            total_sum = total_sum+apy_reader::pool_apy(wrapper, pool_id, epoch);
+            i = i + 1;
+        };
+        total_sum / i
+    }
+
+    #[test_only]
+    public fun ceil_apy(wrapper: &mut SuiSystemState, global: &Global, epoch: u64): u64 {
+        let count = vector::length(&global.staking_pools);
+        let i = 0;
+        let output = 0;
+        while (i < count) {
+            let pool_id = vector::borrow(&global.staking_pool_ids, i);
+            output = math::max( output, apy_reader::pool_apy(wrapper, pool_id, epoch) );
+            i = i + 1;
+        };
+        output
+    }
+
+    #[test_only]
+    public fun floor_apy(wrapper: &mut SuiSystemState,  global: &Global, epoch: u64): u64 {
+        let count = vector::length(&global.staking_pools);
+        let i = 0;
+        let output = 0;
+        while (i < count) {
+            let pool_id = vector::borrow(&global.staking_pool_ids, i);
+            if (output == 0)
+                    output = apy_reader::pool_apy(wrapper, pool_id, epoch)
+                else output = math::min( output, apy_reader::pool_apy(wrapper, pool_id, epoch) );
+            i = i + 1;
+        };
+        output
     }
 
 }
