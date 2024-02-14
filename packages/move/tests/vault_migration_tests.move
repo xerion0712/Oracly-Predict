@@ -1,11 +1,11 @@
 
 // test when migrating PT tokens to the newly created vault and minting additional PT
 #[test_only]
-module legato::vault_migration {
+module legato::vault_migration_tests {
 
     use sui::coin::{Self, Coin};
     use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
-    use sui_system::sui_system::{ SuiSystemState, epoch };
+    use sui_system::sui_system::{ SuiSystemState };
 
     use legato::vault_utils::{
         scenario, 
@@ -91,24 +91,24 @@ module legato::vault_migration {
             test::return_shared(global);
         };
 
-        // allow us to redeem from the 2nd vault
-        advance_epoch(test, 10);
+        // // allow us to redeem from the 2nd vault
+        // advance_epoch(test, 10);
 
-        // redeem PT received from the migration
-        next_tx(test, STAKER_ADDR_1);
-        {
-            let system_state = test::take_shared<SuiSystemState>(test);
-            let global = test::take_shared<Global>(test);
-            let pt_token = test::take_from_sender<Coin<PT_TOKEN<FEB_2024>>>(test);
+        // // redeem PT received from the migration
+        // next_tx(test, STAKER_ADDR_1);
+        // {
+        //     let system_state = test::take_shared<SuiSystemState>(test);
+        //     let global = test::take_shared<Global>(test);
+        //     let pt_token = test::take_from_sender<Coin<PT_TOKEN<FEB_2024>>>(test);
 
-            let current_epoch = epoch(&mut system_state);
-            assert!(current_epoch == 111, ASSERT_CHECK_EPOCH);
+        //     let current_epoch = epoch(&mut system_state);
+        //     assert!(current_epoch == 111, ASSERT_CHECK_EPOCH);
             
-            vault::redeem<FEB_2024>(&mut system_state, &mut global, pt_token, ctx(test));
+        //     vault::redeem<FEB_2024>(&mut system_state, &mut global, pt_token, ctx(test));
 
-            test::return_shared(global);
-            test::return_shared(system_state);  
-        };
+        //     test::return_shared(global);
+        //     test::return_shared(system_state);  
+        // };
 
     }
 

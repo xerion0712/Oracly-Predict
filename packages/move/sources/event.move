@@ -9,6 +9,7 @@ module legato::event {
     friend legato::vault;
     friend legato::vault_lib;
     friend legato::marketplace;
+    friend legato::lp_staking;
 
     /// Liquidity pool added event.
     struct AddedEvent has copy, drop {
@@ -122,6 +123,145 @@ module legato::event {
         amount: u64,
         unit_price: u64, // per 1 unit
         owner: address
+    }
+
+    struct StakeEvent has copy, drop {
+        lp_staking: ID,
+        pool_name: String,
+        input_amount: u64,
+        epoch: u64,
+        sender: address
+    }
+
+    struct UnstakeEvent has copy, drop {
+        lp_staking: ID,
+        pool_name: String,
+        output_amount: u64,
+        epoch: u64,
+        sender: address
+    }
+
+    struct WithdrawRewardsEvent has copy, drop {
+        lp_staking: ID,
+        pool_name: String,
+        reward_name: String,
+        reward_amount: u64,
+        epoch: u64,
+        sender: address
+    }
+
+    struct DepositRewardsEvent has copy, drop {
+        lp_staking: ID,
+        pool_name: String,
+        reward_name: String,
+        reward_amount: u64,
+        epoch: u64,
+        sender: address
+    }
+
+    struct SnapshotEvent has copy, drop {
+        lp_staking: ID,
+        pool_name: String,
+        reward_name: String,
+        total_rewards_to_spend: u64,
+        epoch: u64,
+        sender: address
+    }
+
+    public(friend) fun snapshot_event(
+        lp_staking: ID,
+        pool_name: String,
+        reward_name: String,
+        total_rewards_to_spend: u64,
+        epoch: u64,
+        sender: address
+    ) {
+        emit(
+            SnapshotEvent {
+                lp_staking,
+                pool_name,
+                reward_name,
+                total_rewards_to_spend,
+                epoch,
+                sender
+            }
+        )
+    }
+
+    public(friend) fun deposit_rewards_event(
+        lp_staking: ID,
+        pool_name: String,
+        reward_name: String,
+        reward_amount: u64,
+        epoch: u64,
+        sender: address
+    ) {
+        emit(
+            DepositRewardsEvent {
+                lp_staking,
+                pool_name,
+                reward_name,
+                reward_amount,
+                epoch,
+                sender
+            }
+        )
+    }
+
+    public(friend) fun stake_event(
+        lp_staking: ID,
+        pool_name: String,
+        input_amount: u64,
+        epoch: u64,
+        sender: address
+    ) {
+        emit(
+            StakeEvent {
+                lp_staking,
+                pool_name,
+                input_amount,
+                epoch,
+                sender
+            }
+        )
+    }
+
+    public(friend) fun withdraw_rewards_event(
+        lp_staking: ID,
+        pool_name: String,
+        reward_name: String,
+        reward_amount: u64,
+        epoch: u64,
+        sender: address
+    ) {
+        emit(
+            WithdrawRewardsEvent {
+                lp_staking,
+                pool_name,
+                reward_name,
+                reward_amount,
+                epoch,
+                sender
+            }
+        )
+    }
+
+    public(friend) fun unstake_event(
+        lp_staking: ID,
+        pool_name: String,
+        output_amount: u64,
+        epoch: u64,
+        sender: address
+    ) {
+        emit(
+            UnstakeEvent {
+                lp_staking,
+                pool_name,
+                output_amount,
+                epoch,
+                sender
+            }
+        )
     }
 
     public(friend) fun new_order_event(

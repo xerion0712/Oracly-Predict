@@ -15,8 +15,9 @@ module legato::vault_utils {
 
     // use legato::marketplace::{Self, Marketplace, ManagerCap };
     // use legato::vusd::{Self, ReversePool};
-    use legato::vault::{Self, ManagerCap, Global}; 
+    use legato::vault::{Self, ManagerCap, Global, YT_TOKEN}; 
     use legato::amm::{ Self, AMMGlobal };
+    use legato::lp_staking::{Self, Staking};
     use legato::vault_template::{JAN_2024, FEB_2024, MAR_2024};
 
     const VALIDATOR_ADDR_1: address = @0x1;
@@ -38,6 +39,37 @@ module legato::vault_utils {
     public fun advance_epoch(test: &mut Scenario, value: u64) {
         let i = 0;
         while (i < value) {
+            advance_epoch_with_reward_amounts(0, 500, test);
+            i = i + 1;
+        };
+    }
+
+    public fun advance_epoch_with_snapshot<P>(test: &mut Scenario, admin_address: address, value: u64) {
+        let i = 0;
+        while (i < value) {
+            // next_tx(test, admin_address);
+            // {
+            //     let global = test::take_shared<Staking>(test);
+            //     lp_staking::snapshot<YT_TOKEN<P>>(&mut global, ctx(test));
+            //     test::return_shared(global); 
+            // };
+
+            next_tx(test, admin_address);
+            {
+                let system_state = test::take_shared<SuiSystemState>(test);
+                let managercap = test::take_from_sender<ManagerCap>(test);
+                let global = test::take_shared<Global>(test);
+                let staking_global = test::take_shared<Staking>(test);
+
+                lp_staking::vault_snapshot<P>(&mut system_state, &mut staking_global, &mut global, &mut managercap, ctx(test));
+                
+                test::return_shared(staking_global); 
+                test::return_shared(global);
+                test::return_to_sender(test, managercap);
+                test::return_shared(system_state);
+
+            };
+
             advance_epoch_with_reward_amounts(0, 500, test);
             i = i + 1;
         };
@@ -135,9 +167,11 @@ module legato::vault_utils {
     // }
 
     public fun setup_vault(test: &mut Scenario, admin_address: address) {
+
         next_tx(test, admin_address);
         {
             vault::test_init(ctx(test));
+            lp_staking::test_init(ctx(test));
         };
 
         next_tx(test, admin_address);
@@ -199,6 +233,15 @@ module legato::vault_utils {
             test::return_to_sender(test, managercap);
         };
  
+    }
+
+    public fun buy_yt(test: &mut Scenario, amount: u64, recipient_address: address) {
+        next_tx(test, recipient_address);
+        {
+            let amm_global = test::take_shared<AMMGlobal>(test);
+            amm::swap<SUI, YT_TOKEN<JAN_2024>>(&mut amm_global, coin::mint_for_testing<SUI>(amount, ctx(test)), 1, ctx(test));
+            test::return_shared(amm_global);
+        };
     }
 
     public fun stake_and_mint<P>(test: &mut Scenario, staker_address: address, amount : u64, validator_address: address) {

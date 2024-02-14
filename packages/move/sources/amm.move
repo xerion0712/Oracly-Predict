@@ -98,7 +98,6 @@ module legato::amm {
     struct AMMGlobal has key {
         id: UID,
         admin: vector<address>,
-        treasury: address,
         has_paused: bool,
         pools: Bag
     }
@@ -112,7 +111,6 @@ module legato::amm {
         let global = AMMGlobal {
             id: object::new(ctx),
             admin: admin_list,
-            treasury: tx_context::sender(ctx),
             has_paused: false,
             pools: bag::new(ctx)
         };
@@ -882,11 +880,6 @@ module legato::amm {
         let (contained, index) = vector::index_of<address>(&global.admin, &user);
         assert!(contained,ERR_NOT_FOUND);
         vector::remove<address>(&mut global.admin, index);
-    }
-
-    public entry fun update_treasury(global: &mut AMMGlobal, new_address:address, ctx: &mut TxContext) {
-        check_admin(global, tx_context::sender(ctx));
-        global.treasury = new_address;
     }
 
     #[test_only]

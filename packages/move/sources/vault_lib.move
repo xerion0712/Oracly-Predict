@@ -14,6 +14,14 @@ module legato::vault_lib {
         string::utf8(into_bytes(into_string(get<P>())))
     }
 
+    public fun token_to_name_with_prefix<P>(prefix: vector<u8>): String {
+        let name_with_prefix = string::utf8(b"");
+        string::append_utf8(&mut name_with_prefix, prefix);
+        string::append_utf8(&mut name_with_prefix, b"-");
+        string::append_utf8(&mut name_with_prefix, into_bytes(into_string(get<P>())));
+        name_with_prefix
+    }
+
     public fun calculate_pt_debt_from_epoch(apy: u64, from_epoch: u64, to_epoch: u64, input_amount: u64): u64 {
         let for_epoch = to_epoch-from_epoch;
         let (for_epoch, apy, input_amount) = ((for_epoch as u128), (apy as u128), (input_amount as u128));
@@ -42,45 +50,6 @@ module legato::vault_lib {
         };
     }
 
-    // #[test_only]
-    // public fun median_apy(wrapper: &mut SuiSystemState, vault: &PoolConfig, epoch: u64): u64 {
-    //     let count = vector::length(&vault.staking_pools);
-    //     let i = 0;
-    //     let total_sum = 0;
-    //     while (i < count) {
-    //         let pool_id = vector::borrow(&vault.staking_pools, i);
-    //         total_sum = total_sum+apy_reader::pool_apy(wrapper, pool_id, epoch);
-    //         i = i + 1;
-    //     };
-    //     total_sum / i
-    // }
-
-    // #[test_only]
-    // public fun ceil_apy(wrapper: &mut SuiSystemState, vault: &PoolConfig, epoch: u64): u64 {
-    //     let count = vector::length(&vault.staking_pools);
-    //     let i = 0;
-    //     let output = 0;
-    //     while (i < count) {
-    //         let pool_id = vector::borrow(&vault.staking_pools, i);
-    //         output = math::max( output, apy_reader::pool_apy(wrapper, pool_id, epoch) );
-    //         i = i + 1;
-    //     };
-    //     output
-    // }
-
-    // #[test_only]
-    // public fun floor_apy(wrapper: &mut SuiSystemState, vault: &PoolConfig, epoch: u64): u64 {
-    //     let count = vector::length(&vault.staking_pools);
-    //     let i = 0;
-    //     let output = 0;
-    //     while (i < count) {
-    //         let pool_id = vector::borrow(&vault.staking_pools, i);
-    //         if (output == 0)
-    //                 output = apy_reader::pool_apy(wrapper, pool_id, epoch)
-    //             else output = math::min( output, apy_reader::pool_apy(wrapper, pool_id, epoch) );
-    //         i = i + 1;
-    //     };
-    //     output
-    // }
+   
 
 }
