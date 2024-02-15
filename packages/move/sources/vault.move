@@ -16,7 +16,7 @@ module legato::vault {
     // use sui::url::{Self};
     use sui::tx_context::{Self, TxContext};
 
-    // use std::option::{Self};
+    use std::option::{Self, Option};
     use std::string::{  String }; 
     use std::vector;
 
@@ -62,6 +62,7 @@ module legato::vault {
     const E_INSUFFICIENT_AMOUNT: u64 = 18;
     const E_CLAIM_DISABLED: u64 = 19;
     const E_SURPLUS_ZERO: u64 = 20;
+    const E_DEPOSIT_CAP: u64 = 21;
 
     // ======== Structs =========
 
@@ -97,7 +98,8 @@ module legato::vault {
         pool_list: vector<String>,
         pools: Table<String, PoolConfig>,
         pool_reserves: Bag,
-        redemption_pool: RedemptionPool
+        redemption_pool: RedemptionPool,
+        deposit_cap: Option<u64> // deposit no more than a certain amount
     }
 
     // using ManagerCap for admin permission
@@ -119,6 +121,7 @@ module legato::vault {
             pool_list: vector::empty<String>(),
             pools: table::new(ctx),
             pool_reserves: bag::new(ctx),
+            deposit_cap: option::none<u64>(),
             redemption_pool: RedemptionPool {
                 pending_withdrawal: balance::zero()
             }
@@ -147,6 +150,10 @@ module legato::vault {
 
         // Take the Staked SUI
         let principal_amount = staking_pool::staked_sui_amount(&staked_sui);
+        if (option::is_some(&global.deposit_cap)) {
+            assert!( *option::borrow(&global.deposit_cap) >= principal_amount, E_DEPOSIT_CAP);
+            *option::borrow_mut(&mut global.deposit_cap) = *option::borrow(&global.deposit_cap)-principal_amount;
+        };
         let total_earnings = 
             if (tx_context::epoch(ctx) > staking_pool::stake_activation_epoch(&staked_sui))
                 apy_reader::earnings_from_staked_sui(wrapper, &staked_sui, tx_context::epoch(ctx))
@@ -436,6 +443,13 @@ module legato::vault {
         transfer::public_transfer(coin::from_balance(withdrawn_balance, ctx), tx_context::sender(ctx));
     }
 
+    // set amount as zero to ignore
+    public entry fun set_deposit_cap(global: &mut Global, _manager_cap: &mut ManagerCap, amount: u64) {
+        if (amount == 0)
+            global.deposit_cap = option::none<u64>()
+        else global.deposit_cap = option::some<u64>(amount);
+    }
+
     public fun mint_pt_for_claim<P>(wrapper: &mut SuiSystemState, global: &mut Global, _manager_cap: &mut ManagerCap, ctx: &mut TxContext) : Coin<PT_TOKEN<P>> {
         let vault_config = get_vault_config<P>( &mut global.pools);
         let vault_reserve = get_vault_reserve<P>(&mut global.pool_reserves);
@@ -457,6 +471,8 @@ module legato::vault {
         let minted_balance = balance::increase_supply(&mut vault_reserve.pt_supply, surplus);
         coin::from_balance(minted_balance, ctx)
     }
+
+    
 
     // ======== Internal Functions =========
 
@@ -499,8 +515,6 @@ module legato::vault {
     }
 
     fun locate_withdrawable_asset(wrapper: &mut SuiSystemState, pool_list: &vector<String>, pools: &mut Table<String, PoolConfig> , paidout_amount: u64, pending_withdrawal: u64, epoch: u64): (vector<String>,vector<u64>)  {
-
-        // debug::print(pool_list);
 
         let pool_count = 0;
         let asset_pools = vector::empty();

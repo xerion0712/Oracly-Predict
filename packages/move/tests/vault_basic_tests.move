@@ -84,6 +84,8 @@ module legato::vault_basic_tests {
 
             vault::update_vault_apy<JAN_2024>(&mut global, &mut managercap , median_apy);
 
+            // vault::set_deposit_cap(&mut global, &mut managercap, 100_000_000_000);
+
             test::return_shared(global);
             test::return_shared(system_state);
             test::return_to_sender(test, managercap);
