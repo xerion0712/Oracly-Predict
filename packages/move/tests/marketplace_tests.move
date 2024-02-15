@@ -171,6 +171,8 @@ module legato::marketplace_tests {
             let global = test::take_shared<Marketplace>(test);
             let managercap = test::take_from_sender<ManagerCap>(test);
             marketplace::setup_quote<USDC>(&mut global, &mut managercap,  ctx(test));
+            // marketplace::set_deposit_cap(&mut global, &mut managercap,  1_000_000_000);
+            // marketplace::set_deposit_cap(&mut global, &mut managercap,  0);
             test::return_shared(global);
             test::return_to_sender(test, managercap);
         };

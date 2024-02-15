@@ -17,6 +17,7 @@ module legato::marketplace {
     use sui::coin::{Self, Coin};
     
     use std::vector;
+    use std::option::{Self, Option};
     use std::string::{  String };
    
     use legato::math::{mul_div};
@@ -39,6 +40,7 @@ module legato::marketplace {
     const E_INSUFFICIENT_BALANCE: u64 = 306;
     const E_INVALID_ORDER_ID: u64 = 307;
     const E_PAUSED: u64 = 308;
+    const E_DEPOSIT_CAP: u64 = 309;
 
     // ======== Structs =========
 
@@ -48,7 +50,8 @@ module legato::marketplace {
         has_paused: bool,
         user_balances: Bag,
         markets: Bag, // a collection of QuoteMarket
-        order_count: u64 // tracks the total orders and generates unique IDs for distinct identification
+        order_count: u64, // tracks the total orders and generates unique IDs for distinct identification
+        deposit_cap: Option<u64> // deposit no more than a certain amount
     }
 
     // an easily referenceable currency like USDC or USDT
@@ -95,7 +98,8 @@ module legato::marketplace {
             has_paused: false,
             user_balances: bag::new(ctx),
             markets: bag::new(ctx),
-            order_count: 0
+            order_count: 0,
+            deposit_cap: option::none<u64>(),
         };
 
         transfer::share_object(global)
@@ -114,6 +118,11 @@ module legato::marketplace {
             transfer::public_transfer(quote_token, tx_context::sender(ctx))
             else coin::destroy_zero(quote_token);
 
+        if (option::is_some(&global.deposit_cap)) {
+            assert!( *option::borrow(&global.deposit_cap) >= coin::value(&remaining_token), E_DEPOSIT_CAP);
+            *option::borrow_mut(&mut global.deposit_cap) = *option::borrow(&global.deposit_cap)-coin::value(&remaining_token);
+        };
+
         add_ask_order<X,Y>(global, remaining_token, ask_price, ctx);
     }
 
@@ -128,6 +137,10 @@ module legato::marketplace {
             transfer::public_transfer(base_token, tx_context::sender(ctx))
             else coin::destroy_zero(base_token);
 
+        if (option::is_some(&global.deposit_cap)) {
+            assert!( *option::borrow(&global.deposit_cap) >= coin::value(&remaining_token), E_DEPOSIT_CAP);
+            *option::borrow_mut(&mut global.deposit_cap) = *option::borrow(&global.deposit_cap)-coin::value(&remaining_token);
+        };
 
         add_bid_order<X,Y>(global, remaining_token, bid_price, ctx);
     }
@@ -298,6 +311,13 @@ module legato::marketplace {
 
     public entry fun unpause( global: &mut Marketplace, _manager_cap: &mut ManagerCap) {
         global.has_paused = false;
+    }
+
+    // set amount as zero to ignore
+    public entry fun set_deposit_cap(global: &mut Marketplace, _manager_cap: &mut ManagerCap, amount: u64) {
+        if (amount == 0)
+            global.deposit_cap = option::none<u64>()
+        else global.deposit_cap = option::some<u64>(amount);
     }
 
     // ======== Internal Functions =========
