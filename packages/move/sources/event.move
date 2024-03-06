@@ -10,6 +10,7 @@ module legato::event {
     friend legato::vault_lib;
     friend legato::marketplace;
     friend legato::lp_staking;
+    // friend legato::vusd;
 
     /// Liquidity pool added event.
     struct AddedEvent has copy, drop {
@@ -166,6 +167,41 @@ module legato::event {
         total_rewards_to_spend: u64,
         epoch: u64,
         sender: address
+    }
+
+    struct VUsdMint has copy, drop {
+        position_manager: ID,
+        input_token: String,
+        input_amount: u64,
+        neutralization_factor: u64,
+        hedging_amount: u64,
+        collateral_staked_sui_amount: u64,
+        epoch: u64,
+        sender: address
+    }
+
+    public(friend) fun vusd_mint_event(
+        position_manager: ID,
+        input_token: String,
+        input_amount: u64,
+        neutralization_factor: u64,
+        hedging_amount: u64,
+        collateral_staked_sui_amount: u64,
+        epoch: u64,
+        sender: address
+    ) {
+        emit(
+            VUsdMint {
+                position_manager,
+                input_token,
+                input_amount,
+                neutralization_factor,
+                hedging_amount,
+                collateral_staked_sui_amount,
+                epoch,
+                sender
+            }
+        )
     }
 
     public(friend) fun snapshot_event(

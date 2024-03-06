@@ -13,8 +13,8 @@ module legato::vault_utils {
         advance_epoch_with_reward_amounts
     };
 
-    // use legato::marketplace::{Self, Marketplace, ManagerCap };
-    // use legato::vusd::{Self, ReversePool};
+    use legato::marketplace::{Self, Marketplace };
+    // use legato::vusd::{Self, PositionManager};
     use legato::vault::{Self, ManagerCap, Global, YT_TOKEN}; 
     use legato::amm::{ Self, AMMGlobal };
     use legato::lp_staking::{Self, Staking};
@@ -107,34 +107,34 @@ module legato::vault_utils {
         test::end(scenario_val);
     }
 
-    // public fun setup_marketplace(test: &mut Scenario, admin_address: address) {
+    public fun setup_marketplace(test: &mut Scenario, admin_address: address) {
 
-    //     next_tx(test, admin_address);
-    //     {
-    //         marketplace::test_init(ctx(test));
-    //     };
+        next_tx(test, admin_address);
+        {
+            marketplace::test_init(ctx(test));
+        };
 
-    //     next_tx(test, admin_address);
-    //     {
-    //         let global = test::take_shared<Marketplace>(test);
-    //         let managercap = test::take_from_sender<ManagerCap>(test);
-    //         marketplace::setup_quote<USDC>(&mut global, &mut managercap,  ctx(test));
-    //         test::return_shared(global);
-    //         test::return_to_sender(test, managercap);
-    //     };
+        next_tx(test, admin_address);
+        {
+            let global = test::take_shared<Marketplace>(test);
+            let managercap = test::take_from_sender<marketplace::ManagerCap>(test);
+            marketplace::setup_quote<USDC>(&mut global, &mut managercap,  ctx(test));
+            test::return_shared(global);
+            test::return_to_sender(test, managercap);
+        };
 
-    //     // listing SUI for USDC
-    //     next_tx(test, admin_address);
-    //     {
-    //         let global = test::take_shared<Marketplace>(test); 
-    //         marketplace::sell_and_listing<SUI, USDC>(&mut global,  coin::mint_for_testing<SUI>( 300 * MIST_PER_SUI, ctx(test)), 500_000_000 , ctx(test));
-    //         marketplace::sell_and_listing<SUI, USDC>(&mut global, coin::mint_for_testing<SUI>( 200 * MIST_PER_SUI, ctx(test)), 550_000_000 , ctx(test));
-    //         marketplace::sell_and_listing<SUI, USDC>(&mut global, coin::mint_for_testing<SUI>( 100 * MIST_PER_SUI, ctx(test)), 600_000_000 , ctx(test));
-    //         marketplace::sell_and_listing<SUI, USDC>(&mut global,coin::mint_for_testing<SUI>( 50 * MIST_PER_SUI, ctx(test)), 650_000_000 , ctx(test));
-    //         test::return_shared(global);
-    //     };
+        // listing SUI for USDC
+        next_tx(test, admin_address);
+        {
+            let global = test::take_shared<Marketplace>(test); 
+            marketplace::sell_and_listing<SUI, USDC>(&mut global,  coin::mint_for_testing<SUI>( 300 * MIST_PER_SUI, ctx(test)), 500_000_000 , ctx(test));
+            marketplace::sell_and_listing<SUI, USDC>(&mut global, coin::mint_for_testing<SUI>( 200 * MIST_PER_SUI, ctx(test)), 550_000_000 , ctx(test));
+            marketplace::sell_and_listing<SUI, USDC>(&mut global, coin::mint_for_testing<SUI>( 100 * MIST_PER_SUI, ctx(test)), 600_000_000 , ctx(test));
+            marketplace::sell_and_listing<SUI, USDC>(&mut global,coin::mint_for_testing<SUI>( 50 * MIST_PER_SUI, ctx(test)), 650_000_000 , ctx(test));
+            test::return_shared(global);
+        };
 
-    // }
+    }
 
     // public fun setup_vusd(test: &mut Scenario, admin_address: address) {
     //     next_tx(test, admin_address);
@@ -145,7 +145,7 @@ module legato::vault_utils {
     //     next_tx(test, admin_address);
     //     { 
     //         let system_state = test::take_shared<SuiSystemState>(test);
-    //         let global = test::take_shared<ReversePool>(test);
+    //         let global = test::take_shared<PositionManager>(test);
     //         let managercap = test::take_from_sender<vusd::ManagerCap>(test);
 
     //         let pool_id_1 = validator_staking_pool_id(&mut system_state,  VALIDATOR_ADDR_1);
