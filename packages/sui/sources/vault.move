@@ -24,7 +24,7 @@ module legato::vault {
     use sui_system::sui_system::{ Self, SuiSystemState };
 
     use legato::vault_lib::{token_to_name, calculate_pt_debt_from_epoch, sort_items};
-    use legato::event::{new_vault_event, mint_event, redeem_event, rebalance_event, exit_event};
+    use legato::event::{new_vault_event, mint_event, redeem_event, rebalance_event, exit_event, migrate_event};
     use legato::apy_reader::{Self};
     use legato::amm::{ Self, AMMGlobal };
     
@@ -39,6 +39,7 @@ module legato::vault {
     const MIN_PT_TO_REDEEM: u64 = 1_000_000_000; // 1 PT
     const MIN_PT_REBALANCE: u64 = 1_000;
     const MIN_YT_FOR_EXIT: u64 = 1_000_000; // 0.001 YT
+    const MIN_PT_TO_MIGRATE : u64 = 1_000_000_000; // 1 PT
 
 
     // ======== Errors ========
@@ -302,6 +303,42 @@ module legato::vault {
         );
     }
 
+    // burn PT tokens from the expired vault and mint PT on the new vault
+    public entry fun migrate<X,Y>(global: &mut Global, pt: Coin<PT_TOKEN<X>>, ctx: &mut TxContext) {
+        check_vault_order<X,Y>(global);
+        assert!(coin::value<PT_TOKEN<X>>(&pt) >= MIN_PT_TO_MIGRATE, E_MIN_THRESHOLD);
+
+        // PT burning in the 1st reserve
+        let (from_started_epoch, from_ended_epoch) = get_vault_epochs<X>(&global.pools);
+        assert!(tx_context::epoch(ctx) >= from_started_epoch, E_VAULT_NOT_STARTED); 
+        let from_vault_reserve = get_vault_reserve<X>(&mut global.pool_reserves);
+        let amount_to_migrate = coin::value(&pt);
+        balance::decrease_supply(&mut from_vault_reserve.pt_supply, coin::into_balance(pt));
+
+        // minting PT on the 2nd reserve
+        let to_vault_config = get_vault_config<Y>(&mut global.pools);
+        let to_vault_reserve = get_vault_reserve<Y>(&mut global.pool_reserves);
+        assert!(to_vault_config.maturity_epoch-COOLDOWN_EPOCH > tx_context::epoch(ctx), E_VAULT_MATURED);
+        assert!(tx_context::epoch(ctx) >= to_vault_config.started_epoch, E_VAULT_NOT_STARTED);
+
+        // Calculate extra PT to send out
+        let debt_amount = calculate_pt_debt_from_epoch(to_vault_config.vault_apy, from_ended_epoch, to_vault_config.maturity_epoch, amount_to_migrate);
+        let minted_pt_amount = amount_to_migrate+debt_amount;
+        to_vault_config.debt_balance = to_vault_config.debt_balance+debt_amount;
+
+        mint_pt<Y>(to_vault_reserve, minted_pt_amount, ctx);
+
+        // emit event
+        migrate_event(
+            token_to_name<X>(),
+            amount_to_migrate,
+            token_to_name<Y>(),
+            minted_pt_amount,
+            tx_context::sender(ctx),
+            tx_context::epoch(ctx)
+        );
+    }
+
     public fun get_vault_config<P>(table: &mut Table<String, PoolConfig>): &mut PoolConfig  {
         let vault_name = token_to_name<P>();
         let has_registered = table::contains(table, vault_name);
@@ -539,6 +576,16 @@ module legato::vault {
         let ref_pool_name = *vector::borrow( &global.pool_list, total-2);
         let ref_pool_config = table::borrow(&global.pools, ref_pool_name);
         assert!((ref_pool_config.maturity_epoch >= current_epoch) , E_PAUSED_STATE);
+    }
+
+    fun check_vault_order<X,Y>(global: &Global) {
+        let from_pool_name = token_to_name<X>();
+        let to_pool_name = token_to_name<Y>();
+        let (from_contained, from_id) = vector::index_of<String>(&global.pool_list, &from_pool_name);
+        assert!(from_contained,E_NOT_REGISTERED);
+        let (to_contained, to_id) = vector::index_of<String>(&global.pool_list, &to_pool_name);
+        assert!(to_contained,E_NOT_REGISTERED);
+        assert!( to_id > from_id ,E_VAULT_NOT_ORDER);
     }
 
     // initiates withdrawal by unstaking locked Staked SUI and retaining SUI tokens in the pool
