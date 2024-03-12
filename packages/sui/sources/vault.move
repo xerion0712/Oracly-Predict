@@ -24,7 +24,7 @@ module legato::vault {
     use sui_system::sui_system::{ Self, SuiSystemState };
 
     use legato::vault_lib::{token_to_name, calculate_pt_debt_from_epoch, sort_items};
-    use legato::event::{new_vault_event, mint_event, redeem_event, rebalance_event};
+    use legato::event::{new_vault_event, mint_event, redeem_event, rebalance_event, exit_event};
     use legato::apy_reader::{Self};
     use legato::amm::{ Self, AMMGlobal };
     
@@ -38,6 +38,7 @@ module legato::vault {
     const U64_MAX: u64 = 18446744073709551615;
     const MIN_PT_TO_REDEEM: u64 = 1_000_000_000; // 1 PT
     const MIN_PT_REBALANCE: u64 = 1_000;
+    const MIN_YT_FOR_EXIT: u64 = 1_000_000; // 0.001 YT
 
 
     // ======== Errors ========
@@ -66,6 +67,7 @@ module legato::vault {
     const E_ONLY_LIQUIDITY_ALLOWED: u64 = 23;
     const E_INVALID_LIQUIDITY: u64 = 24;
     const E_TOO_LOW: u64 = 25;
+    const E_RATE_NOT_SET: u64 = 26;
 
     // ======== Structs =========
 
@@ -82,6 +84,7 @@ module legato::vault {
         vault_apy: u64,
         deposit_items: vector<StakedSui>,
         debt_balance: u64,
+        exit_conversion_rate: Option<u64>, // rates for USDC/PT for the exit
         enable_mint: bool,
         enable_exit: bool,
         enable_redeem: bool
@@ -229,6 +232,76 @@ module legato::vault {
         );
     }
 
+    // exit the position before the vault matures by using the combination of PT and VT to unlock Staked SUI objects (disabled by default)
+    public entry fun exit<P, T>(wrapper: &mut SuiSystemState, global: &mut Global, amm_global: &mut AMMGlobal, deposit_id: u64, pt: Coin<PT_TOKEN<P>>,yt: Coin<VAULT>, ctx: &mut TxContext) {
+        let vault_config = get_vault_config<P>(&mut global.pools);
+        let vault_reserve = get_vault_reserve<P>(&mut global.pool_reserves);
+
+        assert!(vault_config.enable_exit == true, E_EXIT_DISABLED);
+        assert!(vault_config.maturity_epoch-COOLDOWN_EPOCH > tx_context::epoch(ctx), E_VAULT_MATURED);
+        assert!( vector::length( &vault_config.deposit_items ) > deposit_id, E_INVALID_DEPOSIT_ID );
+        assert!( option::is_some( &vault_config.exit_conversion_rate ), E_RATE_NOT_SET );
+
+        let token_name = token_to_name<T>();
+        assert!( table::contains(&global.yt_in_circulation, token_name), E_INVALID_LIQUIDITY);
+
+        let staked_sui = vector::swap_remove(&mut vault_config.deposit_items, deposit_id);
+        let asset_object_id = object::id(&staked_sui);
+
+        // PT needed calculates from the principal + accumurated rewards
+        let needed_pt_amount = staking_pool::staked_sui_amount(&staked_sui)+apy_reader::earnings_from_staked_sui(wrapper, &staked_sui, tx_context::epoch(ctx));
+
+        // YT covers of the remaining debt until the vault matures
+        let pt_outstanding_debts = calculate_pt_debt_from_epoch(vault_config.vault_apy, tx_context::epoch(ctx), vault_config.maturity_epoch, needed_pt_amount);
+
+        // converts to USDC equivalent
+        let pt_outstanding_debts_in_usdc = mul_div( pt_outstanding_debts, *option::borrow(&vault_config.exit_conversion_rate), 1_000_000_000 );
+
+        let amm_pool = amm::get_mut_pool<VAULT, T>(amm_global, true);
+        let (reserve_1, reserve_2, _) = amm::get_reserves_size<VAULT, T>(amm_pool);
+        let needed_yt_amount = amm::get_amount_out(
+                pt_outstanding_debts_in_usdc,
+                reserve_1,
+                reserve_2
+        );
+        if (MIN_YT_FOR_EXIT > needed_yt_amount) needed_yt_amount = MIN_YT_FOR_EXIT;
+
+        let input_pt_amount = coin::value<PT_TOKEN<P>>(&pt);
+        let input_yt_amount = coin::value<VAULT>(&yt);
+
+        assert!( input_pt_amount >= needed_pt_amount , E_INSUFFICIENT_AMOUNT);
+        assert!( input_yt_amount >= needed_yt_amount , E_INSUFFICIENT_AMOUNT);
+
+        // burn PT
+        if (input_pt_amount == needed_pt_amount) {
+            balance::decrease_supply(&mut vault_reserve.pt_supply, coin::into_balance(pt));
+        } else {
+            balance::decrease_supply(&mut vault_reserve.pt_supply, coin::into_balance(coin::split(&mut pt, needed_pt_amount, ctx)));
+            transfer::public_transfer(pt, tx_context::sender(ctx));
+        };
+
+        // burn YT
+        if (input_yt_amount == needed_yt_amount) {
+            balance::decrease_supply(&mut global.yt_supply, coin::into_balance(yt));
+        } else {
+            balance::decrease_supply(&mut global.yt_supply, coin::into_balance( coin::split(&mut yt, needed_yt_amount, ctx) ));
+            transfer::public_transfer(yt, tx_context::sender(ctx));
+        };
+
+        // send out Staked SUI
+        transfer::public_transfer(staked_sui, tx_context::sender(ctx)); 
+
+        exit_event(
+            token_to_name<P>(),
+            deposit_id,
+            asset_object_id,
+            needed_pt_amount,
+            needed_yt_amount,
+            tx_context::sender(ctx),
+            tx_context::epoch(ctx)
+        );
+    }
+
     public fun get_vault_config<P>(table: &mut Table<String, PoolConfig>): &mut PoolConfig  {
         let vault_name = token_to_name<P>();
         let has_registered = table::contains(table, vault_name);
@@ -279,6 +352,7 @@ module legato::vault {
             vault_apy: initial_apy, 
             deposit_items: vector::empty<StakedSui>(),
             debt_balance: 0,
+            exit_conversion_rate: option::none<u64>(),
             enable_exit : false,
             enable_mint: true,
             enable_redeem: true
@@ -423,6 +497,14 @@ module legato::vault {
     public entry fun update_vault_apy<P>(global: &mut Global, _manager_cap: &mut ManagerCap, value: u64) {
         let vault_config = get_vault_config<P>( &mut global.pools);
         vault_config.vault_apy = value;
+    }
+
+    // set exit conversion rate for the given vault
+    public entry fun set_exit_conversion_rate<P>(global: &mut Global, _manager_cap: &mut ManagerCap, conversion_rate: u64) {
+        let vault_config = get_vault_config<P>( &mut global.pools);
+        if (conversion_rate == 0)
+            vault_config.exit_conversion_rate = option::none<u64>()
+        else vault_config.exit_conversion_rate = option::some<u64>(conversion_rate);
     }
 
     // top-up redeem pool

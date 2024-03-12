@@ -16,7 +16,7 @@ module legato::vault_utils {
     };
 
     use legato::marketplace::{Self, Marketplace }; 
-    use legato::vault::{Self, ManagerCap, Global, VAULT };
+    use legato::vault::{Self, ManagerCap, Global, VAULT, PT_TOKEN };
     use legato::vault_template::{JAN_2024, FEB_2024, MAR_2024};
     use legato::amm::{Self, AMMGlobal};
 
@@ -259,7 +259,24 @@ module legato::vault_utils {
         let usdc_token = test::take_from_sender<Coin<USDC>>(test); 
         // assert!( coin::value(&usdc_token) == 104_120_399, 1234);
         test::return_to_sender(test, usdc_token);
-        
+    }
+
+    public fun vault_exit<P>(test: &mut Scenario, staker_address: address) {
+        next_tx(test, staker_address);
+        {
+            let system_state = test::take_shared<SuiSystemState>(test);
+            let global = test::take_shared<Global>(test);
+            let amm_global = test::take_shared<AMMGlobal>(test);
+
+            let pt_token = test::take_from_sender<Coin<PT_TOKEN<P>>>(test);
+            let yt_token = test::take_from_sender<Coin<VAULT>>(test);
+
+            vault::exit<P, USDC>( &mut system_state, &mut global, &mut amm_global, 0, pt_token, yt_token, ctx(test) );
+
+            test::return_shared(global);
+            test::return_shared(amm_global);
+            test::return_shared(system_state);  
+        };
     }
 
 
