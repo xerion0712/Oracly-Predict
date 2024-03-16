@@ -69,6 +69,7 @@ module legato::vault {
     const E_INVALID_LIQUIDITY: u64 = 24;
     const E_TOO_LOW: u64 = 25;
     const E_RATE_NOT_SET: u64 = 26;
+    const E_MINT_PT_ERROR: u64 = 27;
 
     // ======== Structs =========
 
@@ -188,6 +189,9 @@ module legato::vault {
         let debt_amount = calculate_pt_debt_from_epoch(vault_config.vault_apy, tx_context::epoch(ctx), vault_config.maturity_epoch, principal_amount+total_earnings);
         let minted_pt_amount = principal_amount+total_earnings+debt_amount;
         
+        // sanity check
+        assert!(minted_pt_amount >= MIN_SUI_TO_STAKE, E_MINT_PT_ERROR);
+
         // Mint PT to the user
         mint_pt<P>(vault_reserve, minted_pt_amount, ctx);
 
@@ -258,7 +262,9 @@ module legato::vault {
         // converts to USDC equivalent
         let pt_outstanding_debts_in_usdc = mul_div( pt_outstanding_debts, *option::borrow(&vault_config.exit_conversion_rate), 1_000_000_000 );
 
-        let amm_pool = amm::get_mut_pool<VAULT, T>(amm_global, true);
+        let is_order = amm::is_order<VAULT, T>();
+
+        let amm_pool = amm::get_mut_pool<VAULT, T>(amm_global, is_order);
         let (reserve_1, reserve_2, _) = amm::get_reserves_size<VAULT, T>(amm_pool);
         let needed_yt_amount = amm::get_amount_out(
                 pt_outstanding_debts_in_usdc,
@@ -433,7 +439,14 @@ module legato::vault {
         // mint YT
         let minted_balance = balance::increase_supply<VAULT>(&mut global.yt_supply, mint_amount);
 
-        amm::add_liquidity<VAULT, P>( amm_global, coin::from_balance(minted_balance, ctx) , 1, liquidity_coin, 1, ctx );
+        let is_order = amm::is_order<VAULT, P>();
+
+        if (is_order) {
+            amm::add_liquidity<VAULT, P>( amm_global, coin::from_balance(minted_balance, ctx) , 1, liquidity_coin, 1, ctx );
+        } else {
+            amm::add_liquidity<P, VAULT>( amm_global, liquidity_coin, 1, coin::from_balance(minted_balance, ctx) , 1, ctx );
+        };
+
     }
 
     // rebalance YT tokens
