@@ -1,0 +1,36 @@
+{
+    "name": "legato-api",
+    "dependencies": {
+        "@pulumi/pulumi": "^3.0.0",
+        "@pulumi/aws": "^6.0.0",
+        "@pulumi/awsx": "^2.0.2",
+        "@mysten/bcs": "^0.8.1",
+        "@mysten/sui.js": "^0.47.0",
+        "bignumber.js": "^9.1.2",
+        "dotenv": "^16.0.3"
+    },
+    "devDependencies": {
+        "@faker-js/faker": "^8.0.1",
+        "chai": "^4.3.7",
+        "mocha": "^10.2.0"
+    },
+    "license": "MIT",
+    "main": "lib/index.js",
+    "directories": {
+        "lib": "lib",
+        "test": "test"
+    },
+    "files": [
+        "lib"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/pisuthd/legato-finance.git"
+    },
+    "scripts": {
+        "test": "mocha --timeout 120000 --reporter spec test/*.js"
+    },
+    "bugs": {
+        "url": "https://github.com/pisuthd/legato-finance/issues"
+    }
+}
