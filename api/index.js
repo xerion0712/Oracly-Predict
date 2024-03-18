@@ -6,7 +6,7 @@ const aws = require("@pulumi/aws");
 const awsx = require("@pulumi/awsx");
 
 const { getPriceById } = require("./routes")
-const { getTokenPrices } = require("./lib/index.js")
+const { getTokenPrices, getVaultTokenPrices } = require("./lib/index.js")
 
 // Assets table
 const legatoTable = new aws.dynamodb.Table(
@@ -44,9 +44,69 @@ const endpoint = new awsx.classic.apigateway.API(`legato-api`, {
 const tokensBot = async (event) => {
 
     const tableName = legatoTable.name.get()
-    const client = new AWS.DynamoDB.DocumentClient() 
+    const client = new AWS.DynamoDB.DocumentClient()
 
     const tokens = await getTokenPrices()
+
+    for (let token of tokens) {
+
+        const { coinId, price } = token
+
+        const params = {
+            TableName: tableName,
+            Key: {
+                "key": "token",
+                "value": coinId
+            }
+        };
+
+        let { Item } = await client.get(params).promise()
+        if (!Item) {
+
+            let prices = {}
+            let currentDate = new Date()
+
+            currentDate.setUTCHours(0)
+            currentDate.setUTCMinutes(0)
+            currentDate.setUTCSeconds(0)
+            currentDate.setUTCMilliseconds(0)
+
+            prices[currentDate.valueOf()] = price
+
+            const NewItem = {
+                key: "token",
+                value: coinId,
+                prices
+            }
+            console.log("Saving New Item : ", NewItem)
+            await client.put({ TableName: tableName, Item: NewItem }).promise();
+        } else {
+
+            let currentDate = new Date()
+
+            currentDate.setUTCHours(0)
+            currentDate.setUTCMinutes(0)
+            currentDate.setUTCSeconds(0)
+            currentDate.setUTCMilliseconds(0)
+
+            Item.prices[currentDate.valueOf()] = price
+
+            console.log("Saving Existing Item : ", Item)
+            await client.put({ TableName: tableName, Item: Item }).promise();
+        }
+
+    }
+
+}
+
+
+// vault token prices bot
+const vaultTokensBot = async (event) => {
+
+    const tableName = legatoTable.name.get()
+    const client = new AWS.DynamoDB.DocumentClient()
+
+    const tokens = await getVaultTokenPrices("testnet")
 
     for (let token of tokens) {
 
@@ -104,5 +164,12 @@ const tokensBotScheduler = new aws.cloudwatch.onSchedule(
     "rate(12 hours)",
     tokensBot,
 );
+
+const vaultTokensBotScheduler = new aws.cloudwatch.onSchedule(
+    "vaultTokensBotScheduler",
+    "rate(12 hours)",
+    vaultTokensBot,
+);
+
 
 exports.endpoint = endpoint.url

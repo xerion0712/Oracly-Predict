@@ -1,14 +1,11 @@
 const chai = require('chai')
-const { getTokenPrices } = require("../lib")
+const { getVaultTokenPrices, getTokenPrices } = require("../lib")
 
 const { expect } = chai
 
 describe('#lib', function () {
 
 
-    // before(function () {
-    //     lib = new Lib()
-    // })
 
     it('should get all token prices from CoinGecko success ', async () => {
 
@@ -16,6 +13,13 @@ describe('#lib', function () {
 
         expect(prices.length).to.equal(1)
         expect(prices[0].price > 0.1).to.true
+    })
+
+    it('should get vault token prices from AMM success ', async () => {
+
+        const prices = await getVaultTokenPrices() 
+        expect(prices.length).to.equal(3)
+        expect(prices[0].price > 0.01).to.true
     })
 
     // it('test dates', async () => {

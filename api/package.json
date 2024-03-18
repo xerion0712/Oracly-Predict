@@ -10,7 +10,10 @@
         "aws-sdk": "^2.1579.0",
         "axios": "^1.6.8",
         "bignumber.js": "^9.1.2",
-        "dotenv": "^16.0.3"
+        "dotenv": "^16.0.3",
+        "node-fetch": "1.7.3",
+        "whatwg-fetch": "^3.6.20",
+        "xhr2": "^0.2.1"
     },
     "devDependencies": {
         "@faker-js/faker": "^8.0.1",

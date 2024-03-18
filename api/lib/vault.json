@@ -9,7 +9,7 @@
         "packageId": "0x61bc3f475d97acf87194fbef1241737af5e8d34e73e5a75fe040fb5dcdc78421",
         "managercapVault": "0x8a6fd79758b4210f20e5e17444151b27e32d53a08e91e8c56f0ec64a52c01a72",
         "managercapMarketplace": "0x12eb5cf9b3349b55d2372639e0c1d4c9a5057bc5688bf519f80bd70d3193579b",
-        "vaultType": "0x61bc3f475d97acf87194fbef1241737af5e8d34e73e5a75fe040fb5dcdc78421::vault_template::APR_2024",
+        "vaultType": "0x61bc3f475d97acf87194fbef1241737af5e8d34e73e5a75fe040fb5dcdc78421::vault::VAULT",
         "vaultGlobal": "0x8f7c29f55aec81374920a470ec8544f38134a4917ac4d01c66f02bc801c5f75f",
         "suiSystemStateId": "0x0000000000000000000000000000000000000000000000000000000000000005",
         "ammGlobal": "0x75b41ba12f51e1b568d0ee536a1f31beb608687424fe2daf497ebb3fc176b0b5",
