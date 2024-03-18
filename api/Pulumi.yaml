@@ -1,0 +1,6 @@
+name: legato-api
+runtime:
+  name: nodejs
+  options:
+    typescript: false
+description: A minimal AWS JavaScript Pulumi program
