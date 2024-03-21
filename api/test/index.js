@@ -17,9 +17,16 @@ describe('#lib', function () {
 
     it('should get vault token prices from AMM success ', async () => {
 
-        const prices = await getVaultTokenPrices() 
+        let prices = await getVaultTokenPrices("testnet") 
+
         expect(prices.length).to.equal(3)
         expect(prices[0].price > 0.01).to.true
+
+        prices = await getVaultTokenPrices("mainnet") 
+
+        expect(prices.length).to.equal(3)
+        expect(prices[0].price > 0.01).to.true
+
     })
 
     // it('test dates', async () => {

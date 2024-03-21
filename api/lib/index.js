@@ -4,7 +4,7 @@ const axios = require('axios')
 const TOKENS = [
     {
         "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
-        "coinId" : "sui"
+        "coinId": "sui"
     }
 ]
 const VAULTS = [
@@ -22,6 +22,16 @@ const VAULTS = [
         "network": "testnet",
         "vaultType": "0x61bc3f475d97acf87194fbef1241737af5e8d34e73e5a75fe040fb5dcdc78421::vault_template::JUN_2024",
         "ammGlobal": "0x75b41ba12f51e1b568d0ee536a1f31beb608687424fe2daf497ebb3fc176b0b5"
+    },
+    {
+        "network": "mainnet",
+        "vaultType": "0x5cf159eededc6f5094ff5f0efe01a4cfa5b6b56a814927f87f2f825f5c3b16df::vault::VAULT",
+        "ammGlobal": "0x0ee9bac5522ed149d2b1af16efdd1174cd8c3b5c46b6397587424145e3956a2f"
+    },
+    {
+        "network": "mainnet",
+        "vaultType": "0x5cf159eededc6f5094ff5f0efe01a4cfa5b6b56a814927f87f2f825f5c3b16df::vault_template::APR_2024",
+        "ammGlobal": "0x0ee9bac5522ed149d2b1af16efdd1174cd8c3b5c46b6397587424145e3956a2f"
     }
 ]
 
@@ -90,7 +100,9 @@ const getVaultTokenPrices = async (network = "testnet") => {
 
         let price
 
-        if (pool_name[1].includes("usdc")) {
+        const usdcSymbol = network === "testnet" ? "usdc" : "coin"
+
+        if (pool_name[1].includes(usdcSymbol)) {
             // x is usdc
             const coin_x_amount = BigNumber(result.data.content.fields.value.fields.coin_x).dividedBy(10 ** 6)
             const coin_y_amount = BigNumber(result.data.content.fields.value.fields.coin_y).dividedBy(10 ** 9)

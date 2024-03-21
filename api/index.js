@@ -106,18 +106,18 @@ const vaultTokensBot = async (event) => {
     const tableName = legatoTable.name.get()
     const client = new AWS.DynamoDB.DocumentClient()
 
-    const tokens = await getVaultTokenPrices("testnet")
+    const tokens = (await getVaultTokenPrices("testnet")).concat(await getVaultTokenPrices("mainnet"))
 
     for (let token of tokens) {
 
         const { coinId, price } = token
 
         const params = {
-            TableName: tableName,
+            TableName: tableName,                                       
             Key: {
                 "key": "token",
-                "value": coinId
-            }
+                "value": coinId                                                                         
+            }               
         };
 
         let { Item } = await client.get(params).promise()
@@ -127,7 +127,7 @@ const vaultTokensBot = async (event) => {
             let currentDate = new Date()
 
             currentDate.setUTCHours(0)
-            currentDate.setUTCMinutes(0)
+            currentDate.setUTCMinutes(0)                    
             currentDate.setUTCSeconds(0)
             currentDate.setUTCMilliseconds(0)
 
