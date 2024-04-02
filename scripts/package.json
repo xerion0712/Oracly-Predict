@@ -30,7 +30,8 @@
   },
   "scripts": {
     "test": "mocha --timeout 120000 --reporter spec test/*.js",
-    "dump-validator-data" : "node ./lib/printout_validator.js"
+    "dump-validator-data" : "node ./lib/printout_validator.js",
+    "upload-validator-data" : "node ./lib/upload_validator.js"
   },
   "bugs": {
     "url": "https://github.com/pisuthd/legato-finance/issues"

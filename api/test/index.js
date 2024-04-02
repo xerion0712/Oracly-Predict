@@ -22,7 +22,6 @@ describe('#lib', function () {
 
     })
 
-    
 
     // it('test dates', async () => {
 
