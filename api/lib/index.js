@@ -167,14 +167,6 @@ const getTokenPrices = async () => {
     return output
 }
 
-const fetchAllValidators = async () => {
-
-    
-
-}
-
 exports.getVaultTokenPrices = getVaultTokenPrices
 
 exports.getTokenPrices = getTokenPrices
-
-exports.fetchAllValidators = fetchAllValidators

@@ -29,7 +29,8 @@
     "url": "git+https://github.com/pisuthd/legato-finance.git"
   },
   "scripts": {
-    "test": "mocha --timeout 120000 --reporter spec test/*.js"
+    "test": "mocha --timeout 120000 --reporter spec test/*.js",
+    "dump-validator-data" : "node ./lib/printout_validator.js"
   },
   "bugs": {
     "url": "https://github.com/pisuthd/legato-finance/issues"

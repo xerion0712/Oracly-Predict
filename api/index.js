@@ -28,6 +28,25 @@ const legatoTable = new aws.dynamodb.Table(
     }
 )
 
+const legatoSuiValidatorTable = new aws.dynamodb.Table(
+    "legatoSuiValidatorTable",
+    {
+        attributes: [
+            {
+                name: "validator_address",
+                type: "S"
+            },
+            {
+                name: "epoch",
+                type: "N"
+            }
+        ],
+        hashKey: "validator_address",
+        rangeKey: "epoch",
+        billingMode: "PAY_PER_REQUEST"
+    }
+)
+
 // API endpoints
 const endpoint = new awsx.classic.apigateway.API(`legato-api`, {
     routes: [
