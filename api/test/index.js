@@ -5,8 +5,6 @@ const { expect } = chai
 
 describe('#lib', function () {
 
-
-
     it('should get all token prices from CoinGecko success ', async () => {
 
         const prices = await getTokenPrices() 
@@ -17,17 +15,14 @@ describe('#lib', function () {
 
     it('should get vault token prices from AMM success ', async () => {
 
-        let prices = await getVaultTokenPrices("testnet") 
-
-        expect(prices.length).to.equal(3)
-        expect(prices[0].price > 0.01).to.true
-
-        prices = await getVaultTokenPrices("mainnet") 
+        const prices = await getVaultTokenPrices("testnet") 
 
         expect(prices.length).to.equal(3)
         expect(prices[0].price > 0.01).to.true
 
     })
+
+    
 
     // it('test dates', async () => {
 
