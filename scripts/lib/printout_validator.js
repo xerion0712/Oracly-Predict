@@ -36,7 +36,7 @@ async function printValidatorData() {
     }
 
     try {
-        fs.writeFileSync(`validator-data-${(new Date()).valueOf()}`, JSON.stringify(items.map((item) => ({ ...item.parsedJson, epoch : Number(item.parsedJson.epoch) }))));
+        fs.writeFileSync(`validator-data-${(new Date()).valueOf()}.json`, JSON.stringify(items.map((item) => ({ ...item.parsedJson, epoch : Number(item.parsedJson.epoch) }))));
     } catch (err) {
         console.log(err);
     }
