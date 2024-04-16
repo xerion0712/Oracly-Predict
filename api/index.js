@@ -28,6 +28,44 @@ const legatoTable = new aws.dynamodb.Table(
     }
 )
 
+const legatoSuiValidatorTable = new aws.dynamodb.Table(
+    "legatoSuiValidatorTable",
+    {
+        attributes: [
+            {
+                name: "validator_address",
+                type: "S"
+            },
+            {
+                name: "epoch",
+                type: "N"
+            }
+        ],
+        hashKey: "validator_address",
+        rangeKey: "epoch",
+        billingMode: "PAY_PER_REQUEST"
+    }
+)
+
+const legatoUnstakeTable = new aws.dynamodb.Table(
+    "legatoUnstakeTable",
+    {
+        attributes: [
+            {
+                name: "stake_epoch",
+                type: "N"
+            },
+            {
+                name: "object_id",
+                type: "S"
+            }
+        ],
+        hashKey: "stake_epoch",
+        rangeKey: "object_id",
+        billingMode: "PAY_PER_REQUEST"
+    }
+)
+
 // API endpoints
 const endpoint = new awsx.classic.apigateway.API(`legato-api`, {
     routes: [
@@ -113,11 +151,11 @@ const vaultTokensBot = async (event) => {
         const { coinId, price } = token
 
         const params = {
-            TableName: tableName,                                       
+            TableName: tableName,
             Key: {
                 "key": "token",
-                "value": coinId                                                                         
-            }               
+                "value": coinId
+            }
         };
 
         let { Item } = await client.get(params).promise()
@@ -127,7 +165,7 @@ const vaultTokensBot = async (event) => {
             let currentDate = new Date()
 
             currentDate.setUTCHours(0)
-            currentDate.setUTCMinutes(0)                    
+            currentDate.setUTCMinutes(0)
             currentDate.setUTCSeconds(0)
             currentDate.setUTCMilliseconds(0)
 

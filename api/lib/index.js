@@ -32,12 +32,15 @@ const VAULTS = [
         "network": "mainnet",
         "vaultType": "0x5cf159eededc6f5094ff5f0efe01a4cfa5b6b56a814927f87f2f825f5c3b16df::vault_template::APR_2024",
         "ammGlobal": "0x0ee9bac5522ed149d2b1af16efdd1174cd8c3b5c46b6397587424145e3956a2f"
+    },
+    {
+        "network": "mainnet",
+        "vaultType": "0x5cf159eededc6f5094ff5f0efe01a4cfa5b6b56a814927f87f2f825f5c3b16df::vault_template::JUL_2024",
+        "ammGlobal": "0x0ee9bac5522ed149d2b1af16efdd1174cd8c3b5c46b6397587424145e3956a2f"
     }
 ]
 
 const BigNumber = require("bignumber.js")
-
-
 
 const getVaultTokenPrices = async (network = "testnet") => {
 

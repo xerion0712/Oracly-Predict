@@ -2,9 +2,6 @@
 const { SuiClient, getFullnodeUrl } = require("@mysten/sui.js/client")
 const BigNumber = require("bignumber.js")
 
-// const { bcs } = require('@mysten/sui.js/bcs')
-// const { bcs, fromB58, fromB64, fromHex } = require('@mysten/bcs')
-
 class ApyReader {
 
   client

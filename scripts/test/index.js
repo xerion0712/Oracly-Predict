@@ -30,7 +30,6 @@ describe('#calculate apy script', function () {
             const { rates } = validator
             const apy = await reader.calculateApy(rates)
 
-            // console.log("apy output : ", apy)
             expect(0.1 > apy).to.true
         }
 

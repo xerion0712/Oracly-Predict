@@ -17,7 +17,8 @@
     "@mysten/bcs": "^0.8.1",
     "@mysten/sui.js": "^0.47.0",
     "bignumber.js": "^9.1.2",
-    "dotenv": "^16.0.3"
+    "dotenv": "^16.0.3",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@faker-js/faker": "^8.0.1",
@@ -29,7 +30,11 @@
     "url": "git+https://github.com/pisuthd/legato-finance.git"
   },
   "scripts": {
-    "test": "mocha --timeout 120000 --reporter spec test/*.js"
+    "test": "mocha --timeout 120000 --reporter spec test/*.js",
+    "dump-validator-data": "node ./lib/printout_validator.js",
+    "dump-unstake-data": "node ./lib/printout_unstake.js",
+    "dump-apy-data": "node ./lib/read_apy.js",
+    "upload-validator-data": "node ./lib/upload_validator.js"
   },
   "bugs": {
     "url": "https://github.com/pisuthd/legato-finance/issues"
