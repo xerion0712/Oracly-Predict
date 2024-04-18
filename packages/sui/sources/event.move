@@ -6,8 +6,7 @@ module legato::event {
     use sui::object::ID;
     
     friend legato::amm;
-    friend legato::vault;
-    friend legato::marketplace;
+    friend legato::vault; 
 
     /// Liquidity pool added event.
     struct AddedEvent has copy, drop {
@@ -90,39 +89,6 @@ module legato::event {
         epoch: u64
     }
 
-    struct RemoveOrderEvent has copy, drop {
-        marketplace: ID,
-        order_id: u64,
-        owner: address
-    }
-
-    struct UpdateOrderEvent has copy, drop {
-        marketplace: ID,
-        order_id: u64,
-        updated_price: u64,
-        owner: address
-    }
-
-    struct TradeEvent has copy, drop {
-        marketplace: ID,
-        from_token: String,
-        to_token: String,
-        input_amount: u64,
-        output_amount: u64,
-        sender: address
-    }
-
-    struct NewOrderEvent has copy, drop {
-        marketplace: ID,
-        order_id: u64,
-        is_bid: bool,
-        base_token: String,
-        quote_token: String,
-        amount: u64,
-        unit_price: u64, // per 1 unit
-        owner: address
-    }
-
     struct Rebalance has copy, drop {
         vault_name: String,
         minted_pt: u64,
@@ -145,81 +111,6 @@ module legato::event {
                 liquidity_amount,
                 conversion_rate,
                 epoch
-            }
-        )
-    }
-
-
-    public(friend) fun new_order_event(
-        marketplace: ID,
-        order_id: u64,
-        is_bid: bool,
-        base_token: String,
-        quote_token: String,
-        amount: u64,
-        unit_price: u64,
-        owner: address
-    ) {
-        emit(
-            NewOrderEvent {
-                marketplace,
-                order_id,
-                is_bid,
-                base_token,
-                quote_token,
-                amount,
-                unit_price,
-                owner
-            }
-        )
-    }
-
-    public(friend) fun trade_event(
-        marketplace: ID,
-        from_token: String,
-        to_token: String,
-        input_amount: u64,
-        output_amount: u64,
-        sender: address
-    ) {
-        emit(
-            TradeEvent {
-                marketplace,
-                from_token,
-                to_token,
-                input_amount,
-                output_amount,
-                sender
-            }
-        )
-    }
-
-    public(friend) fun remove_order_event(
-        marketplace: ID,
-        order_id: u64,
-        owner: address
-    ) {
-        emit(
-            RemoveOrderEvent {
-                marketplace,
-                order_id,
-                owner
-            }
-        )
-    }
-
-    public(friend) fun update_order_event(
-        marketplace: ID,
-        order_id: u64,
-        updated_price: u64,
-        owner: address
-    ) {
-        emit(
-            UpdateOrderEvent {
-                marketplace,
-                order_id,
-                updated_price,
-                owner
             }
         )
     }
