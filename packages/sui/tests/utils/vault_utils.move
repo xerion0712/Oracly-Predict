@@ -14,8 +14,7 @@ module legato::vault_utils {
         create_validator_for_testing,
         advance_epoch_with_reward_amounts
     };
-
-    use legato::marketplace::{Self, Marketplace }; 
+ 
     use legato::vault::{Self, ManagerCap, Global, VAULT, PT_TOKEN };
     use legato::vault_template::{JAN_2024, FEB_2024, MAR_2024};
     use legato::amm::{Self, AMMGlobal};
@@ -58,47 +57,13 @@ module legato::vault_utils {
         create_sui_system_state_for_testing(validators, 70000000, 0, ctx);
 
         test::end(scenario_val);
-    }
-
-    public fun setup_marketplace(test: &mut Scenario, admin_address: address) {
-
-        next_tx(test, admin_address);
-        {
-            marketplace::test_init(ctx(test));
-        };
-
-        next_tx(test, admin_address);
-        {
-            let global = test::take_shared<Marketplace>(test);
-            let managercap = test::take_from_sender<marketplace::ManagerCap>(test);
-            marketplace::setup_quote<USDC>(&mut global, &mut managercap,  ctx(test));
-            test::return_shared(global);
-            test::return_to_sender(test, managercap);
-        };
-
-        // listing SUI for USDC
-        next_tx(test, admin_address);
-        {
-            let global = test::take_shared<Marketplace>(test); 
-            marketplace::sell_and_listing<SUI, USDC>(&mut global, coin::mint_for_testing<SUI>( 300 * MIST_PER_SUI, ctx(test)), 500_000_000 , ctx(test));
-            marketplace::sell_and_listing<SUI, USDC>(&mut global, coin::mint_for_testing<SUI>( 200 * MIST_PER_SUI, ctx(test)), 550_000_000 , ctx(test));
-            marketplace::sell_and_listing<SUI, USDC>(&mut global, coin::mint_for_testing<SUI>( 100 * MIST_PER_SUI, ctx(test)), 600_000_000 , ctx(test));
-            marketplace::sell_and_listing<SUI, USDC>(&mut global, coin::mint_for_testing<SUI>( 50 * MIST_PER_SUI, ctx(test)), 650_000_000 , ctx(test));
-            test::return_shared(global);
-        };
-
-    }
+    } 
 
     public fun setup_vault(test: &mut Scenario, admin_address: address) {
 
         next_tx(test, admin_address);
         {
             vault::test_init(ctx(test));
-        };
-
-        next_tx(test, admin_address);
-        {
-            marketplace::test_init(ctx(test));
         };
 
         next_tx(test, admin_address);
@@ -120,16 +85,6 @@ module legato::vault_utils {
             test::return_shared(global);
             test::return_shared(system_state);
             test::return_to_sender(test, managercap);
-        };
-
-        next_tx(test, admin_address);
-        { 
-            let marketplace_global = test::take_shared<Marketplace>(test);
-            let marketplace_managercap = test::take_from_sender<marketplace::ManagerCap>(test);
-            marketplace::setup_quote<USDC>(&mut marketplace_global, &mut marketplace_managercap,  ctx(test));
-            
-            test::return_shared(marketplace_global); 
-            test::return_to_sender(test, marketplace_managercap); 
         };
 
         register_vault<JAN_2024>(test, admin_address, 40, 100);
@@ -201,8 +156,7 @@ module legato::vault_utils {
         {
             let managercap = test::take_from_sender<ManagerCap>(test);
             let system_state = test::take_shared<SuiSystemState>(test);
-            let global = test::take_shared<Global>(test);
-            let marketplace = test::take_shared<Marketplace>(test);
+            let global = test::take_shared<Global>(test); 
             let initial_apy = 30000000; // APY = 3%
 
             vault::new_vault<P>(
@@ -214,8 +168,7 @@ module legato::vault_utils {
                 ctx(test)
             );
 
-            test::return_shared(global);
-            test::return_shared(marketplace);
+            test::return_shared(global); 
             test::return_shared(system_state);
             test::return_to_sender(test, managercap);
         };
