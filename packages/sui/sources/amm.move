@@ -83,6 +83,7 @@ module legato::amm {
     const ERR_INVALID_FEE: u64 = 221;
     const ERR_EMERGENCY: u64 = 222;
     const ERR_NOT_REGISTERED: u64 = 223;
+    const ERR_UNEXPECTED_RETURN: u64 = 224;
 
     // ======== Structs =========
 
@@ -161,7 +162,7 @@ module legato::amm {
         assert!(!has_registered<X, Y>(global), ERR_NOT_REGISTERED);
         let pool = get_mut_pool<X, Y>(global, is_order);
 
-        let (lp, _return_values) = add_liquidity_non_entry(
+        let (lp, return_values) = add_liquidity_non_entry(
             pool,
             coin_x,
             coin_x_min,
@@ -170,9 +171,11 @@ module legato::amm {
             is_order,
             ctx
         );
-
+        assert!(vector::length(&return_values) == 3, ERR_UNEXPECTED_RETURN);
 
         transfer::public_transfer(lp, tx_context::sender(ctx));
+
+        // emit event
     }
 
     /// Add liquidity to the `Pool`. Sender needs to provide both
@@ -263,6 +266,65 @@ module legato::amm {
         vector::push_back(&mut return_values, provided_liq);
 
         (coin::from_balance(balance, ctx), return_values)
+    }
+
+    /// Entrypoint for the `remove_liquidity` method.
+    /// Transfers Coin<X> and Coin<Y> to the sender.
+    public entry fun remove_liquidity<X, Y>(
+        global: &mut AMMGlobal,
+        lp_coin: Coin<LP<X, Y>>,
+        ctx: &mut TxContext
+    ) {
+        
+        assert!(!is_emergency(global), ERR_EMERGENCY);
+        let is_order = is_order<X, Y>();
+        let pool = get_mut_pool<X, Y>(global, is_order);
+
+        // let lp_val = value(&lp_coin);
+        let (coin_x, coin_y) = remove_liquidity_non_entry(pool, lp_coin, is_order, ctx);
+        // let coin_x_val = value(&coin_x);
+        // let coin_y_val = value(&coin_y);
+
+        transfer::public_transfer(
+            coin_x,
+            tx_context::sender(ctx)
+        );
+
+        transfer::public_transfer(
+            coin_y,
+            tx_context::sender(ctx)
+        );
+
+        // let global = global_id<X, Y>(pool);
+        // let lp_name = generate_lp_name<X, Y>();
+
+        // emit event
+
+    }
+
+    /// Remove liquidity from the `Pool` by burning `Coin<LP>`.
+    /// Returns `Coin<X>` and `Coin<Y>`.
+    public fun remove_liquidity_non_entry<X, Y>(
+        pool: &mut Pool<X, Y>,
+        lp_coin: Coin<LP<X, Y>>,
+        is_order: bool,
+        ctx: &mut TxContext
+    ): (Coin<X>, Coin<Y>) {
+        assert!(is_order, ERR_MUST_BE_ORDER);
+
+        let lp_val = coin::value(&lp_coin);
+        assert!(lp_val > 0, ERR_ZERO_AMOUNT);
+
+        let (coin_x_amount, coin_y_amount, lp_supply) = get_reserves_size(pool);
+        let coin_x_out = weighted_math::compute_withdrawn_coins( coin_x_amount, lp_val, lp_supply );
+        let coin_y_out = weighted_math::compute_withdrawn_coins(  coin_y_amount,lp_val, lp_supply );
+
+        balance::decrease_supply(&mut pool.lp_supply, coin::into_balance(lp_coin));
+
+        (
+            coin::take(&mut pool.coin_x, coin_x_out, ctx),
+            coin::take(&mut pool.coin_y, coin_y_out, ctx)
+        )
     }
 
     // Registers a new liquidity pool with custom weights (only whitelist)
@@ -393,7 +455,7 @@ module legato::amm {
             return (coin_x_desired, coin_y_desired)
         } else { 
 
-            let coin_y_returned = weighted_math::get_optimal_value(
+            let coin_y_returned = weighted_math::compute_optimal_value(
                 coin_x_desired,
                 coin_x_reserve,
                 pool.weight_x,
@@ -408,7 +470,7 @@ module legato::amm {
                 return (coin_x_desired, coin_y_returned)
             } else {
 
-                let coin_x_returned = weighted_math::get_optimal_value(
+                let coin_x_returned = weighted_math::compute_optimal_value(
                     coin_y_desired,
                     coin_y_reserve,
                     pool.weight_y,
@@ -507,6 +569,24 @@ module legato::amm {
             1,
             coin_y,
             1,
+            is_order,
+            ctx
+        )
+    }
+
+    #[test_only]
+    public fun remove_liquidity_for_testing<X, Y>(
+        global: &mut AMMGlobal,
+        lp_coin: Coin<LP<X, Y>>,
+        ctx: &mut TxContext
+    ): (Coin<X>, Coin<Y>) {
+
+        let is_order = is_order<X, Y>();
+        let pool = get_mut_pool<X, Y>(global, is_order);
+
+        remove_liquidity_non_entry<X, Y>(
+            pool,
+            lp_coin,
             is_order,
             ctx
         )

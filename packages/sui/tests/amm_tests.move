@@ -57,6 +57,92 @@ module legato::amm_tests {
         end(scenario);
     }
 
+    #[test]
+    fun test_remove_liquidity_50_50_pool() {
+        let scenario = scenario();
+        remove_liquidity_50_50_pool(&mut scenario);
+        end(scenario);
+    }
+
+    #[test]
+    fun test_remove_liquidity_10_90_pool() {
+        let scenario = scenario();
+        remove_liquidity_10_90_pool(&mut scenario);
+        end(scenario);
+    }
+
+    fun remove_liquidity_50_50_pool(test: &mut Scenario) {
+        let (owner, _) = people();
+
+        register_50_50_pool(test);
+
+        // adding then removing
+        next_tx(test, owner);
+        {
+            let global = test_scenario::take_shared<AMMGlobal>(test);
+
+            let (lp, _pool_id) = amm::add_liquidity_for_testing<USDT, XBTC>(
+                &mut global,
+                mint<USDT>(USDT_AMOUNT, ctx(test)),
+                mint<XBTC>(XBTC_AMOUNT, ctx(test)),
+                5000,
+                5000,
+                6,
+                8,
+                ctx(test)
+            );
+
+            let (coin_x, coin_y) = amm::remove_liquidity_for_testing<USDT, XBTC>(
+                 &mut global,
+                 lp,
+                 ctx(test)
+            );
+
+            let burn_coin_x = burn(coin_x); 
+            assert!(5999999999 == burn_coin_x, 0);
+            let burn_coin_y = burn(coin_y);
+            assert!(9999999 == burn_coin_y, 0);
+
+            test_scenario::return_shared(global)
+        };
+    }
+
+    fun remove_liquidity_10_90_pool(test: &mut Scenario) {
+        let (owner, _) = people();
+
+        register_10_90_pool(test);
+
+        // adding then removing
+        next_tx(test, owner);
+        {
+            let global = test_scenario::take_shared<AMMGlobal>(test);
+
+            let (lp, _pool_id) = amm::add_liquidity_for_testing<USDT, XBTC>(
+                &mut global,
+                mint<USDT>(666_666_666, ctx(test)), // 666 USDT
+                mint<XBTC>(10_000_000, ctx(test)), // 0.1 BTC
+                1000,
+                9000,
+                6,
+                8,
+                ctx(test)
+            );
+
+            let (coin_x, coin_y) = amm::remove_liquidity_for_testing<USDT, XBTC>(
+                 &mut global,
+                 lp,
+                 ctx(test)
+            );
+
+            let burn_coin_x = burn(coin_x); 
+            assert!(666666665 == burn_coin_x, 0);
+            let burn_coin_y = burn(coin_y);
+            assert!(9999999 == burn_coin_x, 0);
+
+            test_scenario::return_shared(global)
+        };
+    }
+
     fun register_50_50_pool(test: &mut Scenario) {
         let (owner, _) = people();
 
