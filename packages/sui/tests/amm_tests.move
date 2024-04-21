@@ -2,6 +2,8 @@
 #[test_only]
 module legato::amm_tests {
 
+    use std::vector;
+
     use sui::coin::{  mint_for_testing as mint, burn_for_testing as burn};
     // use sui::sui::SUI;
     use sui::test_scenario::{Self, Scenario, next_tx, ctx, end};
@@ -39,6 +41,90 @@ module legato::amm_tests {
         let scenario = scenario();
         remove_liquidity(&mut scenario);
         end(scenario);
+    }
+
+    #[test]
+    fun test_swap_usdt_for_xbtc() {
+        let scenario = scenario();
+        swap_usdt_for_xbtc(&mut scenario);
+        end(scenario);
+    }
+
+    #[test]
+    fun test_swap_xbtc_for_usdt() {
+        let scenario = scenario();
+        swap_xbtc_for_usdt(&mut scenario);
+        end(scenario);
+    }
+
+    fun swap_usdt_for_xbtc(test: &mut Scenario) {
+        register_50_50_pool(test);
+
+        let (_, the_guy) = people();
+
+        next_tx(test, the_guy);
+        {
+            let global = test_scenario::take_shared<AMMGlobal>(test);
+            let pool = amm::get_mut_pool_for_testing<USDT, XBTC>(&mut global);
+            let (reserve_usdt, reserve_xbtc, _lp_supply) = amm::get_reserves_size<USDT, XBTC>(pool);
+
+            let expected_xbtc = amm::get_amount_out<USDT, XBTC>(
+                pool,
+                60_000_000, // 60 USDT
+                reserve_usdt,
+                reserve_xbtc
+            );
+ 
+            assert!(expected_xbtc == 99099, 0); // before fees
+
+            let returns = amm::swap_for_testing<USDT, XBTC>(
+                &mut global,
+                mint<USDT>(USDT_AMOUNT / 100, ctx(test)),
+                1,
+                ctx(test)
+            );
+            assert!(vector::length(&returns) == 4, vector::length(&returns));
+
+            let coin_out = vector::borrow(&returns, 3);
+            assert!(*coin_out == 98116, 0); // 0.00098116 XBTC at ~ 1 BTC = 61,152 USDT 
+
+            test_scenario::return_shared(global);
+        };
+    }
+
+    fun swap_xbtc_for_usdt(test: &mut Scenario) {
+        swap_usdt_for_xbtc(test);
+
+        let (owner, _) = people();
+
+        next_tx(test, owner);
+        {
+            let global = test_scenario::take_shared<AMMGlobal>(test);
+            let pool = amm::get_mut_pool_for_testing<USDT, XBTC>(&mut global);
+            let (reserve_usdt, reserve_xbtc, _lp_supply) = amm::get_reserves_size<USDT, XBTC>(pool);
+
+            let expected_usdt = amm::get_amount_out<USDT, XBTC>(
+                pool,
+                100000, // 0.001 XBTC
+                reserve_xbtc,
+                reserve_usdt
+            );
+
+            assert!(expected_usdt == 60529632, 0); // before fees
+
+            let returns = amm::swap_for_testing<XBTC, USDT>(
+                &mut global,
+                mint<XBTC>(100000, ctx(test)), // 0.001 XBTC
+                1,
+                ctx(test)
+            );
+            assert!(vector::length(&returns) == 4, vector::length(&returns));
+
+            let coin_out = vector::borrow(&returns, 1); 
+            assert!(*coin_out == 59930383, 0); // 59.930383 USDT 
+
+            test_scenario::return_shared(global);
+        };
     }
 
     fun remove_liquidity(test: &mut Scenario) {

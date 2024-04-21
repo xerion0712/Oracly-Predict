@@ -55,7 +55,7 @@ module legato::amm {
     const ERR_POOL_NOT_REGISTER: u64 = 211; 
     const ERR_MUST_BE_ORDER: u64 = 212; 
     const ERR_U64_OVERFLOW: u64 = 213; 
-    const ERR_INCORRECT_SWAP: u64 = 214; 
+    // const ERR_INCORRECT_SWAP: u64 = 214; 
     const ERR_INSUFFICIENT_LIQUIDITY_MINTED: u64 = 215;
     const ERR_NOT_FOUND: u64 = 216;
     const ERR_DUPLICATED_ENTRY: u64 = 217;
@@ -127,6 +127,43 @@ module legato::amm {
     }
 
     // ======== Entry Points =========
+
+    /// Entry point for the `swap` method.
+    /// Sends swapped Coin to the sender.
+    public entry fun swap<X, Y>(
+        global: &mut AMMGlobal,
+        coin_in: Coin<X>,
+        coin_out_min: u64,
+        ctx: &mut TxContext
+    ) {
+        assert!(!is_emergency(global), ERR_EMERGENCY);
+        let is_order = is_order<X, Y>();
+
+        let return_values = swap_out_non_entry<X, Y>(
+            global,
+            coin_in,
+            coin_out_min,
+            is_order,
+            ctx
+        );
+
+        let _coin_y_out = vector::pop_back(&mut return_values);
+        let _coin_y_in = vector::pop_back(&mut return_values);
+        let _coin_x_out = vector::pop_back(&mut return_values);
+        let _coin_x_in = vector::pop_back(&mut return_values);
+
+        // let global =  id<X, Y>(global);
+        // let lp_name = generate_lp_name<X, Y>();
+
+        // swapped_event(
+        //     global,
+        //     lp_name,
+        //     coin_x_in,
+        //     coin_x_out,
+        //     coin_y_in,
+        //     coin_y_out
+        // )
+    }
 
     /// Entrypoint for the `add_liquidity` method.
     /// Sends `LP<X,Y>` to the transaction sender.
@@ -413,6 +450,18 @@ module legato::amm {
         )
     }
 
+    public fun get_amount_out<X,Y>(pool: &Pool<X,Y>, amount_in: u64, reserve_in: u64, reserve_out: u64): u64 {
+        weighted_math::get_amount_out(
+            amount_in,
+            reserve_in,
+            pool.weight_x,
+            pool.scaling_factor_x,
+            reserve_out,
+            pool.weight_y,
+            pool.scaling_factor_y
+        )
+    }
+
     /// Calculate amounts needed for adding new liquidity for both `X` and `Y`.
     /// Returns both `X` and `Y` coins amounts.
     public fun calc_optimal_coin_values<X,Y>(
@@ -486,6 +535,130 @@ module legato::amm {
         )
     }
 
+    /// Swap Coin<X> for Coin<Y>
+    /// Returns Coin<Y>
+    public fun swap_out_non_entry<X, Y>(
+        global: &mut AMMGlobal,
+        coin_in: Coin<X>,
+        coin_out_min: u64,
+        is_order: bool,
+        ctx: &mut TxContext
+    ): vector<u64> {
+        assert!(coin::value<X>(&coin_in) > 0, ERR_ZERO_AMOUNT);
+
+        let current_fee = get_current_fee(global);
+
+        if (is_order) {
+            let pool = get_mut_pool<X, Y>(global, is_order);
+            let (coin_x_reserve, coin_y_reserve, _lp) = get_reserves_size(pool);
+            assert!(coin_x_reserve > 0 && coin_y_reserve > 0, ERR_RESERVES_EMPTY);
+            let coin_x_in = coin::value(&coin_in);
+
+            
+            let (coin_x_after_fees, coin_x_fee) = weighted_math::get_fee_to_treasury( current_fee , coin_x_in);
+
+            let coin_y_out = weighted_math::get_amount_out(
+                coin_x_after_fees,
+                coin_x_reserve,
+                pool.weight_x,
+                pool.scaling_factor_x,
+                coin_y_reserve,
+                pool.weight_y,
+                pool.scaling_factor_y
+            );
+            assert!(
+                coin_y_out >= coin_out_min,
+                ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM
+            );
+
+            let coin_x_balance = coin::into_balance(coin_in);
+            transfer::public_transfer(
+                coin::from_balance(balance::split(&mut coin_x_balance, coin_x_fee) , ctx),
+                tx_context::sender(ctx)
+            );
+            balance::join(&mut pool.coin_x, coin_x_balance);
+            let coin_out = coin::take(&mut pool.coin_y, coin_y_out, ctx);
+            transfer::public_transfer(coin_out, tx_context::sender(ctx));
+
+            // The division operation truncates the decimal,
+            // Causing coin_out_value to be less than the calculated value.
+            // Thus making the actual value of new_reserve_out be more.
+            // So lp_value is increased.
+
+            let (new_reserve_x, new_reserve_y, _lp) = get_reserves_size(pool);
+
+            weighted_math::assert_lp_value_is_increased(
+                pool.weight_x,
+                pool.weight_y,
+                pool.scaling_factor_x,
+                pool.scaling_factor_y,
+                coin_x_reserve,
+                coin_y_reserve,
+                new_reserve_x,
+                new_reserve_y
+            );
+
+            let return_values = vector::empty<u64>();
+            vector::push_back(&mut return_values, coin_x_in);
+            vector::push_back(&mut return_values, 0);
+            vector::push_back(&mut return_values, 0);
+            vector::push_back(&mut return_values, coin_y_out);
+            return_values
+        } else {
+            let pool = get_mut_pool<Y, X>(global, !is_order);
+            let (coin_x_reserve, coin_y_reserve, _lp) = get_reserves_size(pool);
+            assert!(coin_x_reserve > 0 && coin_y_reserve > 0, ERR_RESERVES_EMPTY);
+            let coin_y_in = coin::value(&coin_in);
+
+            let (coin_y_after_fees, coin_y_fee) =  weighted_math::get_fee_to_treasury( current_fee , coin_y_in);
+            let coin_x_out = weighted_math::get_amount_out(
+                coin_y_after_fees,
+                coin_y_reserve,
+                pool.weight_y,
+                pool.scaling_factor_y,
+                coin_x_reserve,
+                pool.weight_x,
+                pool.scaling_factor_x
+            );
+            assert!(
+                coin_x_out >= coin_out_min,
+                ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM
+            );
+
+            let coin_y_balance = coin::into_balance(coin_in);
+            transfer::public_transfer(
+                coin::from_balance(balance::split(&mut coin_y_balance, coin_y_fee) , ctx),
+                tx_context::sender(ctx)
+            );
+            balance::join(&mut pool.coin_y, coin_y_balance);
+            let coin_out = coin::take(&mut pool.coin_x, coin_x_out, ctx);
+            transfer::public_transfer(coin_out, tx_context::sender(ctx));
+
+            // The division operation truncates the decimal,
+            // Causing coin_out_value to be less than the calculated value.
+            // Thus making the actual value of new_reserve_out be more.
+            // So lp_value is increased.
+            let (new_reserve_x, new_reserve_y, _lp) = get_reserves_size(pool);
+             weighted_math::assert_lp_value_is_increased(
+                pool.weight_x,
+                pool.weight_y,
+                pool.scaling_factor_x,
+                pool.scaling_factor_y,
+                coin_x_reserve,
+                coin_y_reserve,
+                new_reserve_x,
+                new_reserve_y
+            );
+
+            let return_values = vector::empty<u64>();
+            vector::push_back(&mut return_values, 0);
+            vector::push_back(&mut return_values, coin_x_out);
+            vector::push_back(&mut return_values, coin_y_in);
+            vector::push_back(&mut return_values, 0);
+            return_values
+        }
+    }
+
     // ======== Only Governance =========
 
     public entry fun pause(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap) {
@@ -547,6 +720,24 @@ module legato::amm {
         pow(10, 9-decimal)
     }
 
+    fun get_current_fee(global: &AMMGlobal) : u64 {
+        global.fee_multiplier
+    }
+
+    // fun assert_lp_value_is_increased(
+    //     old_reserve_x: u64,
+    //     old_reserve_y: u64,
+    //     new_reserve_x: u64,
+    //     new_reserve_y: u64,
+    // ) {
+    //     // never overflow
+    //     assert!(
+    //         (old_reserve_x as u128) * (old_reserve_y as u128)
+    //             < (new_reserve_x as u128) * (new_reserve_y as u128),
+    //         ERR_INCORRECT_SWAP
+    //     )
+    // }
+
     // ======== Test-related Functions =========
 
     #[test_only]
@@ -603,6 +794,22 @@ module legato::amm {
             pool,
             lp_coin,
             is_order,
+            ctx
+        )
+    }
+
+     #[test_only]
+    public fun swap_for_testing<X, Y>(
+        global: &mut AMMGlobal,
+        coin_in: Coin<X>,
+        coin_out_min: u64,
+        ctx: &mut TxContext
+    ): vector<u64> {
+        swap_out_non_entry<X, Y>(
+            global,
+            coin_in,
+            coin_out_min,
+            is_order<X, Y>(),
             ctx
         )
     }
