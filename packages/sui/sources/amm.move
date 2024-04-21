@@ -1,24 +1,23 @@
 // Copyright (c) Tamago Blockchain Labs, Inc.
 // SPDX-License-Identifier: MIT
 
-// upgraded AMM from the previous version which was forked from OmniBTC
-// this new version includes custom weight pools, enabling the bootstrapping of new pools with less capital
-// and only permit whitelisted addresses to register new pools
+// AMM with custom weights upgraded from the forked Sui Move OmniBTC using maths from Balancer V2 Lite
+// With custom weight pools, we can bootstrap new pools with much less capital and greater flexibility
+// this version also only permits whitelisted addresses to register a new pool
 
 module legato::amm {
-
+    
     use std::vector;
     use std::string::{Self, String}; 
     use std::type_name::{get, into_string};
     use std::ascii::into_bytes;
-    
-    use sui::math;
+
+    use sui::math::{pow};
     use sui::bag::{Self, Bag};
     use sui::object::{Self, ID, UID};
-    use sui::balance::{ Self, Supply, Balance};
-    // use sui::coin::{Self, Coin, value, split, destroy_zero};
-    use sui::coin::{Self, Coin};
+    use sui::balance::{ Self, Supply, Balance}; 
     use sui::tx_context::{ Self, TxContext};
+    use sui::coin::{Self, Coin};
     use sui::transfer;
 
     use legato::comparator; 
@@ -35,46 +34,29 @@ module legato::amm {
     const MINIMAL_LIQUIDITY: u64 = 1000;
     /// Max u64 value.
     const U64_MAX: u64 = 18446744073709551615;
-    /// Current fee is 1%
-    const DEFAUTL_FEE_MULTIPLIER: u64 = 100;
+    /// Default fee is 1%
+    const DEFAULT_FEE_MULTIPLIER: u64 = 100;
     /// The integer scaling setting for fees calculation and weights
     const FEE_SCALE: u64 = 10000;
 
     // ======== Errors ========
-
-    /// For when Coin is zero.
-    const ERR_ZERO_AMOUNT: u64 = 200;
-    /// For when someone tries to swap in an empty pool.
-    const ERR_RESERVES_EMPTY: u64 = 201;
-    /// For when someone attempts to add more liquidity than u128 Math allows.
-    const ERR_POOL_FULL: u64 = 202;
-    /// Insuficient amount in coin x reserves.
-    const ERR_INSUFFICIENT_COIN_X: u64 = 203;
-    /// Insuficient amount in coin y reserves.
-    const ERR_INSUFFICIENT_COIN_Y: u64 = 204;
-    /// Divide by zero while calling mul_div.
-    const ERR_DIVIDE_BY_ZERO: u64 = 205;
-    /// For when someone add liquidity with invalid parameters.
-    const ERR_OVERLIMIT: u64 = 206;
-    /// Amount out less than minimum.
-    const ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM: u64 = 207;
-    /// Liquid not enough.
-    const ERR_LIQUID_NOT_ENOUGH: u64 = 208;
-    /// Coin X is the same as Coin Y
-    const ERR_THE_SAME_COIN: u64 = 209;
-    /// Pool X-Y has registered
-    const ERR_POOL_HAS_REGISTERED: u64 = 210;
-    /// Pool X-Y not register
-    const ERR_POOL_NOT_REGISTER: u64 = 211;
-    /// Coin X and Coin Y order
-    const ERR_MUST_BE_ORDER: u64 = 212;
-    /// Overflow for u64
-    const ERR_U64_OVERFLOW: u64 = 213;
-    /// Incorrect swap
-    const ERR_INCORRECT_SWAP: u64 = 214;
-    /// Insufficient liquidity
+ 
+    const ERR_ZERO_AMOUNT: u64 = 200; 
+    const ERR_RESERVES_EMPTY: u64 = 201; 
+    const ERR_POOL_FULL: u64 = 202; 
+    const ERR_INSUFFICIENT_COIN_X: u64 = 203; 
+    const ERR_INSUFFICIENT_COIN_Y: u64 = 204; 
+    const ERR_DIVIDE_BY_ZERO: u64 = 205; 
+    const ERR_OVERLIMIT: u64 = 206; 
+    const ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM: u64 = 207; 
+    const ERR_LIQUID_NOT_ENOUGH: u64 = 208; 
+    const ERR_THE_SAME_COIN: u64 = 209; 
+    const ERR_POOL_HAS_REGISTERED: u64 = 210; 
+    const ERR_POOL_NOT_REGISTER: u64 = 211; 
+    const ERR_MUST_BE_ORDER: u64 = 212; 
+    const ERR_U64_OVERFLOW: u64 = 213; 
+    const ERR_INCORRECT_SWAP: u64 = 214; 
     const ERR_INSUFFICIENT_LIQUIDITY_MINTED: u64 = 215;
-
     const ERR_NOT_FOUND: u64 = 216;
     const ERR_DUPLICATED_ENTRY: u64 = 217;
     const ERR_UNAUTHORISED: u64 = 218;
@@ -92,19 +74,19 @@ module legato::amm {
     /// coin held in the pool.
     struct LP<phantom X, phantom Y> has drop, store {}
 
-    /// The Basic Weighted Pool with fixed weights forked from Balancer V2 Lite
+    /// Improved liquidity pool with custom weighting
     struct Pool<phantom X, phantom Y> has store {
         global: ID,
         coin_x: Balance<X>,
         coin_y: Balance<Y>,
-        weight_x: u64,
-        weight_y: u64,
+        weight_x: u64, // 50% is 5000
+        weight_y: u64, // 50% is 5000
         scaling_factor_x: u64,
         scaling_factor_y: u64,
         lp_supply: Supply<LP<X, Y>>,
         min_liquidity: Balance<LP<X, Y>>,
+        pool_treasury: address // where all fees from the pool will be redirected for further LP staking
     }
-
 
     // the global state of the AMM
     struct AMMGlobal has key {
@@ -138,13 +120,13 @@ module legato::amm {
             whitelist: whitelist_list,
             has_paused: false,
             pools: bag::new(ctx),
-            fee_multiplier: DEFAUTL_FEE_MULTIPLIER
+            fee_multiplier: DEFAULT_FEE_MULTIPLIER
         };
 
         transfer::share_object(global)
     }
 
-    // ======== Public Functions =========
+    // ======== Entry Points =========
 
     /// Entrypoint for the `add_liquidity` method.
     /// Sends `LP<X,Y>` to the transaction sender.
@@ -177,6 +159,89 @@ module legato::amm {
 
         // emit event
     }
+
+    /// Entrypoint for the `remove_liquidity` method.
+    /// Transfers Coin<X> and Coin<Y> to the sender.
+    public entry fun remove_liquidity<X, Y>(
+        global: &mut AMMGlobal,
+        lp_coin: Coin<LP<X, Y>>,
+        ctx: &mut TxContext
+    ) {
+        
+        assert!(!is_emergency(global), ERR_EMERGENCY);
+        let is_order = is_order<X, Y>();
+        let pool = get_mut_pool<X, Y>(global, is_order);
+
+        // let lp_val = value(&lp_coin);
+        let (coin_x, coin_y) = remove_liquidity_non_entry(pool, lp_coin, is_order, ctx);
+        // let coin_x_val = value(&coin_x);
+        // let coin_y_val = value(&coin_y);
+
+        transfer::public_transfer(
+            coin_x,
+            tx_context::sender(ctx)
+        );
+
+        transfer::public_transfer(
+            coin_y,
+            tx_context::sender(ctx)
+        );
+
+        // let global = global_id<X, Y>(pool);
+        // let lp_name = generate_lp_name<X, Y>();
+
+        // emit event
+
+    }
+
+    // Registers a new liquidity pool with custom weights (only whitelist)
+    public entry fun register_pool<X, Y>(
+        global: &mut AMMGlobal,
+        weight_x: u64,
+        weight_y: u64,
+        decimal_x: u8,
+        decimal_y: u8,
+        ctx: &mut TxContext
+    ) {
+        let is_order = is_order<X, Y>();
+        assert!(is_order, ERR_MUST_BE_ORDER);
+
+        // Check if authorized to register
+        check_whitelist(global, tx_context::sender(ctx));
+
+        // Check if the pool already exists
+        let lp_name = generate_lp_name<X, Y>();
+        let has_registered = bag::contains_with_type<String, Pool<X, Y>>(&global.pools, lp_name);
+        assert!(!has_registered, ERR_POOL_HAS_REGISTERED);
+
+        // Ensure that the normalized weights sum up to 100%
+        assert!( weight_x+weight_y == 10000, ERR_WEIGHTS_SUM);
+        
+        // Ensure decimals are correct
+        assert!( decimal_x >= 0 && decimal_x <= 9, ERR_DECIMALS);
+        assert!( decimal_y >= 0 && decimal_y <= 9, ERR_DECIMALS);
+
+        let lp_supply = balance::create_supply(LP<X, Y> {});
+        let new_pool = Pool {
+            global: object::uid_to_inner(&global.id),
+            coin_x: balance::zero<X>(),
+            coin_y: balance::zero<Y>(),
+            lp_supply,
+            min_liquidity: balance::zero<LP<X, Y>>(),
+            weight_x,
+            weight_y,
+            scaling_factor_x: compute_scaling_factor(decimal_x),
+            scaling_factor_y: compute_scaling_factor(decimal_y),
+            pool_treasury: tx_context::sender(ctx)
+        };
+
+        bag::add(&mut global.pools, lp_name, new_pool);
+
+        // TODO: emit event
+        
+    }
+
+    // ======== Public Functions =========
 
     /// Add liquidity to the `Pool`. Sender needs to provide both
     /// `Coin<X>` and `Coin<Y>`, and in exchange he gets `Coin<LP>` -
@@ -225,8 +290,8 @@ module legato::amm {
 
             initial_liq - MINIMAL_LIQUIDITY
         } else {
-            let x_liq = weighted_math::compute_derive_lp( lp_supply, optimal_coin_x, pool.weight_x, pool.weight_y, pool.scaling_factor_x, coin_x_reserve );
-            let y_liq = weighted_math::compute_derive_lp( lp_supply, optimal_coin_y, pool.weight_y, pool.weight_x, pool.scaling_factor_y, coin_y_reserve );
+            let x_liq = weighted_math::compute_derive_lp( lp_supply, optimal_coin_x, pool.scaling_factor_x, coin_x_reserve );
+            let y_liq = weighted_math::compute_derive_lp( lp_supply, optimal_coin_y, pool.scaling_factor_y, coin_y_reserve );
 
             if (x_liq < y_liq) {
                 assert!(x_liq < (U64_MAX as u128), ERR_U64_OVERFLOW);
@@ -234,7 +299,7 @@ module legato::amm {
             } else {
                 assert!(y_liq < (U64_MAX as u128), ERR_U64_OVERFLOW);
                 (y_liq as u64)
-            }
+            } 
         };
  
         assert!(provided_liq > 0, ERR_INSUFFICIENT_LIQUIDITY_MINTED);
@@ -252,6 +317,8 @@ module legato::amm {
             )
         };
 
+        // std::debug::print(&(provided_liq));
+
         let coin_x_amount = balance::join(&mut pool.coin_x, coin_x_balance);
         let coin_y_amount = balance::join(&mut pool.coin_y, coin_y_balance);
 
@@ -266,111 +333,6 @@ module legato::amm {
         vector::push_back(&mut return_values, provided_liq);
 
         (coin::from_balance(balance, ctx), return_values)
-    }
-
-    /// Entrypoint for the `remove_liquidity` method.
-    /// Transfers Coin<X> and Coin<Y> to the sender.
-    public entry fun remove_liquidity<X, Y>(
-        global: &mut AMMGlobal,
-        lp_coin: Coin<LP<X, Y>>,
-        ctx: &mut TxContext
-    ) {
-        
-        assert!(!is_emergency(global), ERR_EMERGENCY);
-        let is_order = is_order<X, Y>();
-        let pool = get_mut_pool<X, Y>(global, is_order);
-
-        // let lp_val = value(&lp_coin);
-        let (coin_x, coin_y) = remove_liquidity_non_entry(pool, lp_coin, is_order, ctx);
-        // let coin_x_val = value(&coin_x);
-        // let coin_y_val = value(&coin_y);
-
-        transfer::public_transfer(
-            coin_x,
-            tx_context::sender(ctx)
-        );
-
-        transfer::public_transfer(
-            coin_y,
-            tx_context::sender(ctx)
-        );
-
-        // let global = global_id<X, Y>(pool);
-        // let lp_name = generate_lp_name<X, Y>();
-
-        // emit event
-
-    }
-
-    /// Remove liquidity from the `Pool` by burning `Coin<LP>`.
-    /// Returns `Coin<X>` and `Coin<Y>`.
-    public fun remove_liquidity_non_entry<X, Y>(
-        pool: &mut Pool<X, Y>,
-        lp_coin: Coin<LP<X, Y>>,
-        is_order: bool,
-        ctx: &mut TxContext
-    ): (Coin<X>, Coin<Y>) {
-        assert!(is_order, ERR_MUST_BE_ORDER);
-
-        let lp_val = coin::value(&lp_coin);
-        assert!(lp_val > 0, ERR_ZERO_AMOUNT);
-
-        let (coin_x_amount, coin_y_amount, lp_supply) = get_reserves_size(pool);
-        let coin_x_out = weighted_math::compute_withdrawn_coins( coin_x_amount, lp_val, lp_supply );
-        let coin_y_out = weighted_math::compute_withdrawn_coins(  coin_y_amount,lp_val, lp_supply );
-
-        balance::decrease_supply(&mut pool.lp_supply, coin::into_balance(lp_coin));
-
-        (
-            coin::take(&mut pool.coin_x, coin_x_out, ctx),
-            coin::take(&mut pool.coin_y, coin_y_out, ctx)
-        )
-    }
-
-    // Registers a new liquidity pool with custom weights (only whitelist)
-    public entry fun register_pool<X, Y>(
-        global: &mut AMMGlobal,
-        weight_x: u64,
-        weight_y: u64,
-        decimal_x: u8,
-        decimal_y: u8,
-        ctx: &mut TxContext
-    ) {
-        let is_order = is_order<X, Y>();
-        assert!(is_order, ERR_MUST_BE_ORDER);
-
-        // Check if authorized to register
-        check_whitelist(global, tx_context::sender(ctx));
-
-        // Check if the pool already exists
-        let lp_name = generate_lp_name<X, Y>();
-        let has_registered = bag::contains_with_type<String, Pool<X, Y>>(&global.pools, lp_name);
-        assert!(!has_registered, ERR_POOL_HAS_REGISTERED);
-
-        // Ensure that the normalized weights sum up to 100%
-        assert!( weight_x+weight_y == 10000, ERR_WEIGHTS_SUM);
-        
-        // Ensure decimals are correct
-        assert!( decimal_x >= 0 && decimal_x <= 9, ERR_DECIMALS);
-        assert!( decimal_y >= 0 && decimal_y <= 9, ERR_DECIMALS);
-
-        let lp_supply = balance::create_supply(LP<X, Y> {});
-        let new_pool = Pool {
-            global: object::uid_to_inner(&global.id),
-            coin_x: balance::zero<X>(),
-            coin_y: balance::zero<Y>(),
-            lp_supply,
-            min_liquidity: balance::zero<LP<X, Y>>(),
-            weight_x,
-            weight_y,
-            scaling_factor_x: compute_scaling_factor(decimal_x),
-            scaling_factor_y: compute_scaling_factor(decimal_y)
-        };
-
-        bag::add(&mut global.pools, lp_name, new_pool);
-
-        // TODO: emit event
-        
     }
 
     public fun global_id<X, Y>(pool: &Pool<X, Y>): ID {
@@ -439,6 +401,18 @@ module legato::amm {
         global.has_paused
     }
 
+    /// Get most used values in a handy way:
+    /// - amount of Coin<X>
+    /// - amount of Coin<Y>
+    /// - total supply of LP<X,Y>
+    public fun get_reserves_size<X, Y>(pool: &Pool<X, Y>): (u64, u64, u64) {
+        (
+            balance::value(&pool.coin_x),
+            balance::value(&pool.coin_y),
+            balance::supply_value(&pool.lp_supply)
+        )
+    }
+
     /// Calculate amounts needed for adding new liquidity for both `X` and `Y`.
     /// Returns both `X` and `Y` coins amounts.
     public fun calc_optimal_coin_values<X,Y>(
@@ -469,7 +443,6 @@ module legato::amm {
                 assert!(coin_y_returned >= coin_y_min, ERR_INSUFFICIENT_COIN_Y);
                 return (coin_x_desired, coin_y_returned)
             } else {
-
                 let coin_x_returned = weighted_math::compute_optimal_value(
                     coin_y_desired,
                     coin_y_reserve,
@@ -484,18 +457,32 @@ module legato::amm {
                 assert!(coin_x_returned >= coin_x_min, ERR_INSUFFICIENT_COIN_X);
                 return (coin_x_returned, coin_y_desired) 
             } 
+            
         }
     }
 
-    /// Get most used values in a handy way:
-    /// - amount of Coin<X>
-    /// - amount of Coin<Y>
-    /// - total supply of LP<X,Y>
-    public fun get_reserves_size<X, Y>(pool: &Pool<X, Y>): (u64, u64, u64) {
+    /// Remove liquidity from the `Pool` by burning `Coin<LP>`.
+    /// Returns `Coin<X>` and `Coin<Y>`.
+    public fun remove_liquidity_non_entry<X, Y>(
+        pool: &mut Pool<X, Y>,
+        lp_coin: Coin<LP<X, Y>>,
+        is_order: bool,
+        ctx: &mut TxContext
+    ): (Coin<X>, Coin<Y>) {
+        assert!(is_order, ERR_MUST_BE_ORDER);
+
+        let lp_val = coin::value(&lp_coin);
+        assert!(lp_val > 0, ERR_ZERO_AMOUNT);
+
+        let (coin_x_amount, coin_y_amount, lp_supply) = get_reserves_size(pool);
+        let coin_x_out = weighted_math::compute_withdrawn_coins( coin_x_amount, lp_val, lp_supply );
+        let coin_y_out = weighted_math::compute_withdrawn_coins(  coin_y_amount,lp_val, lp_supply );
+
+        balance::decrease_supply(&mut pool.lp_supply, coin::into_balance(lp_coin));
+
         (
-            balance::value(&pool.coin_x),
-            balance::value(&pool.coin_y),
-            balance::supply_value(&pool.lp_supply)
+            coin::take(&mut pool.coin_x, coin_x_out, ctx),
+            coin::take(&mut pool.coin_y, coin_y_out, ctx)
         )
     }
 
@@ -528,6 +515,27 @@ module legato::amm {
         vector::remove<address>(&mut global.whitelist, index);
     }
 
+    // update pool treasury
+    public entry fun update_pool_treasury<X, Y>(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap, new_address: address) {
+        let is_order = is_order<X, Y>();
+        assert!(!has_registered<X, Y>(global), ERR_NOT_REGISTERED);
+        let pool = get_mut_pool<X, Y>(global, is_order);
+        pool.pool_treasury = new_address
+    }
+
+
+    // update pool weights
+    public entry fun update_pool_weights<X, Y>(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap, weight_x: u64, weight_y: u64,) {
+        assert!( weight_x+weight_y == 10000, ERR_WEIGHTS_SUM);
+
+        let is_order = is_order<X, Y>();
+        assert!(!has_registered<X, Y>(global), ERR_NOT_REGISTERED);
+        let pool = get_mut_pool<X, Y>(global, is_order);
+        
+        pool.weight_x = weight_x;
+        pool.weight_y = weight_y;
+    }
+
     // ======== Internal Functions =========
 
     fun check_whitelist(global: &AMMGlobal, sender: address) {
@@ -536,7 +544,7 @@ module legato::amm {
     }
 
     fun compute_scaling_factor(decimal: u8): u64 { 
-        math::pow(10, 9-decimal)
+        pow(10, 9-decimal)
     }
 
     // ======== Test-related Functions =========
@@ -544,6 +552,13 @@ module legato::amm {
     #[test_only]
     public fun test_init(ctx: &mut TxContext) {
         init(ctx);
+    }
+
+    #[test_only]
+    public fun get_mut_pool_for_testing<X, Y>(
+        global: &mut AMMGlobal
+    ): &mut Pool<X, Y> {
+        get_mut_pool<X, Y>(global, is_order<X, Y>())
     }
 
     #[test_only]
@@ -590,13 +605,6 @@ module legato::amm {
             is_order,
             ctx
         )
-    }
-
-    #[test_only]
-    public fun get_mut_pool_for_testing<X, Y>(
-        global: &mut AMMGlobal
-    ): &mut Pool<X, Y> {
-        get_mut_pool<X, Y>(global, is_order<X, Y>())
     }
 
 }

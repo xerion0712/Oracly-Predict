@@ -4,30 +4,73 @@ module legato::weighted_math {
 
     use legato::math::{sqrt};
     use legato::fixed_point64::{Self}; 
-    use legato::math128;
+    use legato::math128::{Self};
 
     const WEIGHT_SCALE: u64 = 10000;
     const HALF_WEIGHT_SCALE: u64 = 5000;
 
-    // Computes the optimal value for the pair asset
-    public fun get_optimal_value(
+
+    // Computes the optimal value for adding liquidity
+    public fun compute_optimal_value(
         amount_in: u64,
-        balance_in: u64,
+        reserve_in: u64,
         _weight_in: u64,
         scaling_factor_in: u64,
-        balance_out: u64,
+        reserve_out: u64,
         _weight_out: u64,
         scaling_factor_out: u64
     ) : u64 {
         let amount_in_after_scaled = scale_amount(amount_in, scaling_factor_in);
-        let balance_in_after_scaled = scale_amount(balance_in, scaling_factor_in);
-        let balance_out_after_scaled  = scale_amount(balance_out, scaling_factor_out);
+        let balance_in_after_scaled = scale_amount(reserve_in, scaling_factor_in);
+        let balance_out_after_scaled  = scale_amount(reserve_out, scaling_factor_out);
 
         let current_ratio = fixed_point64::create_from_rational( balance_out_after_scaled , balance_in_after_scaled );
         let amount_out = fixed_point64::multiply_u128(amount_in_after_scaled , current_ratio );
 
         (math128::ceil_div( amount_out, (scaling_factor_out as u128) ) as u64)
     }
+
+    // public fun compute_optimal_value(
+    //     amount_in: u64,
+    //     reserve_in: u64,
+    //     weight_in: u64,
+    //     scaling_factor_in: u64,
+    //     reserve_out: u64,
+    //     weight_out: u64,
+    //     scaling_factor_out: u64
+    // ) : u64 {
+
+    //     /**********************************************************************************************
+    //     // outGivenIn                                                                                //
+    //     // aO = amountOut                                                                            //
+    //     // bO = balanceOut                                                                           //
+    //     // bI = balanceIn              /      /            bI             \    (wI / wO) \           //
+    //     // aI = amountIn    aO = bO * |  1 - | --------------------------  | ^            |          //
+    //     // wI = weightIn               \      \       ( bI + aI )         /              /           //
+    //     // wO = weightOut                                                                            //
+    //     **********************************************************************************************/
+
+    //     let amount_in_after_scaled = scale_amount(amount_in, scaling_factor_in);
+    //     let reserve_in_after_scaled = scale_amount(reserve_in, scaling_factor_in);
+    //     let reserve_out_after_scaled = scale_amount(reserve_out, scaling_factor_out); 
+
+    //     if (weight_in == weight_out) {
+            
+    //         let denominator = reserve_in_after_scaled+amount_in_after_scaled; 
+    //         let base = fixed_point64::create_from_rational(reserve_in_after_scaled , denominator);
+    //         let amount_out = fixed_point64::multiply_u128( reserve_out_after_scaled, fixed_point64::sub(fixed_point64::create_from_u128(1), base ) );
+
+    //         (math128::ceil_div(amount_out , (scaling_factor_out as u128)) as u64)
+
+    //     } else if (weight_in > weight_out) { 
+    //         std::debug::print(&456);
+    //         1000
+    //     } else {
+    //         std::debug::print(&789);
+    //         1000
+    //     }
+    // }
+
 
     // Computes initial LP amount
     public fun compute_initial_lp(
@@ -47,8 +90,6 @@ module legato::weighted_math {
     public fun compute_derive_lp(
         lp_supply: u64,
         amount: u64,
-        _weight_in: u64,
-        _weight_out: u64,
         scaling_factor: u64,
         reserve: u64
     ): u128 {
@@ -58,6 +99,17 @@ module legato::weighted_math {
         let multiplier = fixed_point64::create_from_rational( (lp_supply as u128), reserve_after_scaled );
         fixed_point64::multiply_u128( amount_after_scaled , multiplier )
     }
+
+    // Computes coins to be sent out when withdrawing liquidity
+    public fun compute_withdrawn_coins(
+        balance: u64, 
+        lp_amount: u64,
+        lp_supply: u64
+    ): u64 {
+        let multiplier = fixed_point64::create_from_rational( (lp_amount as u128) , (lp_supply as u128) );
+        let amount_out = fixed_point64::multiply_u128( (balance as u128), multiplier );
+        (amount_out as u64)
+    } 
 
     fun scale_amount(amount: u64, scaling_factor: u64): u128 {
         ((amount as u128)*(scaling_factor as u128))
