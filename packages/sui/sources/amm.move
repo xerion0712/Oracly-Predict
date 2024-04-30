@@ -1,12 +1,13 @@
 // Copyright (c) Tamago Blockchain Labs, Inc.
 // SPDX-License-Identifier: MIT
 
-// AMM with custom weights upgraded from the forked Sui Move OmniBTC using maths from Balancer V2 Lite
-// With custom weight pools, we can bootstrap new pools with much less capital and greater flexibility
-// this version also only permits whitelisted addresses to register a new pool
+// AMM with custom weights, based on the OmniBTC AMM and upgraded using the Balancer V2 Lite formula from Ethereum. 
+// This allows for the creation of new pools with significantly less capital
+
+
 
 module legato::amm {
-    
+
     use std::vector;
     use std::string::{Self, String}; 
     use std::type_name::{get, into_string};
@@ -55,7 +56,7 @@ module legato::amm {
     const ERR_POOL_NOT_REGISTER: u64 = 211; 
     const ERR_MUST_BE_ORDER: u64 = 212; 
     const ERR_U64_OVERFLOW: u64 = 213; 
-    // const ERR_INCORRECT_SWAP: u64 = 214; 
+    const ERR_INCORRECT_SWAP: u64 = 214; 
     const ERR_INSUFFICIENT_LIQUIDITY_MINTED: u64 = 215;
     const ERR_NOT_FOUND: u64 = 216;
     const ERR_DUPLICATED_ENTRY: u64 = 217;
@@ -66,6 +67,7 @@ module legato::amm {
     const ERR_EMERGENCY: u64 = 222;
     const ERR_NOT_REGISTERED: u64 = 223;
     const ERR_UNEXPECTED_RETURN: u64 = 224;
+    const ERR_INVALID_WEIGHT: u64 = 225;
 
     // ======== Structs =========
 
@@ -79,8 +81,8 @@ module legato::amm {
         global: ID,
         coin_x: Balance<X>,
         coin_y: Balance<Y>,
-        weight_x: u64, // 50% is 5000
-        weight_y: u64, // 50% is 5000
+        weight_x: u64, // 50% using 5000
+        weight_y: u64, // 50% using 5000
         scaling_factor_x: u64,
         scaling_factor_y: u64,
         lp_supply: Supply<LP<X, Y>>,
@@ -316,7 +318,7 @@ module legato::amm {
 
         let provided_liq = if (0 == lp_supply) {
 
-            let initial_liq = weighted_math::compute_initial_lp( pool.weight_x, pool.weight_y, pool.scaling_factor_x, pool.scaling_factor_y ,optimal_coin_x, optimal_coin_y );
+            let initial_liq = weighted_math::compute_initial_lp(  pool.weight_x, pool.weight_y , pool.scaling_factor_x, pool.scaling_factor_y ,optimal_coin_x / 10, optimal_coin_y / 10 );
             assert!(initial_liq > MINIMAL_LIQUIDITY, ERR_LIQUID_NOT_ENOUGH);
 
             let minimal_liquidity = balance::increase_supply(
@@ -327,16 +329,19 @@ module legato::amm {
 
             initial_liq - MINIMAL_LIQUIDITY
         } else {
-            let x_liq = weighted_math::compute_derive_lp( lp_supply, optimal_coin_x, pool.scaling_factor_x, coin_x_reserve );
-            let y_liq = weighted_math::compute_derive_lp( lp_supply, optimal_coin_y, pool.scaling_factor_y, coin_y_reserve );
-
-            if (x_liq < y_liq) {
-                assert!(x_liq < (U64_MAX as u128), ERR_U64_OVERFLOW);
-                (x_liq as u64)
-            } else {
-                assert!(y_liq < (U64_MAX as u128), ERR_U64_OVERFLOW);
-                (y_liq as u64)
-            } 
+ 
+            let (x_liq, y_liq) = weighted_math::compute_derive_lp(
+                optimal_coin_x,
+                optimal_coin_y,
+                pool.weight_x,
+                pool.weight_y,
+                coin_x_reserve,
+                coin_y_reserve,
+                lp_supply
+            );
+ 
+            (x_liq + y_liq)
+            
         };
  
         assert!(provided_liq > 0, ERR_INSUFFICIENT_LIQUIDITY_MINTED);
@@ -353,8 +358,6 @@ module legato::amm {
                 tx_context::sender(ctx)
             )
         };
-
-        // std::debug::print(&(provided_liq));
 
         let coin_x_amount = balance::join(&mut pool.coin_x, coin_x_balance);
         let coin_y_amount = balance::join(&mut pool.coin_y, coin_y_balance);
@@ -450,18 +453,6 @@ module legato::amm {
         )
     }
 
-    public fun get_amount_out<X,Y>(pool: &Pool<X,Y>, amount_in: u64, reserve_in: u64, reserve_out: u64): u64 {
-        weighted_math::get_amount_out(
-            amount_in,
-            reserve_in,
-            pool.weight_x,
-            pool.scaling_factor_x,
-            reserve_out,
-            pool.weight_y,
-            pool.scaling_factor_y
-        )
-    }
-
     /// Calculate amounts needed for adding new liquidity for both `X` and `Y`.
     /// Returns both `X` and `Y` coins amounts.
     public fun calc_optimal_coin_values<X,Y>(
@@ -481,11 +472,9 @@ module legato::amm {
             let coin_y_returned = weighted_math::compute_optimal_value(
                 coin_x_desired,
                 coin_x_reserve,
-                pool.weight_x,
-                pool.scaling_factor_x,
+                pool.weight_x, 
                 coin_y_reserve,
-                pool.weight_y,
-                pool.scaling_factor_y
+                pool.weight_y, 
             );
 
             if (coin_y_returned <= coin_y_desired) {
@@ -495,11 +484,9 @@ module legato::amm {
                 let coin_x_returned = weighted_math::compute_optimal_value(
                     coin_y_desired,
                     coin_y_reserve,
-                    pool.weight_y,
-                    pool.scaling_factor_y,
+                    pool.weight_y, 
                     coin_x_reserve,
-                    pool.weight_x,
-                    pool.scaling_factor_x
+                    pool.weight_x
                 );
 
                 assert!(coin_x_returned <= coin_x_desired, ERR_OVERLIMIT);
@@ -523,9 +510,8 @@ module legato::amm {
         let lp_val = coin::value(&lp_coin);
         assert!(lp_val > 0, ERR_ZERO_AMOUNT);
 
-        let (coin_x_amount, coin_y_amount, lp_supply) = get_reserves_size(pool);
-        let coin_x_out = weighted_math::compute_withdrawn_coins( coin_x_amount, lp_val, lp_supply );
-        let coin_y_out = weighted_math::compute_withdrawn_coins(  coin_y_amount,lp_val, lp_supply );
+        let (reserve_x_amount, reserve_y_amount, lp_supply) = get_reserves_size(pool); 
+        let (coin_x_out, coin_y_out) = weighted_math::compute_withdrawn_coins( lp_val, lp_supply, reserve_x_amount, reserve_y_amount, pool.weight_x, pool.weight_y); 
 
         balance::decrease_supply(&mut pool.lp_supply, coin::into_balance(lp_coin));
 
@@ -587,7 +573,7 @@ module legato::amm {
 
             let (new_reserve_x, new_reserve_y, _lp) = get_reserves_size(pool);
 
-            weighted_math::assert_lp_value_is_increased(
+            weighted_math::assert_lp_value_is_increased( 
                 pool.weight_x,
                 pool.weight_y,
                 pool.scaling_factor_x,
@@ -639,7 +625,7 @@ module legato::amm {
             // Thus making the actual value of new_reserve_out be more.
             // So lp_value is increased.
             let (new_reserve_x, new_reserve_y, _lp) = get_reserves_size(pool);
-             weighted_math::assert_lp_value_is_increased(
+             weighted_math::assert_lp_value_is_increased( 
                 pool.weight_x,
                 pool.weight_y,
                 pool.scaling_factor_x,
@@ -699,7 +685,7 @@ module legato::amm {
 
     // update pool weights
     public entry fun update_pool_weights<X, Y>(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap, weight_x: u64, weight_y: u64,) {
-        assert!( weight_x+weight_y == 10000, ERR_WEIGHTS_SUM);
+        assert!( weight_x+weight_y == 10000, ERR_WEIGHTS_SUM); 
 
         let is_order = is_order<X, Y>();
         assert!(!has_registered<X, Y>(global), ERR_NOT_REGISTERED);
@@ -724,19 +710,7 @@ module legato::amm {
         global.fee_multiplier
     }
 
-    // fun assert_lp_value_is_increased(
-    //     old_reserve_x: u64,
-    //     old_reserve_y: u64,
-    //     new_reserve_x: u64,
-    //     new_reserve_y: u64,
-    // ) {
-    //     // never overflow
-    //     assert!(
-    //         (old_reserve_x as u128) * (old_reserve_y as u128)
-    //             < (new_reserve_x as u128) * (new_reserve_y as u128),
-    //         ERR_INCORRECT_SWAP
-    //     )
-    // }
+    
 
     // ======== Test-related Functions =========
 

@@ -4,7 +4,7 @@
 /// Standard math utilities missing in the Move Language.
 module legato::math128 {
 
-    use std::fixed_point32::{Self, FixedPoint32}; 
+    use legato::fixed_point32::{Self, FixedPoint32}; 
     use legato::fixed_point64::{Self, FixedPoint64};
 
     /// Cannot log2 the value 0
