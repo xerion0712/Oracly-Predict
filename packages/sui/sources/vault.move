@@ -3,8 +3,6 @@
 
 module legato::vault {
 
-    // use std::debug;
-
     use sui::math;
     use sui::object::{ Self, ID, UID }; 
     use sui::balance::{  Self, Supply, Balance};
