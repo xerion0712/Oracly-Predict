@@ -10,17 +10,18 @@ module legato::amm_tests {
     use sui::test_scenario::{Self, Scenario, next_tx, ctx, end};
     use sui::sui::SUI;
 
-    use legato::amm::{Self, AMMGlobal};
+    use legato::amm::{Self, AMMGlobal, AMMManagerCap};
     
     const XBTC_DECIMAL: u8 = 8;
     const USDT_DECIMAL: u8 = 6; 
     
-    // when setup a 90/10 pool of $100k
-    // 50,000 XBTC/USDT at the initial
+    // When setting up a 90/10 pool of ~$100k
+    // Initial allocation at 1 XBTC = 50,000 USDT
     const XBTC_AMOUNT: u64 = 180_000_000; // 90% at 1.8 BTC
     const USDT_AMOUNT: u64 = 10_000_000_000; // 10% at 10,000 USDT
 
-    // when setup a 50/50 pool of $100k
+    // When setting up a 50/50 pool of ~$100k
+    // Initial allocation at 1 SUI = 1.5 USDC
     const SUI_AMOUNT: u64  = 33333_000_000_000; // 33,333 SUI
     const USDC_AMOUNT: u64 = 50_000_000_000; // 50,000 USDC
 
@@ -78,11 +79,12 @@ module legato::amm_tests {
             amm::test_init(ctx(test));
         };
 
+      
         // Setup a 10/90 pool first 
         next_tx(test, owner);
         {
             let global = test_scenario::take_shared<AMMGlobal>(test);
-
+            
             let (lp, _pool_id) = amm::add_liquidity_for_testing<USDT, XBTC>(
                 &mut global,
                 mint<USDT>(USDT_AMOUNT, ctx(test)),  
@@ -96,8 +98,22 @@ module legato::amm_tests {
 
             let burn = burn(lp);   
             assert!(burn == 26_898_565, burn); 
+ 
+            test_scenario::return_shared(global);
+        };
 
-            test_scenario::return_shared(global)
+          // test admin functions
+        next_tx(test, owner);
+        {
+            let global = test_scenario::take_shared<AMMGlobal>(test);
+            let managercap = test_scenario::take_from_sender<AMMManagerCap>(test);
+
+            amm::pause<USDT, XBTC>( &mut global, &mut managercap );
+
+            amm::resume<USDT, XBTC>( &mut global, &mut managercap );
+
+            test_scenario::return_to_sender(test, managercap);
+            test_scenario::return_shared(global);
         };
 
         // add 10% more
@@ -164,8 +180,8 @@ module legato::amm_tests {
             );
             assert!(vector::length(&returns) == 4, vector::length(&returns));
 
-            let coin_out = vector::borrow(&returns, 3);  
-            assert!(*coin_out == 197015, *coin_out); // 0.00197015 XBTC at a rate of 1 BTC = 50757 USDT
+            let coin_out = vector::borrow(&returns, 3);
+            assert!(*coin_out == 198005, *coin_out); // 0.00198005 XBTC at a rate of 1 BTC = 50757 USDT
 
             test_scenario::return_shared(global);
         };
@@ -188,8 +204,8 @@ module legato::amm_tests {
             );
             assert!(vector::length(&returns) == 4, vector::length(&returns));
 
-            let coin_out = vector::borrow(&returns, 1);  
-            assert!(*coin_out == 49376974, *coin_out); // 49.376974 USDT at a rate of 1 BTC = 49376 USDT
+            let coin_out = vector::borrow(&returns, 1);
+            assert!(*coin_out == 49625724, *coin_out); // 49.625724 USDT at a rate of 1 BTC = 49376 USDT
 
             test_scenario::return_shared(global);
         };
@@ -212,8 +228,8 @@ module legato::amm_tests {
             );
             assert!(vector::length(&returns) == 4, vector::length(&returns));
 
-            let coin_out = vector::borrow(&returns, 3);
-            assert!(*coin_out == 368_517_443, *coin_out); // 368.517443 USDC at a rate of 1 SUI = 1.474069772 USDC
+            let coin_out = vector::borrow(&returns, 3); 
+            assert!(*coin_out == 370364855, *coin_out); // 370.364855 USDC at a rate of 1 SUI = 1.474069772 USDC
 
             test_scenario::return_shared(global);
         };
@@ -230,9 +246,8 @@ module legato::amm_tests {
             );
             assert!(vector::length(&returns) == 4, vector::length(&returns));
 
-            let coin_out = vector::borrow(&returns, 1);
-            std::debug::print((coin_out));
-            assert!(*coin_out == 66_849_734_058, *coin_out); // 66.849734058 SUI at a rate of 1 SUI = 1.495892264 USDC
+            let coin_out = vector::borrow(&returns, 1); 
+            assert!(*coin_out == 67191680466, *coin_out); // 67.191680466 SUI at a rate of 1 SUI = 1.495892264 USDC
 
             test_scenario::return_shared(global);
         };
@@ -274,7 +289,6 @@ module legato::amm_tests {
         };
 
     }
-
 
     // utilities
     fun scenario(): Scenario { test_scenario::begin(@0x1) }

@@ -3,8 +3,7 @@
 
 // AMM with custom weights, based on the OmniBTC AMM and upgraded using the Balancer V2 Lite formula from Ethereum. 
 // This allows for the creation of new pools with significantly less capital
-
-
+// Only whitelisted users are allowed to register new pools
 
 module legato::amm {
 
@@ -35,8 +34,8 @@ module legato::amm {
     const MINIMAL_LIQUIDITY: u64 = 1000;
     /// Max u64 value.
     const U64_MAX: u64 = 18446744073709551615;
-    /// Default fee is 1%
-    const DEFAULT_FEE_MULTIPLIER: u64 = 100;
+    /// Default fee is 0.5%
+    const DEFAULT_FEE_MULTIPLIER: u64 = 50;
     /// The integer scaling setting for fees calculation and weights
     const FEE_SCALE: u64 = 10000;
 
@@ -87,16 +86,16 @@ module legato::amm {
         scaling_factor_y: u64,
         lp_supply: Supply<LP<X, Y>>,
         min_liquidity: Balance<LP<X, Y>>,
-        pool_treasury: address // where all fees from the pool will be redirected for further LP staking
+        has_paused: bool
     }
 
     // the global state of the AMM
     struct AMMGlobal has key {
-        id: UID,
-        has_paused: bool,
+        id: UID, 
         pools: Bag,
         whitelist: vector<address>, // who can setup a new pool
-        fee_multiplier: u64
+        fee_multiplier: u64,
+        treasury: address // where all fees from all pools are collected for further LP staking
     }
 
     struct AMMManagerCap has key {
@@ -120,9 +119,9 @@ module legato::amm {
         let global = AMMGlobal {
             id: object::new(ctx),
             whitelist: whitelist_list,
-            has_paused: false,
             pools: bag::new(ctx),
-            fee_multiplier: DEFAULT_FEE_MULTIPLIER
+            fee_multiplier: DEFAULT_FEE_MULTIPLIER,
+            treasury: tx_context::sender(ctx)
         };
 
         transfer::share_object(global)
@@ -138,8 +137,9 @@ module legato::amm {
         coin_out_min: u64,
         ctx: &mut TxContext
     ) {
-        assert!(!is_emergency(global), ERR_EMERGENCY);
         let is_order = is_order<X, Y>();
+
+        assert!(!is_emergency<X,Y>(global, is_order), ERR_EMERGENCY);
 
         let return_values = swap_out_non_entry<X, Y>(
             global,
@@ -177,10 +177,10 @@ module legato::amm {
         coin_y_min: u64,
         ctx: &mut TxContext
     ) {
-        assert!(!is_emergency(global), ERR_EMERGENCY);
         let is_order = is_order<X, Y>();
-
+        
         assert!(!has_registered<X, Y>(global), ERR_NOT_REGISTERED);
+        assert!(!is_emergency<X,Y>(global, is_order), ERR_EMERGENCY);
         let pool = get_mut_pool<X, Y>(global, is_order);
 
         let (lp, return_values) = add_liquidity_non_entry(
@@ -207,8 +207,9 @@ module legato::amm {
         ctx: &mut TxContext
     ) {
         
-        assert!(!is_emergency(global), ERR_EMERGENCY);
         let is_order = is_order<X, Y>();
+        // We allow removal of liquidity even when the pool is paused
+        // assert!(!is_emergency(global, is_order), ERR_EMERGENCY);
         let pool = get_mut_pool<X, Y>(global, is_order);
 
         // let lp_val = value(&lp_coin);
@@ -271,7 +272,7 @@ module legato::amm {
             weight_y,
             scaling_factor_x: compute_scaling_factor(decimal_x),
             scaling_factor_y: compute_scaling_factor(decimal_y),
-            pool_treasury: tx_context::sender(ctx)
+            has_paused: false
         };
 
         bag::add(&mut global.pools, lp_name, new_pool);
@@ -437,8 +438,15 @@ module legato::amm {
         }
     }
 
-    public fun is_emergency(global: &AMMGlobal): bool {
-        global.has_paused
+    public fun is_emergency<X,Y>(global: &mut AMMGlobal, is_order: bool): bool { 
+        if (is_order) { 
+            let pool = get_mut_pool<X, Y>(global, is_order);
+            pool.has_paused
+        } else {
+            let pool = get_mut_pool<Y, X>(global, !is_order);
+            pool.has_paused
+        }
+
     }
 
     /// Get most used values in a handy way:
@@ -533,6 +541,7 @@ module legato::amm {
         assert!(coin::value<X>(&coin_in) > 0, ERR_ZERO_AMOUNT);
 
         let current_fee = get_current_fee(global);
+        let treasury_address = get_treasury_address(global);
 
         if (is_order) {
             let pool = get_mut_pool<X, Y>(global, is_order);
@@ -540,7 +549,6 @@ module legato::amm {
             assert!(coin_x_reserve > 0 && coin_y_reserve > 0, ERR_RESERVES_EMPTY);
             let coin_x_in = coin::value(&coin_in);
 
-            
             let (coin_x_after_fees, coin_x_fee) = weighted_math::get_fee_to_treasury( current_fee , coin_x_in);
 
             let coin_y_out = weighted_math::get_amount_out(
@@ -560,7 +568,7 @@ module legato::amm {
             let coin_x_balance = coin::into_balance(coin_in);
             transfer::public_transfer(
                 coin::from_balance(balance::split(&mut coin_x_balance, coin_x_fee) , ctx),
-                tx_context::sender(ctx)
+                treasury_address
             );
             balance::join(&mut pool.coin_x, coin_x_balance);
             let coin_out = coin::take(&mut pool.coin_y, coin_y_out, ctx);
@@ -614,7 +622,7 @@ module legato::amm {
             let coin_y_balance = coin::into_balance(coin_in);
             transfer::public_transfer(
                 coin::from_balance(balance::split(&mut coin_y_balance, coin_y_fee) , ctx),
-                tx_context::sender(ctx)
+                treasury_address
             );
             balance::join(&mut pool.coin_y, coin_y_balance);
             let coin_out = coin::take(&mut pool.coin_x, coin_x_out, ctx);
@@ -646,15 +654,8 @@ module legato::amm {
     }
 
     // ======== Only Governance =========
-
-    public entry fun pause(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap) {
-        global.has_paused = true
-    }
-
-    public entry fun resume( global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap) {
-        global.has_paused = false
-    }
-
+    
+    
     // ensure that the new fee is within the range of 0.1% to 10%
     public entry fun update_fee(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap, new_fee: u64) {
         assert!( new_fee >= 10 && new_fee < 1000 ,ERR_INVALID_FEE);
@@ -674,21 +675,30 @@ module legato::amm {
         vector::remove<address>(&mut global.whitelist, index);
     }
 
-    // update pool treasury
-    public entry fun update_pool_treasury<X, Y>(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap, new_address: address) {
+    // pause the given pool
+    public entry fun pause<X, Y>(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap) {
         let is_order = is_order<X, Y>();
-        assert!(!has_registered<X, Y>(global), ERR_NOT_REGISTERED);
         let pool = get_mut_pool<X, Y>(global, is_order);
-        pool.pool_treasury = new_address
+        pool.has_paused = true
     }
 
+    // unpause
+    public entry fun resume<X, Y>( global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap) {
+        let is_order = is_order<X, Y>();
+        let pool = get_mut_pool<X, Y>(global, is_order);
+        pool.has_paused = false
+    }
+
+    // update treasury address
+    public entry fun update_treasury(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap, treasury_address: address) {
+        global.treasury = treasury_address;
+    }
 
     // update pool weights
     public entry fun update_pool_weights<X, Y>(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap, weight_x: u64, weight_y: u64,) {
         assert!( weight_x+weight_y == 10000, ERR_WEIGHTS_SUM); 
 
         let is_order = is_order<X, Y>();
-        assert!(!has_registered<X, Y>(global), ERR_NOT_REGISTERED);
         let pool = get_mut_pool<X, Y>(global, is_order);
         
         pool.weight_x = weight_x;
@@ -710,7 +720,9 @@ module legato::amm {
         global.fee_multiplier
     }
 
-    
+    fun get_treasury_address(global: &AMMGlobal) : address {
+        global.treasury
+    }
 
     // ======== Test-related Functions =========
 
@@ -741,6 +753,7 @@ module legato::amm {
         if (!has_registered<X, Y>(global)) {
             register_pool<X, Y>(global, weight_x, weight_y, decimal_x, decimal_y, ctx)
         };
+
         let pool = get_mut_pool<X, Y>(global, is_order);
 
         add_liquidity_non_entry(
