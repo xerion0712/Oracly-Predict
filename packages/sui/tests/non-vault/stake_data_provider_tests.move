@@ -43,13 +43,15 @@ module legato::stake_data_provider_tests {
         set_up_sui_system_state();
         set_up_random(test);
 
+        let empty_list = vector::empty<address>();
+
         // Stake 100 SUI for Staker#1
         next_tx(test, STAKER_ADDR_1);
         { 
             let system_state = test::take_shared<SuiSystemState>(test); 
             let random_state = test::take_shared<Random>(test);    
 
-            let validator_address = stake_data_provider::random_active_validator(&mut system_state, &random_state, ctx(test)); 
+            let validator_address = stake_data_provider::random_active_validator(&mut system_state, &random_state, empty_list, ctx(test)); 
             sui_system::request_add_stake(&mut system_state, coin::mint_for_testing(100 * MIST_PER_SUI, ctx(test)), validator_address, ctx(test));
 
             test::return_shared(system_state);
@@ -62,7 +64,7 @@ module legato::stake_data_provider_tests {
             let system_state = test::take_shared<SuiSystemState>(test); 
             let random_state = test::take_shared<Random>(test);    
 
-            let validator_address = stake_data_provider::random_active_validator(&mut system_state, &random_state, ctx(test)); 
+            let validator_address = stake_data_provider::random_active_validator(&mut system_state, &random_state, empty_list, ctx(test)); 
             sui_system::request_add_stake(&mut system_state, coin::mint_for_testing(100 * MIST_PER_SUI, ctx(test)), validator_address, ctx(test));
 
             test::return_shared(system_state);

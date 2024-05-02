@@ -1,55 +1,25 @@
 // Copyright (c) Tamago Blockchain Labs, Inc.
 // SPDX-License-Identifier: MIT
 
+// All necessary functions for vault.move calculations reside here
+
 module legato::vault_lib {
 
-    use sui_system::staking_pool::{ Self, StakedSui};
+    use legato::fixed_point64::{ Self, FixedPoint64};
+    use legato::math_fixed64::{Self};
 
-    use std::string::{ Self, String }; 
-    use std::ascii::{ into_bytes};
-    use std::type_name::{get, into_string};
-    use std::vector;
+    // Calculate the amount of PT debt to be sent out using the formula A = P * e^(rt)
+    public fun calculate_pt_debt_amount(apy: FixedPoint64, from_epoch: u64, to_epoch: u64, input_amount: u64): u64 {
+        
+        // Calculate time duration in years
+        let time = fixed_point64::create_from_rational( ((to_epoch-from_epoch) as u128), 365 );
 
-    public fun token_to_name<P>(): String {
-        string::utf8(into_bytes(into_string(get<P>())))
+        // Calculate rt (rate * time)
+        let rt = math_fixed64::mul_div( apy, time, fixed_point64::create_from_u128(1));
+        let multiplier = math_fixed64::exp(rt);
+
+        // the final PT debt amount
+        ( fixed_point64::multiply_u128( (input_amount as u128), multiplier  ) as u64 )
     }
-
-    public fun token_to_name_with_prefix<P>(prefix: vector<u8>): String {
-        let name_with_prefix = string::utf8(b"");
-        string::append_utf8(&mut name_with_prefix, prefix);
-        string::append_utf8(&mut name_with_prefix, b"-");
-        string::append_utf8(&mut name_with_prefix, into_bytes(into_string(get<P>())));
-        name_with_prefix
-    }
-
-    public fun calculate_pt_debt_from_epoch(apy: u64, from_epoch: u64, to_epoch: u64, input_amount: u64): u64 {
-        let for_epoch = to_epoch-from_epoch;
-        let (for_epoch, apy, input_amount) = ((for_epoch as u128), (apy as u128), (input_amount as u128));
-        let result = (for_epoch*apy*input_amount) / (365_000_000_000);
-        (result as u64)
-    }
-
-    public fun sort_items(items: &mut vector<StakedSui>) {
-        let length = vector::length(items);
-        let i = 1;
-        while (i < length) {
-            let cur = vector::borrow(items, i);
-            let cur_amount = staking_pool::staked_sui_amount(cur);
-            let j = i;
-            while (j > 0) {
-                j = j - 1;
-                let item = vector::borrow(items, j);
-                let item_amount = staking_pool::staked_sui_amount(item);
-                if (item_amount > cur_amount) {
-                    vector::swap(items, j, j + 1);
-                } else {
-                    break
-                };
-            };
-            i = i + 1;
-        };
-    }
-
-   
 
 }
