@@ -1,13 +1,18 @@
 
-// A module to fetch APY on-chain using the same formula stated in the RPC node
+// The module retrieves on-chain information from the network's global state
+// Including the APY rate, using the same formula as stated in the RPC node
 
-module legato::apy_reader {
+module legato::stake_data_provider {
 
-    use sui_system::sui_system::{SuiSystemState, pool_exchange_rates};
-    use sui_system::staking_pool::{ Self, PoolTokenExchangeRate, StakedSui};
+    use std::vector;
+
+    use sui_system::sui_system::{ Self, SuiSystemState, pool_exchange_rates};
+    use sui_system::staking_pool::{ Self, PoolTokenExchangeRate, StakedSui}; 
 
     use sui::object::{ID};
     use sui::table::{Self,  Table};
+    use sui::random::{Self, Random};
+    use sui::tx_context::{ TxContext};
     
     const EPOCH_TO_WEIGHT : u64 = 30;
     const MIST_PER_SUI: u64 = 1_000_000_000;
@@ -15,7 +20,23 @@ module legato::apy_reader {
     const EInvalidRefEpoch: u64 = 1;
     const EInvalidEpoch: u64 = 2;
 
-    // fetch APY from the given pool
+
+    // Retrieve a random active validator address
+    // Note: We are not using this in the vault as we still want to whitelist validators we know
+    #[allow(lint(public_random))]
+    public fun random_active_validator(wrapper: &mut SuiSystemState, r: &Random, ctx: &mut TxContext) : address {
+        // Get the list of active validators
+        let active_list = sui_system::active_validator_addresses(wrapper);
+
+        // Generate a random number
+        let generator = random::new_generator(r, ctx);
+        let random_num = random::generate_u64(&mut generator);
+
+        // Return a random active validator address
+        *vector::borrow( &active_list, random_num % vector::length(&active_list) )
+    }
+
+    // Fetch APY from the provided pool ID
     public fun pool_apy(wrapper: &mut SuiSystemState, pool_id: &ID, epoch: u64) : u64 {
         let table_rates = pool_exchange_rates(wrapper, pool_id);
         assert!(table::contains(table_rates, epoch), EInvalidEpoch);
@@ -43,7 +64,7 @@ module legato::apy_reader {
         sum / total_sum
     }
 
-    // APY_e = (ER_e+1 / ER_e) ^ 365
+    // Calculate APY using the formula: APY_e = (ER_e / ER_e-diff)^(365/diff) - 1
     fun calculate_apy(table_rates: &Table<u64, PoolTokenExchangeRate>, epoch: u64, ref_epoch: u64,) : u64 {
         assert!(epoch > ref_epoch, EInvalidRefEpoch);
 
@@ -56,7 +77,7 @@ module legato::apy_reader {
         (((numerator * (MIST_PER_SUI as u256)  / denominator) - (MIST_PER_SUI as u256)) as u64) * (365/(epoch-ref_epoch))
     }
  
-    // re-implement from staking_pool module
+    // Re-implement earnings calculation from staking_pool module
     public fun earnings_from_staked_sui(wrapper: &mut SuiSystemState, staked_sui: &StakedSui, to_epoch: u64): u64  {
 
         let activation_epoch = staking_pool::stake_activation_epoch(staked_sui);
@@ -91,6 +112,11 @@ module legato::apy_reader {
 
         reward_withdraw_amount
     }
+
+
+    // TODO: Overall APY = Σ (Probability * APY)
+
+
 
     // ======== Helper Functions =========
 

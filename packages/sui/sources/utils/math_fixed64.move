@@ -1,4 +1,5 @@
-// borrows from Aptos lib.
+
+// Borrowed from Aptos
 
 /// Standard math utilities missing in the Move Language.
 
