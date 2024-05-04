@@ -9,18 +9,17 @@ module legato::vault_lib {
     use std::string::{  String };
     use std::option::{  Self, Option}; 
     use sui_system::staking_pool::{ Self, StakedSui};
-    use sui_system::sui_system::{ Self, SuiSystemState };
+    use sui_system::sui_system::{  SuiSystemState };
     
 
     use legato::fixed_point64::{ Self, FixedPoint64};
     use legato::math_fixed64::{Self};
     use legato::stake_data_provider;
-    
-    const MAX_U64: u128 = 18446744073709551615;
+     
     
     const ERR_INVALID_LENGTH : u64 = 401;
 
-    // Calculate the amount of PT debt to be sent out using the formula A = P * e^(rt)
+    // Calculate the amount of PT debt to be sent out using the formula P = S * e^(rt)
     public fun calculate_pt_debt_amount(apy: FixedPoint64, from_epoch: u64, to_epoch: u64, input_amount: u64): u64 {
         
         // Calculate time duration in years
@@ -32,6 +31,19 @@ module legato::vault_lib {
 
         // the final PT debt amount
         ( fixed_point64::multiply_u128( (input_amount as u128), multiplier  ) as u64 )
+    }
+
+    // Calculate the amount when exiting with PT prior to the vault matures using the formula S = P / e^(rt)
+    public fun calculate_exit_amount(apy: FixedPoint64, from_epoch: u64, to_epoch: u64, input_amount: u64): u64 {
+        
+        // Calculate time duration in years
+        let time = fixed_point64::create_from_rational( ((to_epoch-from_epoch) as u128), 365 );
+
+        // Calculate rt (rate * time)
+        let rt = math_fixed64::mul_div( apy, time, fixed_point64::create_from_u128(1));
+        let denominator = math_fixed64::exp(rt);
+
+        ( fixed_point64::divide_u128( (input_amount as u128), denominator  ) as u64 )
     }
 
     // Finds an asset with a ratio close to the target ratio

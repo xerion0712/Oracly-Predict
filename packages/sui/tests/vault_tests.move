@@ -3,12 +3,12 @@
 #[test_only]
 module legato::vault_tests {
 
-    use sui::test_scenario::{Self as test, Scenario, next_tx, ctx };
-    use sui::random::{  Random};
+    use sui::test_scenario::{Self as test, Scenario, next_tx, ctx  }; 
     use sui_system::sui_system::{ SuiSystemState  };
     use sui::coin::{Self, Coin};
     use sui::sui::SUI;
-
+    use sui::random::{Random};
+ 
     use legato::vault_utils::{
         scenario, 
         advance_epoch,
@@ -39,13 +39,27 @@ module legato::vault_tests {
         test::end(scenario);
     }
 
+    #[test]
+    public fun test_mint_migrate_flow() {
+        let scenario = scenario();
+        mint_migrate_flow(&mut scenario);
+        test::end(scenario);
+    }
+
+    #[test]
+    public fun test_mint_exit_flow() {
+        let scenario = scenario();
+        mint_exit_flow(&mut scenario);
+        test::end(scenario);
+    }
+
     fun mint_redeem_flow( test: &mut Scenario ) {
         set_up_sui_system_state();
         set_up_random(test);
         advance_epoch(test, 40); // <-- overflow when less than 40
-
+ 
         // setup vaults
-        setup_vault(test, ADMIN_ADDR);
+        setup_vault(test, ADMIN_ADDR  );
 
         // mint PT for all users
         mint_pt<MAR_2024>(test, STAKER_ADDR_1, 100 * MIST_PER_SUI);
@@ -98,8 +112,8 @@ module legato::vault_tests {
             let global = test::take_shared<Global>(test); 
 
             let remaining_amount = vault::get_pending_withdrawal_amount(&global);   
-
-            assert!( remaining_amount == 498148547, 2); // 0.498148547 SUI
+   
+            assert!( remaining_amount == 299374307, 2); // 0.299374307 SUI
 
             vault::withdraw_redemption_pool(&mut global, &mut managercap, remaining_amount, ctx(test) );
 
@@ -118,6 +132,110 @@ module legato::vault_tests {
             test::return_shared(global);
             test::return_shared(system_state);  
         };
+
+    }
+
+    fun mint_migrate_flow( test: &mut Scenario ) {
+        set_up_sui_system_state();
+        set_up_random(test);
+        advance_epoch(test, 40); // <-- overflow when less than 40
+
+        // setup vaults
+        setup_vault(test, ADMIN_ADDR );
+
+        // mint PT for all users
+        mint_pt<MAR_2024>(test, STAKER_ADDR_1, 100 * MIST_PER_SUI);
+
+        // Check the balance on the JUN_2024 vault after migration.
+        next_tx(test, STAKER_ADDR_1);
+        {  
+            let pt_coin = test::take_from_sender<Coin<PT_TOKEN<MAR_2024>>>(test);            
+            let balance = coin::value(&(pt_coin));
+            
+            assert!( balance == 100699420903, 3 ); // 100.699420903 PT
+            
+            test::return_to_sender(test, pt_coin);
+        };
+
+        // Execute the migration 
+        next_tx(test, STAKER_ADDR_1);
+        {
+            let system_state = test::take_shared<SuiSystemState>(test);
+            let global = test::take_shared<Global>(test); 
+            let migrate_coin = test::take_from_sender<Coin<PT_TOKEN<MAR_2024>>>(test);
+            
+            vault::migrate<MAR_2024, JUN_2024>(&mut global, migrate_coin , ctx(test));
+
+            test::return_shared(global);
+            test::return_shared(system_state); 
+        };
+
+        // Check the balance on the JUN_2024 vault after migration.
+        next_tx(test, STAKER_ADDR_1);
+        {  
+            let pt_coin = test::take_from_sender<Coin<PT_TOKEN<JUN_2024>>>(test);            
+            let balance = coin::value(&(pt_coin));
+            
+            assert!( balance == 101757735246, 4 ); // 101.757735246 PT
+            
+            test::return_to_sender(test, pt_coin);
+        };
+
+    }
+
+    fun mint_exit_flow( test: &mut Scenario ) {
+        set_up_sui_system_state();
+        set_up_random(test);
+        advance_epoch(test, 40); // <-- overflow when less than 40
+
+        // setup vaults
+        setup_vault(test, ADMIN_ADDR );
+
+        mint_pt<MAR_2024>(test, STAKER_ADDR_1, 100 * MIST_PER_SUI); 
+        mint_pt<MAR_2024>(test, STAKER_ADDR_2, 200 * MIST_PER_SUI); 
+        mint_pt<MAR_2024>(test, STAKER_ADDR_3, 300 * MIST_PER_SUI); 
+
+        advance_epoch(test, 30);
+
+        // Exiting now 
+        next_tx(test, STAKER_ADDR_1);
+        {
+            let system_state = test::take_shared<SuiSystemState>(test);
+            let global = test::take_shared<Global>(test); 
+            let pt_token = test::take_from_sender<Coin<PT_TOKEN<MAR_2024>>>(test);
+            
+            let withdraw_coin = coin::split(&mut pt_token, 100*MIST_PER_SUI, ctx(test));
+
+            vault::exit<MAR_2024>(&mut system_state, &mut global, withdraw_coin , ctx(test));
+
+            test::return_shared(global);
+            test::return_shared(system_state);
+            test::return_to_sender(test, pt_token);
+        };
+
+        // Restake remaining SUI 
+        next_tx(test, ADMIN_ADDR);
+        {
+            let system_state = test::take_shared<SuiSystemState>(test);
+            let managercap = test::take_from_sender<ManagerCap>(test);
+            let global = test::take_shared<Global>(test); 
+            let random_state = test::take_shared<Random>(test);    
+
+            let remaining_amount = vault::get_pending_withdrawal_amount(&global);   
+
+            assert!( remaining_amount == 3578277803, 5); // 3.578277803 SUI
+
+            // add 7 SUI before restake
+            vault::topup_redemption_pool(&mut global, &mut managercap, coin::mint_for_testing<SUI>( 7*MIST_PER_SUI , ctx(test)) , ctx(test) );
+
+            vault::restake(&mut system_state, &mut global, &mut managercap, &random_state, 10*MIST_PER_SUI, ctx(test));
+
+            test::return_to_sender(test, managercap);
+            test::return_shared(global);
+            test::return_shared(random_state);
+            test::return_shared(system_state);
+        };
+
 
     }
 

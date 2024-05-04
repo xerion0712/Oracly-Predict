@@ -48,7 +48,7 @@ module legato::vault_utils {
         test::end(scenario_val);
     } 
 
-    public fun setup_vault(test: &mut Scenario, admin_address: address) {
+    public fun setup_vault(test: &mut Scenario, admin_address: address ) {
 
         next_tx(test, admin_address);
         {
@@ -71,7 +71,7 @@ module legato::vault_utils {
             vault::attach_pool( &mut global, &mut managercap, VALIDATOR_ADDR_3, pool_id_3 );
             vault::attach_pool( &mut global, &mut managercap, VALIDATOR_ADDR_4, pool_id_4 );
 
-            vault::set_first_epoch( &mut global, &mut managercap, tx_context::epoch(ctx(test)) - 30 );
+            vault::set_first_epoch( &mut global, &mut managercap, tx_context::epoch( ctx(test) )-30 );
 
             test::return_shared(global);
             test::return_shared(system_state);
@@ -106,30 +106,11 @@ module legato::vault_utils {
         };
  
     }
- 
 
     public fun check_usdc_balance(test: &mut Scenario, _amount: u64) {
         let usdc_token = test::take_from_sender<Coin<USDC>>(test);  
         test::return_to_sender(test, usdc_token);
     }
-
-    // public fun vault_exit<P>(test: &mut Scenario, staker_address: address) {
-    //     next_tx(test, staker_address);
-    //     {
-    //         let system_state = test::take_shared<SuiSystemState>(test);
-    //         let global = test::take_shared<Global>(test);
-    //         let amm_global = test::take_shared<AMMGlobal>(test);
-
-    //         let pt_token = test::take_from_sender<Coin<PT_TOKEN<P>>>(test);
-    //         let yt_token = test::take_from_sender<Coin<VAULT>>(test);
-
-    //         vault::exit<P, USDC>( &mut system_state, &mut global, &mut amm_global, 0, pt_token, yt_token, ctx(test) );
-
-    //         test::return_shared(global);
-    //         test::return_shared(amm_global);
-    //         test::return_shared(system_state);  
-    //     };
-    // }
 
     public fun set_up_random(test: &mut Scenario) {
         // Setup randomness

@@ -30,7 +30,7 @@ module legato::vault {
 
     use legato::fixed_point64::{Self, FixedPoint64};
     use legato::stake_data_provider::{Self};
-    use legato::vault_lib::{calculate_pt_debt_amount, get_amount_with_rewards,  sort_items, matching_asset_to_ratio, reduce_pool_list, filter_asset_ids};
+    use legato::vault_lib::{calculate_pt_debt_amount, get_amount_with_rewards, calculate_exit_amount, sort_items, matching_asset_to_ratio, reduce_pool_list, filter_asset_ids};
 
     // ======== Constants ========
     
@@ -39,6 +39,10 @@ module legato::vault {
     const COOLDOWN_EPOCH: u64 = 3; 
     const MIN_SUI_TO_STAKE : u64 = 1_000_000_000; // 1 Sui
     const MIN_PT_TO_REDEEM: u64 = 1_000_000_000; // 1 PT
+    const MIN_PT_TO_MIGRATE : u64 = 1_000_000_000; // 1 PT
+    const MIN_PT_TO_EXIT: u64 = 1_000_000_000; // 1 PT
+
+    const DEFAULT_EXIT_FEE: u128 = 553402322211286548; // 3% in fixed-point
 
     // ======== Errors ========
 
@@ -55,7 +59,9 @@ module legato::vault {
     const E_MINT_PT_ERROR: u64 = 11;
     const E_VAULT_NOT_MATURED: u64 = 12;
     const E_INVALID_AMOUNT: u64 = 13;
-
+    const E_VAULT_NOT_ORDER: u64 = 14;
+    const E_EXIT_DISABLED: u64 = 15;
+    const E_INSUFFICIENT: u64 = 16;
 
     // ======== Structs =========
 
@@ -94,7 +100,8 @@ module legato::vault {
         vault_reserves: Bag,
         pending_withdrawal: Balance<SUI>, // where the redemption process takes place
         deposit_cap: Option<u64>, // deposit no more than a certain amount
-        first_epoch_of_the_year: u64 // the epoch that is equivalent to the first day of the year
+        first_epoch_of_the_year: u64, // the epoch that is equivalent to the first day of the year
+        exit_fee: FixedPoint64
     }
 
     fun init(ctx: &mut TxContext) {
@@ -113,7 +120,8 @@ module legato::vault {
             vault_reserves: bag::new(ctx),
             pending_withdrawal: balance::zero(),
             deposit_cap: option::none<u64>(),
-            first_epoch_of_the_year: FIRST_EPOCH_ON_THIS_YEAR
+            first_epoch_of_the_year: FIRST_EPOCH_ON_THIS_YEAR,
+            exit_fee: fixed_point64::create_from_raw_value( DEFAULT_EXIT_FEE )
         })
 
     }
@@ -131,7 +139,8 @@ module legato::vault {
         mint<P>(wrapper, global, staked_sui , ctx);
     }
     
-    // Convert Staked SUI to PT on the given vault 
+    // Mint PT represents the future value of Staked SUI at the time of maturity date. PT amount will be calculated by the formula below
+    // - PT = Staked SUI * e^(rt)
     public entry fun mint<P>(
         wrapper: &mut SuiSystemState, 
         global: &mut Global, 
@@ -215,6 +224,70 @@ module legato::vault {
 
     }
 
+    // Migrate PT tokens to other vault that is not backward in time
+    public entry fun migrate<X,Y>(global: &mut Global, pt: Coin<PT_TOKEN<X>>, ctx: &mut TxContext) {
+        check_vault_order<X,Y>(global);
+        assert!(coin::value<PT_TOKEN<X>>(&pt) >= MIN_PT_TO_MIGRATE, E_MIN_THRESHOLD);
+
+        // PT burning in the 1st vault
+        let from_vault_config = get_vault_config<X>(&mut global.vault_config);
+        let from_epoch  = from_vault_config.maturity_epoch;
+        let from_vault_reserve = get_vault_reserve<X>(&mut global.vault_reserves);
+        let amount_to_migrate = coin::value(&pt);
+
+        balance::decrease_supply(&mut from_vault_reserve.pt_supply, coin::into_balance(pt));
+
+        // minting PT on the 2nd vault
+        let to_vault_config = get_vault_config<Y>(&mut global.vault_config);
+        let to_epoch  = to_vault_config.maturity_epoch;
+        let to_vault_reserve = get_vault_reserve<Y>(&mut global.vault_reserves);
+        assert!(to_vault_config.maturity_epoch-COOLDOWN_EPOCH > tx_context::epoch(ctx), E_VAULT_MATURED);
+
+        // Calculate extra PT to send out
+        let minted_pt_amount = calculate_pt_debt_amount(to_vault_config.vault_apy, from_epoch, to_epoch, amount_to_migrate);
+        let debt_amount =
+                    if (amount_to_migrate >= amount_to_migrate)
+                        amount_to_migrate - amount_to_migrate
+                    else 0;
+
+        to_vault_config.debt_balance = to_vault_config.debt_balance+debt_amount;
+
+        transfer::public_transfer( mint_pt<Y>(to_vault_reserve, minted_pt_amount, ctx), tx_context::sender(ctx));
+        
+
+        // TODO: emit event
+    }
+
+    // Exit the position before the vault matures. SUI tokens won't be received in full amount but obtained from the following formula, with the exit fee subtracted
+    // - SUI = PT / e^(rt) - exit fee%
+    public entry fun exit<P>(wrapper: &mut SuiSystemState, global: &mut Global, pt: Coin<PT_TOKEN<P>>, ctx: &mut TxContext) {
+        assert!(coin::value<PT_TOKEN<P>>(&pt) >= MIN_PT_TO_EXIT, E_MIN_THRESHOLD);
+        
+        let vault_config = get_vault_config<P>(&mut global.vault_config); 
+    
+        assert!(vault_config.enable_exit == true, E_EXIT_DISABLED);
+        assert!(vault_config.maturity_epoch-COOLDOWN_EPOCH > tx_context::epoch(ctx), E_VAULT_MATURED);
+        
+        let burned_amount = coin::value<PT_TOKEN<P>>(&pt);
+
+        let exit_amount = calculate_exit_amount(vault_config.vault_apy, tx_context::epoch(ctx), vault_config.maturity_epoch, burned_amount);
+    
+        // Unstakes Staked SUI items closest in value to input PT amount for withdrawal
+
+        prepare_withdrawal(wrapper, global, exit_amount, ctx);
+
+        // Subtract fees and send to the sender, fees remain in the pending withdrawal pool
+        let paidout_amount = ( fixed_point64::multiply_u128( (exit_amount as u128) , fixed_point64::sub( fixed_point64::create_from_u128(1) , global.exit_fee ) ) as u64 );
+        transfer::public_transfer(withdraw_sui(global, paidout_amount, ctx), tx_context::sender(ctx));
+        
+        // burn PT tokens
+        let vault_reserve = get_vault_reserve<P>(&mut global.vault_reserves);
+        let _burned_balance = balance::decrease_supply(&mut vault_reserve.pt_supply, coin::into_balance(pt));
+
+        // emit event
+
+    }
+
     // Retrieve the configuration for a specific vault 
     public fun get_vault_config<P>(table: &mut Table<String, VaultConfig>): &mut VaultConfig  {
         let vault_name = token_to_name<P>();
@@ -237,6 +310,31 @@ module legato::vault {
     public fun get_pending_withdrawal_amount(global: &Global) : u64 {
         balance::value(&global.pending_withdrawal)
     }
+
+    public fun get_vault_info<P>(  global: & Global) : u64 {
+        let vault_name = token_to_name<P>();
+        let has_registered = table::contains(&global.vault_config, vault_name);
+        assert!(has_registered, E_NOT_REGISTERED);
+
+        // TODO: vault principal and  rewards
+
+        let config = table::borrow<String, VaultConfig>(&global.vault_config, vault_name);
+        config.maturity_epoch
+    }
+
+    // return accumulated rewards for the given vault config
+    // fun vault_rewards(wrapper: &mut SuiSystemState, vault_config: &PoolConfig, epoch: u64): u64 {
+    //     let count = vector::length(&vault_config.deposit_items);
+    //     let i = 0;
+    //     let total_sum = 0;
+    //     while (i < count) {
+    //         let staked_sui = vector::borrow(&vault_config.deposit_items, i);
+    //         let activation_epoch = staking_pool::stake_activation_epoch(staked_sui);
+    //         if (epoch > activation_epoch) total_sum = total_sum+apy_reader::earnings_from_staked_sui(wrapper, staked_sui, epoch);
+    //         i = i + 1;
+    //     };
+    //     total_sum
+    // }
 
     // ======== Only Governance =========
 
@@ -348,6 +446,29 @@ module legato::vault {
         transfer::public_transfer(coin::from_balance(withdrawn_balance, ctx), tx_context::sender(ctx));
     }
 
+    // Restake SUI from the redemption pool to a randomly chosen validator 
+    // in the most recent vault
+    #[allow(lint(public_random))]
+    public entry fun restake(wrapper: &mut SuiSystemState, global: &mut Global, _manager_cap: &mut ManagerCap, r: &Random, restake_amount: u64, ctx: &mut TxContext ) {
+        assert!(restake_amount >= MIN_SUI_TO_STAKE, E_MIN_THRESHOLD);
+        assert!(balance::value( &global.pending_withdrawal ) >= restake_amount , E_INSUFFICIENT);
+
+        // Get the name of the most recent vault
+        let pool_name = *vector::borrow( &global.vault_list , vector::length( &( global.vault_list ) )-1 );
+        // Get the configuration of the most recent vault
+        let vault_config = table::borrow_mut<String, VaultConfig>( &mut global.vault_config , pool_name);
+
+        // Randomly select an active validator from the staking pools
+        let validator_address = stake_data_provider::random_active_validator( wrapper, r, global.staking_pools , ctx );
+        let restake_balance = balance::split<SUI>(&mut global.pending_withdrawal, restake_amount);
+
+        // Request to add stake
+        let staked_sui = sui_system::request_add_stake_non_entry(wrapper,  coin::from_balance(restake_balance, ctx)  , validator_address, ctx);
+        vector::push_back<StakedSui>(&mut vault_config.staked_sui, staked_sui); 
+    
+        
+    }
+
     // To set the deposit cap. Put amount as zero to ignore
     public entry fun set_deposit_cap(global: &mut Global, _manager_cap: &mut ManagerCap, amount: u64) {
         // Check if the amount is zero
@@ -356,6 +477,11 @@ module legato::vault {
             global.deposit_cap = option::none<u64>()
         // Set deposit cap to the specified amount
         else global.deposit_cap = option::some<u64>(amount);
+    }
+
+    // To update an exit fee
+    public entry fun update_exit_fee(global: &mut Global, _manager_cap: &mut ManagerCap, value_numerator: u128, value_denominator: u128) {
+        global.exit_fee = fixed_point64::create_from_rational( value_numerator, value_denominator);
     }
 
     // ======== Internal Functions =========
@@ -386,11 +512,11 @@ module legato::vault {
             let remaining_amount = paidout_amount-pending_withdrawal;
             
             // Look for a single asset that cover first
-            let (pool_id, asset_id ) = find_one_with_minimal_excess(wrapper,  &global.vault_list, &mut global.vault_config , remaining_amount, tx_context::epoch(ctx));
+            let (pool_id, asset_id ) = find_one_with_minimal_excess(wrapper,  &global.vault_list, &global.vault_config , remaining_amount, tx_context::epoch(ctx));
     
             if (option::is_none<u64>(&asset_id)) {
                 // If no single asset fits, then we look for multiple assets. 
-                let (pool_ids, asset_ids ) = find_combination(wrapper, &global.vault_list,  &mut global.vault_config , remaining_amount, tx_context::epoch(ctx));
+                let (pool_ids, asset_ids ) = find_combination(wrapper, &global.vault_list,  &global.vault_config , remaining_amount, tx_context::epoch(ctx));
                 
                 let sui_balance = unstake_staked_sui(wrapper, global, pool_ids, asset_ids, ctx); 
                 balance::join<SUI>(&mut global.pending_withdrawal, sui_balance );
@@ -407,7 +533,7 @@ module legato::vault {
     }
 
     //  Find one Staked SUI asset with sufficient value that cover the input amount and minimal excess
-    fun find_one_with_minimal_excess(wrapper: &mut SuiSystemState, pool_list: &vector<String>, pools: &mut Table<String, VaultConfig> , input_amount: u64, epoch: u64 ) : (Option<String> , Option<u64>) {
+    fun find_one_with_minimal_excess(wrapper: &mut SuiSystemState, pool_list: &vector<String>, pools: &Table<String, VaultConfig> , input_amount: u64, epoch: u64 ) : (Option<String> , Option<u64>) {
 
         // Find the longest length across all pools
         let length = longest_length(pool_list, pools);
@@ -426,8 +552,8 @@ module legato::vault {
                 let pool_name = *vector::borrow(pool_list, pool_count);
                 let pool = table::borrow(pools, pool_name);
                 
-                // Check if the pool has staked_sui at the current index and if it has matured
-                if ( ( vector::length(&pool.staked_sui)  > count ) && ( epoch > pool.maturity_epoch  )  ) {
+                // Check if the pool has staked_sui at the current index 
+                if ( vector::length(&pool.staked_sui)  > count )   {
                     let staked_sui = vector::borrow(&pool.staked_sui, count);
                     let amount_with_rewards = get_amount_with_rewards(wrapper,  staked_sui, epoch);
 
@@ -450,7 +576,7 @@ module legato::vault {
     }
 
     // Find a combination of staked SUI assets that have sufficient value to cover the input amount.
-    fun find_combination(wrapper: &mut SuiSystemState, pool_list: &vector<String>, pools: &mut Table<String, VaultConfig> , input_amount: u64, epoch: u64 ) : (vector<String> , vector<u64>) {
+    fun find_combination(wrapper: &mut SuiSystemState, pool_list: &vector<String>, pools: &Table<String, VaultConfig> , input_amount: u64, epoch: u64 ) : (vector<String> , vector<u64>) {
                 
         // Normalizing the value into the ratio
         let (ratio, ratio_to_id, ratio_to_pool) = normalize_into_ratio(wrapper, pool_list, pools, input_amount, epoch);
@@ -500,7 +626,7 @@ module legato::vault {
         ( output_pool, output_id)
     }
 
-    fun normalize_into_ratio(wrapper: &mut SuiSystemState, pool_list: &vector<String>, pools: &mut Table<String, VaultConfig>, input_amount: u64, epoch: u64  ) : (vector<FixedPoint64>, vector<u64>, vector<String>) {
+    fun normalize_into_ratio(wrapper: &mut SuiSystemState, pool_list: &vector<String>, pools: &Table<String, VaultConfig>, input_amount: u64, epoch: u64  ) : (vector<FixedPoint64>, vector<u64>, vector<String>) {
         let ratio = vector::empty<FixedPoint64>();
         let ratio_to_id = vector::empty<u64>();
         let ratio_to_pool = vector::empty<String>();
@@ -511,7 +637,7 @@ module legato::vault {
             let pool_name = *vector::borrow(pool_list, pool_count);
             let pool = table::borrow(pools, pool_name);
 
-            if (epoch > pool.maturity_epoch) {
+            
                 let length = vector::length(&pool.staked_sui);
                 let item_count = 0;
                 while (item_count < length) {
@@ -525,16 +651,15 @@ module legato::vault {
 
                     item_count = item_count+1;
                 };
-            };
+        
 
             pool_count = pool_count+1;
         };
-
-
+        
         (ratio, ratio_to_id, ratio_to_pool)
     }
 
-    fun longest_length(pool_list: &vector<String>, pools: &mut Table<String, VaultConfig>) : u64 {
+    fun longest_length(pool_list: &vector<String>, pools: &Table<String, VaultConfig>) : u64 {
         let pool_count = 0;
         let longest_length = 0;
 
@@ -596,6 +721,15 @@ module legato::vault {
         balance_sui
     }
 
+     fun check_vault_order<X,Y>(global: &Global) {
+        let from_pool_name = token_to_name<X>();
+        let to_pool_name = token_to_name<Y>();
+        let (from_contained, from_id) = vector::index_of<String>(&global.vault_list, &from_pool_name);
+        assert!(from_contained,E_NOT_REGISTERED);
+        let (to_contained, to_id) = vector::index_of<String>(&global.vault_list, &to_pool_name);
+        assert!(to_contained,E_NOT_REGISTERED);
+        assert!( to_id > from_id ,E_VAULT_NOT_ORDER);
+    }
 
     // ======== Test-related Functions =========
 
