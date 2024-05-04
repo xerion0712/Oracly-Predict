@@ -30,7 +30,7 @@ module legato::vault {
 
     use legato::fixed_point64::{Self, FixedPoint64};
     use legato::stake_data_provider::{Self};
-    use legato::vault_lib::{calculate_pt_debt_amount};
+    use legato::vault_lib::{calculate_pt_debt_amount, get_amount_with_rewards,  sort_items, matching_asset_to_ratio, reduce_pool_list, filter_asset_ids};
 
     // ======== Constants ========
     
@@ -38,6 +38,7 @@ module legato::vault {
     const EPOCH_PER_QUARTER: u64 = 90; 
     const COOLDOWN_EPOCH: u64 = 3; 
     const MIN_SUI_TO_STAKE : u64 = 1_000_000_000; // 1 Sui
+    const MIN_PT_TO_REDEEM: u64 = 1_000_000_000; // 1 PT
 
     // ======== Errors ========
 
@@ -52,6 +53,8 @@ module legato::vault {
     const E_UNAUTHORIZED_POOL: u64 = 9;
     const E_DEPOSIT_CAP: u64 = 10;
     const E_MINT_PT_ERROR: u64 = 11;
+    const E_VAULT_NOT_MATURED: u64 = 12;
+    const E_INVALID_AMOUNT: u64 = 13;
 
 
     // ======== Structs =========
@@ -63,8 +66,8 @@ module legato::vault {
     struct VaultConfig has store {
         started_epoch: u64,
         maturity_epoch: u64,
-        vault_apy: FixedPoint64, // Calculated by the recent quarter's average APY from all supported pools
-        staked_sui_ids: vector<ID>,
+        vault_apy: FixedPoint64, // Updated weekly with the average rate. Vaults with 6+ mo. rely on the team's estimation.
+        staked_sui: vector<StakedSui>,
         debt_balance: u64, // Outstanding debts from issuing PT tokens
         enable_mint: bool,
         enable_exit: bool,
@@ -86,7 +89,6 @@ module legato::vault {
         id: UID,
         staking_pools: vector<address>, // supported staking pools
         staking_pool_ids: vector<ID>, // supported staking pools in ID
-        staked_sui: vector<StakedSui>,
         vault_list: vector<String>,
         vault_config: Table<String, VaultConfig>,
         vault_reserves: Bag,
@@ -106,7 +108,6 @@ module legato::vault {
             id: object::new(ctx),
             staking_pools: vector::empty<address>(),
             staking_pool_ids: vector::empty<ID>(), 
-            staked_sui: vector::empty<StakedSui>(),
             vault_list: vector::empty<String>(),
             vault_config: table::new(ctx),
             vault_reserves: bag::new(ctx),
@@ -152,7 +153,7 @@ module legato::vault {
         let pool_id = staking_pool::pool_id(&staked_sui);
         assert!(vector::contains(&global.staking_pool_ids, &pool_id), E_UNAUTHORIZED_POOL);
 
-        let asset_object_id = object::id(&staked_sui);
+        let _asset_object_id = object::id(&staked_sui);
 
         // Extract principal amount of staked SUI
         let principal_amount = staking_pool::staked_sui_amount(&staked_sui);
@@ -170,8 +171,8 @@ module legato::vault {
             else 0;
 
         // Receive staked SUI
-        vector::push_back<StakedSui>(&mut global.staked_sui, staked_sui);
-        vector::push_back<ID>(&mut vault_config.staked_sui_ids, asset_object_id); 
+        vector::push_back<StakedSui>(&mut vault_config.staked_sui, staked_sui); 
+        if (vector::length(&vault_config.staked_sui) > 1) sort_items(&mut vault_config.staked_sui);
 
         // Calculate PT debt amount to send out 
         let minted_pt_amount = calculate_pt_debt_amount(vault_config.vault_apy, tx_context::epoch(ctx), vault_config.maturity_epoch, principal_amount+total_earned);
@@ -189,6 +190,32 @@ module legato::vault {
         // TODO: emit event
     }
 
+    // Redeem SUI back at a 1:1 ratio with PT tokens when the vault reaches its maturity date
+    public entry fun redeem<P>(wrapper: &mut SuiSystemState, global: &mut Global, pt: Coin<PT_TOKEN<P>>, ctx: &mut TxContext) {
+        
+        let vault_config = get_vault_config<P>(&mut global.vault_config);
+        assert!(vault_config.enable_redeem == true, E_NOT_ENABLED);
+        assert!(tx_context::epoch(ctx) > vault_config.maturity_epoch, E_VAULT_NOT_MATURED);
+        assert!(coin::value<PT_TOKEN<P>>(&pt) >= MIN_PT_TO_REDEEM, E_MIN_THRESHOLD);
+
+        let paidout_amount = coin::value<PT_TOKEN<P>>(&pt);
+
+        // Initiates withdrawal by unstaking locked Staked SUI items that have the closest value 
+        // to the input PT amount and puts them into the shared pool
+        prepare_withdrawal(wrapper, global, paidout_amount, ctx);
+
+        // give SUI to sender
+        transfer::public_transfer(withdraw_sui(global, paidout_amount, ctx), tx_context::sender(ctx));
+        
+        // burn PT tokens
+        let vault_reserve = get_vault_reserve<P>(&mut global.vault_reserves);
+        let _burned_balance = balance::decrease_supply(&mut vault_reserve.pt_supply, coin::into_balance(pt));
+
+        // TODO: emit event
+
+    }
+
+    // Retrieve the configuration for a specific vault 
     public fun get_vault_config<P>(table: &mut Table<String, VaultConfig>): &mut VaultConfig  {
         let vault_name = token_to_name<P>();
         let has_registered = table::contains(table, vault_name);
@@ -197,12 +224,18 @@ module legato::vault {
         table::borrow_mut<String, VaultConfig>(table, vault_name)
     }
 
+    // Retrieve the reserve data for a specific vault
     public fun get_vault_reserve<P>(vaults: &mut Bag): &mut VaultReserve<P> {
         let vault_name = token_to_name<P>();
         let has_registered = bag::contains_with_type<String, VaultReserve<P>>(vaults, vault_name);
         assert!(has_registered, E_NOT_REGISTERED);
 
         bag::borrow_mut<String, VaultReserve<P>>(vaults, vault_name)
+    }
+
+    // Retrieve the amount of pending withdrawals
+    public fun get_pending_withdrawal_amount(global: &Global) : u64 {
+        balance::value(&global.pending_withdrawal)
     }
 
     // ======== Only Governance =========
@@ -222,7 +255,8 @@ module legato::vault {
             maturity_epoch: global.first_epoch_of_the_year+(EPOCH_PER_QUARTER*quarter),
             vault_apy: fixed_point64::create_from_rational(apy_numerator, apy_denominator),
             debt_balance: 0,
-            staked_sui_ids: vector::empty<ID>(),
+            // staked_sui_ids: vector::empty<ID>(),
+            staked_sui: vector::empty<StakedSui>(),
             enable_exit : true,
             enable_mint: true,
             enable_redeem: true
@@ -336,6 +370,232 @@ module legato::vault {
         let minted_balance = balance::increase_supply(&mut vault_reserve.pt_supply, amount);
         coin::from_balance(minted_balance, ctx)
     }
+
+    fun withdraw_sui(global: &mut Global, amount: u64, ctx: &mut TxContext) : Coin<SUI>  {
+        assert!( balance::value(&global.pending_withdrawal) >= amount, E_INVALID_AMOUNT);
+
+        let payout_balance = balance::split(&mut global.pending_withdrawal, amount);
+        coin::from_balance(payout_balance, ctx) 
+    }
+ 
+    fun prepare_withdrawal(wrapper: &mut SuiSystemState, global: &mut Global, paidout_amount: u64, ctx: &mut TxContext) {
+        // ignore if there are sufficient SUI to pay out 
+        if (paidout_amount > balance::value(&global.pending_withdrawal)) {
+            // extract all asset IDs to be withdrawn
+            let pending_withdrawal = balance::value(&global.pending_withdrawal);
+            let remaining_amount = paidout_amount-pending_withdrawal;
+            
+            // Look for a single asset that cover first
+            let (pool_id, asset_id ) = find_one_with_minimal_excess(wrapper,  &global.vault_list, &mut global.vault_config , remaining_amount, tx_context::epoch(ctx));
+    
+            if (option::is_none<u64>(&asset_id)) {
+                // If no single asset fits, then we look for multiple assets. 
+                let (pool_ids, asset_ids ) = find_combination(wrapper, &global.vault_list,  &mut global.vault_config , remaining_amount, tx_context::epoch(ctx));
+                
+                let sui_balance = unstake_staked_sui(wrapper, global, pool_ids, asset_ids, ctx); 
+                balance::join<SUI>(&mut global.pending_withdrawal, sui_balance );
+            } else { 
+                let pool_ids = vector::empty<String>();
+                let asset_ids = vector::empty<u64>();
+                vector::push_back<String>( &mut pool_ids, *option::borrow(&pool_id)); 
+                vector::push_back<u64>( &mut asset_ids, *option::borrow(&asset_id)); 
+                let sui_balance = unstake_staked_sui(wrapper, global, pool_ids, asset_ids, ctx); 
+                balance::join<SUI>(&mut global.pending_withdrawal, sui_balance );
+            };
+
+        };
+    }
+
+    //  Find one Staked SUI asset with sufficient value that cover the input amount and minimal excess
+    fun find_one_with_minimal_excess(wrapper: &mut SuiSystemState, pool_list: &vector<String>, pools: &mut Table<String, VaultConfig> , input_amount: u64, epoch: u64 ) : (Option<String> , Option<u64>) {
+
+        // Find the longest length across all pools
+        let length = longest_length(pool_list, pools);
+
+        // Initialize output variables
+        let output_pool = option::none<String>();
+        let output_id = option::none<u64>();
+
+         // Loop through staked_sui in each pool
+        let count = 0;
+
+        while ( count < length ) {
+            
+            let pool_count = 0;
+            while (pool_count < vector::length(pool_list)) {
+                let pool_name = *vector::borrow(pool_list, pool_count);
+                let pool = table::borrow(pools, pool_name);
+                
+                // Check if the pool has staked_sui at the current index and if it has matured
+                if ( ( vector::length(&pool.staked_sui)  > count ) && ( epoch > pool.maturity_epoch  )  ) {
+                    let staked_sui = vector::borrow(&pool.staked_sui, count);
+                    let amount_with_rewards = get_amount_with_rewards(wrapper,  staked_sui, epoch);
+
+                    // If the amount with rewards is greater than the input amount, update output variables and break
+                    if (amount_with_rewards > input_amount) { 
+                        output_pool = option::some<String>( pool_name );
+                        output_id = option::some<u64>( count );
+                        count = length; // break main loop
+                        break
+                    };
+                };
+
+                pool_count = pool_count+1;
+            };
+
+            count = count + 1;
+        };
+
+        ( output_pool, output_id)
+    }
+
+    // Find a combination of staked SUI assets that have sufficient value to cover the input amount.
+    fun find_combination(wrapper: &mut SuiSystemState, pool_list: &vector<String>, pools: &mut Table<String, VaultConfig> , input_amount: u64, epoch: u64 ) : (vector<String> , vector<u64>) {
+                
+        // Normalizing the value into the ratio
+        let (ratio, ratio_to_id, ratio_to_pool) = normalize_into_ratio(wrapper, pool_list, pools, input_amount, epoch);
+
+        // Initialize output variables
+        let output_pool = vector::empty<String>();
+        let output_id = vector::empty<u64>();
+
+        let ratio_count = 0; // Tracks the total ratio
+
+        // Looking for the asset that has 0.5 ratio first
+        let target_ratio = fixed_point64::create_from_rational(1, 2);
+
+        // Iterate until ratio > 10000
+        while ( ratio_count <= 10000 ) {
+                
+            // Finds an asset with a ratio close to the target ratio
+            let (value, id) = matching_asset_to_ratio(ratio, target_ratio );
+
+            if (option::is_some( &id ) ) {
+
+                let current_value = *option::borrow(&value);
+                let current_id = *option::borrow(&id);
+
+                if (fixed_point64::greater_or_equal(  fixed_point64::create_from_u128(1), current_value )) {
+                    
+                    // set new target
+                    target_ratio = fixed_point64::sub( fixed_point64::create_from_u128(1), current_value );
+ 
+                    vector::swap_remove( &mut ratio, current_id );
+                    let pool_id = vector::swap_remove( &mut ratio_to_pool, current_id );
+                    let asset_id = vector::swap_remove( &mut ratio_to_id, current_id );
+
+                    vector::push_back(&mut output_pool, pool_id);
+                    vector::push_back(&mut output_id, asset_id);
+
+                    // increase ratio count 
+                    ratio_count = ratio_count+fixed_point64::multiply_u128(10000, current_value);
+                
+                };
+                
+            } else {
+                break
+            }
+        };
+
+        ( output_pool, output_id)
+    }
+
+    fun normalize_into_ratio(wrapper: &mut SuiSystemState, pool_list: &vector<String>, pools: &mut Table<String, VaultConfig>, input_amount: u64, epoch: u64  ) : (vector<FixedPoint64>, vector<u64>, vector<String>) {
+        let ratio = vector::empty<FixedPoint64>();
+        let ratio_to_id = vector::empty<u64>();
+        let ratio_to_pool = vector::empty<String>();
+
+        let pool_count = 0;
+
+        while (pool_count < vector::length(pool_list)) {
+            let pool_name = *vector::borrow(pool_list, pool_count);
+            let pool = table::borrow(pools, pool_name);
+
+            if (epoch > pool.maturity_epoch) {
+                let length = vector::length(&pool.staked_sui);
+                let item_count = 0;
+                while (item_count < length) {
+                    let staked_sui = vector::borrow(&pool.staked_sui, item_count);
+                    let amount_with_rewards = get_amount_with_rewards(wrapper,  staked_sui, epoch);
+                    let this_ratio = fixed_point64::create_from_rational( (amount_with_rewards as u128) , (input_amount as u128));
+
+                    vector::push_back(&mut ratio, this_ratio);
+                    vector::push_back(&mut ratio_to_id, item_count);
+                    vector::push_back(&mut ratio_to_pool, pool_name);
+
+                    item_count = item_count+1;
+                };
+            };
+
+            pool_count = pool_count+1;
+        };
+
+
+        (ratio, ratio_to_id, ratio_to_pool)
+    }
+
+    fun longest_length(pool_list: &vector<String>, pools: &mut Table<String, VaultConfig>) : u64 {
+        let pool_count = 0;
+        let longest_length = 0;
+
+        while (pool_count < vector::length(pool_list)) {
+            let pool_name = *vector::borrow(pool_list, pool_count);
+            let pool = table::borrow(pools, pool_name);
+            let length = vector::length(&pool.staked_sui);
+
+            if (length > longest_length) {
+                longest_length = length;
+            };
+
+            pool_count = pool_count+1;
+        };
+ 
+        longest_length
+    }
+
+    // Unstake Staked SUI from the staking pool
+    fun unstake_staked_sui(wrapper: &mut SuiSystemState, global: &mut Global, pool_ids: vector<String>, asset_ids: vector<u64>, ctx: &mut TxContext): Balance<SUI> {
+
+        let balance_sui = balance::zero(); 
+
+        let reduced_list = reduce_pool_list(pool_ids);
+ 
+        let count = 0;
+        
+        while (count < vector::length(&(reduced_list))) {
+
+            let pool_id = *vector::borrow(&reduced_list, count );
+            let filtered_asset_ids = filter_asset_ids( pool_id, pool_ids, asset_ids );
+
+            while (vector::length<u64>(&filtered_asset_ids) > 0) {
+                let asset_id = vector::pop_back(&mut filtered_asset_ids);
+
+                let pool = table::borrow_mut( &mut global.vault_config, pool_id);
+                let staked_sui = vector::swap_remove(&mut pool.staked_sui, asset_id);
+                let principal_amount = staking_pool::staked_sui_amount(&staked_sui);
+
+                // Request to withdraw 
+                let balance_each = sui_system::request_withdraw_stake_non_entry(wrapper, staked_sui, ctx);
+
+                let reward_amount =
+                    if (balance::value(&balance_each) >= principal_amount)
+                        balance::value(&balance_each) - principal_amount
+                    else 0;
+                
+                balance::join<SUI>(&mut balance_sui, balance_each);
+
+                pool.debt_balance = 
+                    if (pool.debt_balance >= reward_amount)
+                        pool.debt_balance - reward_amount
+                    else 0;
+            };
+
+            count = count +1;
+        };
+ 
+        balance_sui
+    }
+
 
     // ======== Test-related Functions =========
 

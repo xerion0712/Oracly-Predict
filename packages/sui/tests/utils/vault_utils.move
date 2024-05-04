@@ -2,8 +2,8 @@
 module legato::vault_utils {
 
     use sui::test_scenario::{Self as test, Scenario , next_tx, ctx};
-    // use sui::sui::SUI;
-    use sui::coin::{ Coin};
+    use sui::sui::SUI;
+    use sui::coin::{Self, Coin};
     use sui::random::{Self, update_randomness_state_for_testing, Random};
     use sui::tx_context::{Self};
  
@@ -21,15 +21,6 @@ module legato::vault_utils {
     const VALIDATOR_ADDR_2: address = @0x2;
     const VALIDATOR_ADDR_3: address = @0x3;
     const VALIDATOR_ADDR_4: address = @0x4;
-
-    // const ADMIN_ADDR: address = @0x21;
-
-    // const STAKER_ADDR_1: address = @0x42;
-    // const STAKER_ADDR_2: address = @0x43;
-    // const STAKER_ADDR_3: address = @0x44;
-
-    // const MIST_PER_SUI: u64 = 1_000_000_000;
-    // const INIT_LIQUIDITY: u64 = 10_000_000_000;
 
     struct USDC {}
 
@@ -80,7 +71,7 @@ module legato::vault_utils {
             vault::attach_pool( &mut global, &mut managercap, VALIDATOR_ADDR_3, pool_id_3 );
             vault::attach_pool( &mut global, &mut managercap, VALIDATOR_ADDR_4, pool_id_4 );
 
-            vault::set_first_epoch( &mut global, &mut managercap, tx_context::epoch(ctx(test)) );
+            vault::set_first_epoch( &mut global, &mut managercap, tx_context::epoch(ctx(test)) - 30 );
 
             test::return_shared(global);
             test::return_shared(system_state);
@@ -160,6 +151,23 @@ module legato::vault_utils {
 
             test::return_shared(random_state);
         };
+    }
+
+    public fun mint_pt<P>(test: &mut Scenario, staker_address: address, amount: u64) {
+        
+        next_tx(test, staker_address);
+        {
+            let system_state = test::take_shared<SuiSystemState>(test);
+            let global = test::take_shared<Global>(test); 
+            let random_state = test::take_shared<Random>(test);    
+
+            vault::mint_from_sui<P>(&mut system_state, &mut global, &random_state, coin::mint_for_testing<SUI>( amount , ctx(test)), ctx(test));
+
+            test::return_shared(global);
+            test::return_shared(system_state);
+            test::return_shared(random_state);
+        };
+
     }
 
     public fun scenario(): Scenario { test::begin(VALIDATOR_ADDR_1) }

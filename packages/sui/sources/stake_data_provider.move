@@ -22,18 +22,23 @@ module legato::stake_data_provider {
 
 
     // Retrieve a random active validator address
-    // Note: We are not using this in the vault as we still want to whitelist validators we know
     #[allow(lint(public_random))]
-    public fun random_active_validator(wrapper: &mut SuiSystemState, r: &Random, ctx: &mut TxContext) : address {
-        // Get the list of active validators
-        let active_list = sui_system::active_validator_addresses(wrapper);
+    public fun random_active_validator(wrapper: &mut SuiSystemState, r: &Random, whitelist: vector<address>, ctx: &mut TxContext) : address {
 
         // Generate a random number
         let generator = random::new_generator(r, ctx);
         let random_num = random::generate_u64(&mut generator);
 
-        // Return a random active validator address
-        *vector::borrow( &active_list, random_num % vector::length(&active_list) )
+        // Check if the whitelist is empty, if so, we load all validators
+        if (vector::length(&whitelist) == 0) { 
+            let active_list = sui_system::active_validator_addresses(wrapper);
+            // Return a random validator address from all in the system
+            *vector::borrow( &active_list, random_num % vector::length(&active_list) )
+        } else {
+             // Return a random validator address from the whitelist
+            *vector::borrow( &whitelist, random_num % vector::length(&whitelist) )
+        }
+
     }
 
     // Fetch APY from the provided pool ID
