@@ -101,12 +101,12 @@ module legato::comparator {
     //     assert!(is_greater_than(&compare(&value2, &value1)), 6);
     // }
 
-    #[test_only]
-    struct Complex has drop {
-        value0: vector<u128>,
-        value1: u8,
-        value2: u64,
-    }
+    // #[test_only]
+    // struct Complex has drop {
+    //     value0: vector<u128>,
+    //     value1: u8,
+    //     value2: u64,
+    // }
 
     // #[test]
     // public fun test_complex() {
