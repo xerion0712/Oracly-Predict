@@ -22,6 +22,7 @@ module legato::amm {
 
     use legato::comparator; 
     use legato::weighted_math;
+    use legato::stable_math;
     use legato::fixed_point64::{Self, FixedPoint64};
 
     // ======== Constants ========
@@ -34,6 +35,8 @@ module legato::amm {
     const MINIMAL_LIQUIDITY: u64 = 1000;
     /// The integer scaling setting for weights
     const WEIGHT_SCALE: u64 = 10000;
+     /// Max u64 value.
+    const U64_MAX: u64 = 18446744073709551615;
 
     // ======== Errors ========
 
@@ -315,43 +318,17 @@ module legato::amm {
 
         let (coin_x_reserve, coin_y_reserve, lp_supply) = get_reserves_size(pool);
 
-        let (optimal_coin_x, optimal_coin_y) = calc_optimal_coin_values(
-            pool,
-            coin_x_value,
-            coin_y_value,
-            coin_x_min,
-            coin_y_min,
-            coin_x_reserve,
-            coin_y_reserve
+        let (optimal_coin_x, optimal_coin_y) = calc_optimal_coin_values( 
+            pool, 
+            coin_x_value, 
+            coin_y_value, 
+            coin_x_min, 
+            coin_y_min, 
+            coin_x_reserve, 
+            coin_y_reserve 
         );
 
-        let provided_liq = if (0 == lp_supply) {
-
-            let initial_liq = weighted_math::compute_initial_lp(  pool.weight_x, pool.weight_y ,optimal_coin_x / 10, optimal_coin_y / 10 );
-            assert!(initial_liq > MINIMAL_LIQUIDITY, ERR_LIQUID_NOT_ENOUGH);
-
-            let minimal_liquidity = balance::increase_supply(
-                &mut pool.lp_supply,
-                MINIMAL_LIQUIDITY
-            );
-            balance::join(&mut pool.min_liquidity, minimal_liquidity);
-
-            initial_liq - MINIMAL_LIQUIDITY
-        } else {
- 
-            let (x_liq, y_liq) = weighted_math::compute_derive_lp(
-                optimal_coin_x,
-                optimal_coin_y,
-                pool.weight_x,
-                pool.weight_y,
-                coin_x_reserve,
-                coin_y_reserve,
-                lp_supply
-            );
- 
-            (x_liq + y_liq)
-            
-        };
+        let provided_liq = calculate_provided_liq<X,Y>(pool, lp_supply, coin_x_reserve, coin_y_reserve, optimal_coin_x, optimal_coin_y );
  
         assert!(provided_liq > 0, ERR_INSUFFICIENT_LIQUIDITY_MINTED);
 
@@ -361,7 +338,7 @@ module legato::amm {
                 tx_context::sender(ctx)
             )
         };
-        if (optimal_coin_y < coin_y_value) {
+        if (optimal_coin_y < coin_y_value) { 
             transfer::public_transfer(
                 coin::from_balance(balance::split(&mut coin_y_balance, coin_y_value - optimal_coin_y), ctx),
                 tx_context::sender(ctx)
@@ -380,11 +357,12 @@ module legato::amm {
 
         (coin::from_balance(balance, ctx), return_values)
     }
-
+    
     public fun global_id<X, Y>(pool: &Pool<X, Y>): ID {
         pool.global
     }
 
+    #[allow(unused_variable)]
     public fun id<X, Y>(global: &AMMGlobal): ID {
         object::uid_to_inner(&global.id)
     }
@@ -482,30 +460,104 @@ module legato::amm {
             return (coin_x_desired, coin_y_desired)
         } else { 
 
-            let coin_y_returned = weighted_math::compute_optimal_value(
-                coin_x_desired,
-                coin_x_reserve, 
-                coin_y_reserve,
-                pool.weight_y, 
-            );
-
-            if (coin_y_returned <= coin_y_desired) {
-                assert!(coin_y_returned >= coin_y_min, ERR_INSUFFICIENT_COIN_Y);
-                return (coin_x_desired, coin_y_returned)
-            } else {
-                let coin_x_returned = weighted_math::compute_optimal_value(
-                    coin_y_desired,
-                    coin_y_reserve, 
-                    coin_x_reserve,
-                    pool.weight_x
+            if (!pool.is_stable) {
+                let coin_y_returned = weighted_math::compute_optimal_value(
+                    coin_x_desired,
+                    coin_x_reserve, 
+                    coin_y_reserve,
+                    pool.weight_y, 
                 );
 
-                assert!(coin_x_returned <= coin_x_desired, ERR_OVERLIMIT);
-                assert!(coin_x_returned >= coin_x_min, ERR_INSUFFICIENT_COIN_X);
-                return (coin_x_returned, coin_y_desired) 
-            } 
+                if (coin_y_returned <= coin_y_desired) {
+                    assert!(coin_y_returned >= coin_y_min, ERR_INSUFFICIENT_COIN_Y);
+                    return (coin_x_desired, coin_y_returned)
+                } else {
+                    let coin_x_returned = weighted_math::compute_optimal_value(
+                        coin_y_desired,
+                        coin_y_reserve, 
+                        coin_x_reserve,
+                        pool.weight_x
+                    );
+
+                    assert!(coin_x_returned <= coin_x_desired, ERR_OVERLIMIT);
+                    assert!(coin_x_returned >= coin_x_min, ERR_INSUFFICIENT_COIN_X);
+                    return (coin_x_returned, coin_y_desired) 
+                } 
+            } else {
+                 let coin_y_returned = stable_math::get_amount_out(
+                    coin_x_desired,
+                    coin_x_reserve, 
+                    coin_y_reserve
+                );
+
+                if (coin_y_returned <= coin_y_desired) {
+                    assert!(coin_y_returned >= coin_y_min, ERR_INSUFFICIENT_COIN_Y);
+                    return (coin_x_desired, coin_y_returned)
+                } else {
+                    let coin_x_returned = stable_math::get_amount_out(
+                        coin_y_desired,
+                        coin_y_reserve, 
+                        coin_x_reserve
+                    );
+
+                    assert!(coin_x_returned <= coin_x_desired, ERR_OVERLIMIT);
+                    assert!(coin_x_returned >= coin_x_min, ERR_INSUFFICIENT_COIN_X);
+                    return (coin_x_returned, coin_y_desired) 
+                } 
+            }
             
         }
+    }
+
+    /// Calculates the provided liquidity based on the current LP supply and reserves.
+    /// If the LP supply is zero, it computes the initial liquidity and increases the supply.
+    public fun calculate_provided_liq<X,Y>(pool: &mut Pool<X, Y>, lp_supply: u64, coin_x_reserve: u64, coin_y_reserve: u64, optimal_coin_x: u64, optimal_coin_y: u64 ) : u64 {
+        
+        if (!pool.is_stable) {
+            if (0 == lp_supply) {
+
+                let initial_liq = weighted_math::compute_initial_lp(  pool.weight_x, pool.weight_y , optimal_coin_x , optimal_coin_y  );
+                assert!(initial_liq > MINIMAL_LIQUIDITY, ERR_LIQUID_NOT_ENOUGH);
+
+                let minimal_liquidity = balance::increase_supply(
+                    &mut pool.lp_supply,
+                    MINIMAL_LIQUIDITY
+                );
+                balance::join(&mut pool.min_liquidity, minimal_liquidity);
+
+                initial_liq - MINIMAL_LIQUIDITY
+            } else {
+    
+                let (x_liq, y_liq) = weighted_math::compute_derive_lp( optimal_coin_x, optimal_coin_y, pool.weight_x, pool.weight_y, coin_x_reserve, coin_y_reserve, lp_supply );
+    
+                (x_liq + y_liq)   
+            }
+        } else {
+            if (0 == lp_supply) {
+
+                let initial_liq = stable_math::compute_initial_lp(  optimal_coin_x , optimal_coin_y  );
+                assert!(initial_liq > MINIMAL_LIQUIDITY, ERR_LIQUID_NOT_ENOUGH);
+
+                let minimal_liquidity = balance::increase_supply(
+                    &mut pool.lp_supply,
+                    MINIMAL_LIQUIDITY
+                );
+                balance::join(&mut pool.min_liquidity, minimal_liquidity);
+
+                initial_liq - MINIMAL_LIQUIDITY
+            } else {
+                let x_liq = (lp_supply as u128) * (optimal_coin_x as u128) / (coin_x_reserve as u128);
+                let y_liq = (lp_supply as u128) * (optimal_coin_y as u128) / (coin_y_reserve as u128);
+                if (x_liq < y_liq) {
+                    assert!(x_liq < (U64_MAX as u128), ERR_U64_OVERFLOW);
+                    (x_liq as u64)
+                } else {
+                    assert!(y_liq < (U64_MAX as u128), ERR_U64_OVERFLOW);
+                    (y_liq as u64)
+                }
+            }
+        }
+
     }
 
     /// Remove liquidity from the `Pool` by burning `Coin<LP>`.
@@ -522,14 +574,38 @@ module legato::amm {
         assert!(lp_val > 0, ERR_ZERO_AMOUNT);
 
         let (reserve_x_amount, reserve_y_amount, lp_supply) = get_reserves_size(pool); 
-        let (coin_x_out, coin_y_out) = weighted_math::compute_withdrawn_coins( lp_val, lp_supply, reserve_x_amount, reserve_y_amount, pool.weight_x, pool.weight_y); 
 
-        balance::decrease_supply(&mut pool.lp_supply, coin::into_balance(lp_coin));
+        if (!pool.is_stable) {
 
-        (
-            coin::take(&mut pool.coin_x, coin_x_out, ctx),
-            coin::take(&mut pool.coin_y, coin_y_out, ctx)
-        )
+            let (coin_x_out, coin_y_out) = weighted_math::compute_withdrawn_coins( 
+                lp_val, 
+                lp_supply, 
+                reserve_x_amount, 
+                reserve_y_amount, 
+                pool.weight_x, 
+                pool.weight_y
+            ); 
+
+            balance::decrease_supply(&mut pool.lp_supply, coin::into_balance(lp_coin));
+
+            (
+                coin::take(&mut pool.coin_x, coin_x_out, ctx),
+                coin::take(&mut pool.coin_y, coin_y_out, ctx)
+            )
+        } else {
+            
+            let multiplier = fixed_point64::create_from_rational( (lp_val as u128), (lp_supply as u128)  );
+ 
+            let coin_x_out = fixed_point64::multiply_u128( (reserve_x_amount as u128), multiplier ); 
+            let coin_y_out = fixed_point64::multiply_u128( (reserve_y_amount as u128), multiplier );
+
+            balance::decrease_supply(&mut pool.lp_supply, coin::into_balance(lp_coin));
+
+            (
+                coin::take(&mut pool.coin_x, (coin_x_out as u64), ctx),
+                coin::take(&mut pool.coin_y, (coin_y_out as u64), ctx)
+            )
+        }
     }
 
     /// Swap Coin<X> for Coin<Y>
@@ -553,12 +629,13 @@ module legato::amm {
 
             let (coin_x_after_fees, coin_x_fee) = weighted_math::get_fee_to_treasury( pool.swap_fee , coin_x_in);
 
-            let coin_y_out = weighted_math::get_amount_out(
+            let coin_y_out = get_amount_out(
+                pool.is_stable,
                 coin_x_after_fees,
                 coin_x_reserve,
                 pool.weight_x, 
                 coin_y_reserve,
-                pool.weight_y, 
+                pool.weight_y
             );
             assert!(
                 coin_y_out >= coin_out_min,
@@ -603,7 +680,8 @@ module legato::amm {
             let coin_y_in = coin::value(&coin_in);
 
             let (coin_y_after_fees, coin_y_fee) =  weighted_math::get_fee_to_treasury( pool.swap_fee , coin_y_in);
-            let coin_x_out = weighted_math::get_amount_out(
+            let coin_x_out = get_amount_out(
+                pool.is_stable,
                 coin_y_after_fees,
                 coin_y_reserve,
                 pool.weight_y, 
@@ -644,6 +722,24 @@ module legato::amm {
             vector::push_back(&mut return_values, coin_y_in);
             vector::push_back(&mut return_values, 0);
             return_values
+        }
+    }
+
+    public fun get_amount_out(is_stable: bool, coin_in: u64, reserve_in: u64, weight_in: u64, reserve_out: u64, weight_out: u64) : u64 {
+        if (!is_stable) {
+            weighted_math::get_amount_out(
+                coin_in,
+                reserve_in,
+                weight_in, 
+                reserve_out,
+                weight_out, 
+            )
+        } else { 
+            stable_math::get_amount_out(
+                coin_in,
+                reserve_in, 
+                reserve_out
+            )
         }
     }
 
@@ -710,6 +806,8 @@ module legato::amm {
         global.treasury
     }
 
+    
+
     // ======== Test-related Functions =========
 
     #[test_only]
@@ -731,11 +829,12 @@ module legato::amm {
         coin_y: Coin<Y>,
         weight_x: u64,
         weight_y: u64, 
+        is_stable: bool,
         ctx: &mut TxContext
     ): (Coin<LP<X, Y>>, vector<u64>) {
         let is_order = is_order<X, Y>();
         if (!has_registered<X, Y>(global)) {
-            register_pool<X, Y>(global, weight_x, weight_y, false, ctx)
+            register_pool<X, Y>(global, weight_x, weight_y, is_stable, ctx)
         };
 
         let pool = get_mut_pool<X, Y>(global, is_order);
