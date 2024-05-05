@@ -12,9 +12,6 @@ module legato::amm_tests {
 
     use legato::amm::{Self, AMMGlobal, AMMManagerCap};
     
-    const XBTC_DECIMAL: u8 = 8;
-    const USDT_DECIMAL: u8 = 6; 
-    
     // When setting up a 90/10 pool of ~$100k
     // Initial allocation at 1 XBTC = 50,000 USDT
     const XBTC_AMOUNT: u64 = 180_000_000; // 90% at 1.8 BTC
@@ -90,9 +87,7 @@ module legato::amm_tests {
                 mint<USDT>(USDT_AMOUNT, ctx(test)),  
                 mint<XBTC>(XBTC_AMOUNT, ctx(test)),  
                 1000,
-                9000,
-                6,
-                8,
+                9000, 
                 ctx(test)
             );
 
@@ -126,9 +121,7 @@ module legato::amm_tests {
                 mint<USDT>(USDT_AMOUNT / 10, ctx(test)),
                 mint<XBTC>(XBTC_AMOUNT / 10, ctx(test)),
                 1000,
-                9000,
-                6,
-                8,
+                9000, 
                 ctx(test)
             );
 
@@ -149,9 +142,7 @@ module legato::amm_tests {
                 mint<SUI>(SUI_AMOUNT, ctx(test)),  
                 mint<USDC>(USDC_AMOUNT, ctx(test)),  
                 5000,
-                5000,
-                9,
-                6,
+                5000, 
                 ctx(test)
             );
 
@@ -268,9 +259,7 @@ module legato::amm_tests {
                 mint<USDT>(USDT_AMOUNT / 20, ctx(test)), // 5% - 500 USDT
                 mint<XBTC>(XBTC_AMOUNT / 20, ctx(test)), // 5% - 0.09 XBTC
                 1000,
-                9000,
-                6,
-                8,
+                9000, 
                 ctx(test)
             );
 

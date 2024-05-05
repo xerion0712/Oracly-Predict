@@ -22,25 +22,21 @@ module legato::amm {
 
     use legato::comparator; 
     use legato::weighted_math;
+    use legato::fixed_point64::{Self, FixedPoint64};
 
     // ======== Constants ========
 
-    /// The max value that can be held in one of the Balances of
-    /// a Pool. U64 MAX / FEE_SCALE
-    const MAX_POOL_VALUE: u64 = {
-        18446744073709551615 / 10000
-    };
+    // Default swap fee of 0.5% in fixed-point
+    const DEFAULT_FEE: u128 = 92233720368547758;
+    // 0.1% for stable pools
+    const STABLE_FEE: u128 = 18446744073709551;
     /// Minimal liquidity.
     const MINIMAL_LIQUIDITY: u64 = 1000;
-    /// Max u64 value.
-    const U64_MAX: u64 = 18446744073709551615;
-    /// Default fee is 0.5%
-    const DEFAULT_FEE_MULTIPLIER: u64 = 50;
-    /// The integer scaling setting for fees calculation and weights
-    const FEE_SCALE: u64 = 10000;
+    /// The integer scaling setting for weights
+    const WEIGHT_SCALE: u64 = 10000;
 
     // ======== Errors ========
- 
+
     const ERR_ZERO_AMOUNT: u64 = 200; 
     const ERR_RESERVES_EMPTY: u64 = 201; 
     const ERR_POOL_FULL: u64 = 202; 
@@ -63,7 +59,7 @@ module legato::amm {
     const ERR_WEIGHTS_SUM: u64 = 219; 
     const ERR_DECIMALS: u64 = 220;
     const ERR_INVALID_FEE: u64 = 221;
-    const ERR_EMERGENCY: u64 = 222;
+    const ERR_PAUSED: u64 = 222;
     const ERR_NOT_REGISTERED: u64 = 223;
     const ERR_UNEXPECTED_RETURN: u64 = 224;
     const ERR_INVALID_WEIGHT: u64 = 225;
@@ -81,12 +77,12 @@ module legato::amm {
         coin_x: Balance<X>,
         coin_y: Balance<Y>,
         weight_x: u64, // 50% using 5000
-        weight_y: u64, // 50% using 5000
-        scaling_factor_x: u64,
-        scaling_factor_y: u64,
+        weight_y: u64, // 50% using 5000 
         lp_supply: Supply<LP<X, Y>>,
         min_liquidity: Balance<LP<X, Y>>,
-        has_paused: bool
+        swap_fee: FixedPoint64,
+        has_paused: bool,
+        is_stable: bool
     }
 
     // the global state of the AMM
@@ -94,7 +90,6 @@ module legato::amm {
         id: UID, 
         pools: Bag,
         whitelist: vector<address>, // who can setup a new pool
-        fee_multiplier: u64,
         treasury: address // where all fees from all pools are collected for further LP staking
     }
 
@@ -119,8 +114,7 @@ module legato::amm {
         let global = AMMGlobal {
             id: object::new(ctx),
             whitelist: whitelist_list,
-            pools: bag::new(ctx),
-            fee_multiplier: DEFAULT_FEE_MULTIPLIER,
+            pools: bag::new(ctx), 
             treasury: tx_context::sender(ctx)
         };
 
@@ -139,7 +133,7 @@ module legato::amm {
     ) {
         let is_order = is_order<X, Y>();
 
-        assert!(!is_emergency<X,Y>(global, is_order), ERR_EMERGENCY);
+        assert!(!is_paused<X,Y>(global, is_order), ERR_PAUSED);
 
         let return_values = swap_out_non_entry<X, Y>(
             global,
@@ -180,7 +174,7 @@ module legato::amm {
         let is_order = is_order<X, Y>();
         
         assert!(!has_registered<X, Y>(global), ERR_NOT_REGISTERED);
-        assert!(!is_emergency<X,Y>(global, is_order), ERR_EMERGENCY);
+        assert!(!is_paused<X,Y>(global, is_order), ERR_PAUSED);
         let pool = get_mut_pool<X, Y>(global, is_order);
 
         let (lp, return_values) = add_liquidity_non_entry(
@@ -239,8 +233,7 @@ module legato::amm {
         global: &mut AMMGlobal,
         weight_x: u64,
         weight_y: u64,
-        decimal_x: u8,
-        decimal_y: u8,
+        is_stable: bool,
         ctx: &mut TxContext
     ) {
         let is_order = is_order<X, Y>();
@@ -254,28 +247,43 @@ module legato::amm {
         let has_registered = bag::contains_with_type<String, Pool<X, Y>>(&global.pools, lp_name);
         assert!(!has_registered, ERR_POOL_HAS_REGISTERED);
 
-        // Ensure that the normalized weights sum up to 100%
-        assert!( weight_x+weight_y == 10000, ERR_WEIGHTS_SUM);
-        
-        // Ensure decimals are correct
-        assert!( decimal_x >= 0 && decimal_x <= 9, ERR_DECIMALS);
-        assert!( decimal_y >= 0 && decimal_y <= 9, ERR_DECIMALS);
-
         let lp_supply = balance::create_supply(LP<X, Y> {});
-        let new_pool = Pool {
-            global: object::uid_to_inner(&global.id),
-            coin_x: balance::zero<X>(),
-            coin_y: balance::zero<Y>(),
-            lp_supply,
-            min_liquidity: balance::zero<LP<X, Y>>(),
-            weight_x,
-            weight_y,
-            scaling_factor_x: compute_scaling_factor(decimal_x),
-            scaling_factor_y: compute_scaling_factor(decimal_y),
-            has_paused: false
-        };
 
-        bag::add(&mut global.pools, lp_name, new_pool);
+        if ( !is_stable ) {
+            // Ensure that the normalized weights sum up to 100%
+            assert!( weight_x+weight_y == 10000, ERR_WEIGHTS_SUM);
+            
+            bag::add(&mut global.pools, lp_name, Pool {
+                global: object::uid_to_inner(&global.id),
+                coin_x: balance::zero<X>(),
+                coin_y: balance::zero<Y>(),
+                lp_supply,
+                min_liquidity: balance::zero<LP<X, Y>>(),
+                swap_fee: fixed_point64::create_from_raw_value( DEFAULT_FEE ),
+                weight_x,
+                weight_y,
+                is_stable: false,
+                has_paused: false
+            });
+
+        } else {
+
+            assert!( weight_x == 5000 && weight_y == 5000, ERR_WEIGHTS_SUM);
+
+            bag::add(&mut global.pools, lp_name, Pool {
+                global: object::uid_to_inner(&global.id),
+                coin_x: balance::zero<X>(),
+                coin_y: balance::zero<Y>(),
+                lp_supply,
+                min_liquidity: balance::zero<LP<X, Y>>(),
+                swap_fee: fixed_point64::create_from_raw_value( STABLE_FEE ),
+                weight_x,
+                weight_y,
+                is_stable: true,
+                has_paused: false
+            });
+
+        };
 
         // TODO: emit event
         
@@ -319,7 +327,7 @@ module legato::amm {
 
         let provided_liq = if (0 == lp_supply) {
 
-            let initial_liq = weighted_math::compute_initial_lp(  pool.weight_x, pool.weight_y , pool.scaling_factor_x, pool.scaling_factor_y ,optimal_coin_x / 10, optimal_coin_y / 10 );
+            let initial_liq = weighted_math::compute_initial_lp(  pool.weight_x, pool.weight_y ,optimal_coin_x / 10, optimal_coin_y / 10 );
             assert!(initial_liq > MINIMAL_LIQUIDITY, ERR_LIQUID_NOT_ENOUGH);
 
             let minimal_liquidity = balance::increase_supply(
@@ -362,9 +370,6 @@ module legato::amm {
 
         let coin_x_amount = balance::join(&mut pool.coin_x, coin_x_balance);
         let coin_y_amount = balance::join(&mut pool.coin_y, coin_y_balance);
-
-        assert!(coin_x_amount < MAX_POOL_VALUE, ERR_POOL_FULL);
-        assert!(coin_y_amount < MAX_POOL_VALUE, ERR_POOL_FULL);
 
         let balance = balance::increase_supply(&mut pool.lp_supply, provided_liq);
 
@@ -438,7 +443,7 @@ module legato::amm {
         }
     }
 
-    public fun is_emergency<X,Y>(global: &mut AMMGlobal, is_order: bool): bool { 
+    public fun is_paused<X,Y>(global: &mut AMMGlobal, is_order: bool): bool { 
         if (is_order) { 
             let pool = get_mut_pool<X, Y>(global, is_order);
             pool.has_paused
@@ -479,8 +484,7 @@ module legato::amm {
 
             let coin_y_returned = weighted_math::compute_optimal_value(
                 coin_x_desired,
-                coin_x_reserve,
-                pool.weight_x, 
+                coin_x_reserve, 
                 coin_y_reserve,
                 pool.weight_y, 
             );
@@ -491,8 +495,7 @@ module legato::amm {
             } else {
                 let coin_x_returned = weighted_math::compute_optimal_value(
                     coin_y_desired,
-                    coin_y_reserve,
-                    pool.weight_y, 
+                    coin_y_reserve, 
                     coin_x_reserve,
                     pool.weight_x
                 );
@@ -540,7 +543,6 @@ module legato::amm {
     ): vector<u64> {
         assert!(coin::value<X>(&coin_in) > 0, ERR_ZERO_AMOUNT);
 
-        let current_fee = get_current_fee(global);
         let treasury_address = get_treasury_address(global);
 
         if (is_order) {
@@ -549,16 +551,14 @@ module legato::amm {
             assert!(coin_x_reserve > 0 && coin_y_reserve > 0, ERR_RESERVES_EMPTY);
             let coin_x_in = coin::value(&coin_in);
 
-            let (coin_x_after_fees, coin_x_fee) = weighted_math::get_fee_to_treasury( current_fee , coin_x_in);
+            let (coin_x_after_fees, coin_x_fee) = weighted_math::get_fee_to_treasury( pool.swap_fee , coin_x_in);
 
             let coin_y_out = weighted_math::get_amount_out(
                 coin_x_after_fees,
                 coin_x_reserve,
-                pool.weight_x,
-                pool.scaling_factor_x,
+                pool.weight_x, 
                 coin_y_reserve,
-                pool.weight_y,
-                pool.scaling_factor_y
+                pool.weight_y, 
             );
             assert!(
                 coin_y_out >= coin_out_min,
@@ -583,9 +583,7 @@ module legato::amm {
 
             weighted_math::assert_lp_value_is_increased( 
                 pool.weight_x,
-                pool.weight_y,
-                pool.scaling_factor_x,
-                pool.scaling_factor_y,
+                pool.weight_y, 
                 coin_x_reserve,
                 coin_y_reserve,
                 new_reserve_x,
@@ -604,15 +602,13 @@ module legato::amm {
             assert!(coin_x_reserve > 0 && coin_y_reserve > 0, ERR_RESERVES_EMPTY);
             let coin_y_in = coin::value(&coin_in);
 
-            let (coin_y_after_fees, coin_y_fee) =  weighted_math::get_fee_to_treasury( current_fee , coin_y_in);
+            let (coin_y_after_fees, coin_y_fee) =  weighted_math::get_fee_to_treasury( pool.swap_fee , coin_y_in);
             let coin_x_out = weighted_math::get_amount_out(
                 coin_y_after_fees,
                 coin_y_reserve,
-                pool.weight_y,
-                pool.scaling_factor_y,
+                pool.weight_y, 
                 coin_x_reserve,
-                pool.weight_x,
-                pool.scaling_factor_x
+                pool.weight_x
             );
             assert!(
                 coin_x_out >= coin_out_min,
@@ -635,9 +631,7 @@ module legato::amm {
             let (new_reserve_x, new_reserve_y, _lp) = get_reserves_size(pool);
              weighted_math::assert_lp_value_is_increased( 
                 pool.weight_x,
-                pool.weight_y,
-                pool.scaling_factor_x,
-                pool.scaling_factor_y,
+                pool.weight_y, 
                 coin_x_reserve,
                 coin_y_reserve,
                 new_reserve_x,
@@ -654,12 +648,12 @@ module legato::amm {
     }
 
     // ======== Only Governance =========
-    
-    
-    // ensure that the new fee is within the range of 0.1% to 10%
-    public entry fun update_fee(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap, new_fee: u64) {
-        assert!( new_fee >= 10 && new_fee < 1000 ,ERR_INVALID_FEE);
-        global.fee_multiplier = new_fee
+
+    // update the pool fee
+    public entry fun update_pool_fee<X, Y>(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap, fee_numerator: u128, fee_denominator: u128 ) {
+        let is_order = is_order<X, Y>();
+        let pool = get_mut_pool<X, Y>(global, is_order);
+        pool.swap_fee = fixed_point64::create_from_rational( fee_numerator, fee_denominator )
     }
 
     // add whitelist
@@ -709,17 +703,9 @@ module legato::amm {
 
     fun check_whitelist(global: &AMMGlobal, sender: address) {
         let (contained, _) = vector::index_of<address>(&global.whitelist, &sender);
-        assert!(contained,ERR_UNAUTHORISED);
+        assert!(contained, ERR_UNAUTHORISED);
     }
-
-    fun compute_scaling_factor(decimal: u8): u64 { 
-        pow(10, 9-decimal)
-    }
-
-    fun get_current_fee(global: &AMMGlobal) : u64 {
-        global.fee_multiplier
-    }
-
+ 
     fun get_treasury_address(global: &AMMGlobal) : address {
         global.treasury
     }
@@ -744,14 +730,12 @@ module legato::amm {
         coin_x: Coin<X>,
         coin_y: Coin<Y>,
         weight_x: u64,
-        weight_y: u64,
-        decimal_x: u8,
-        decimal_y: u8,
+        weight_y: u64, 
         ctx: &mut TxContext
     ): (Coin<LP<X, Y>>, vector<u64>) {
         let is_order = is_order<X, Y>();
         if (!has_registered<X, Y>(global)) {
-            register_pool<X, Y>(global, weight_x, weight_y, decimal_x, decimal_y, ctx)
+            register_pool<X, Y>(global, weight_x, weight_y, false, ctx)
         };
 
         let pool = get_mut_pool<X, Y>(global, is_order);
@@ -785,7 +769,7 @@ module legato::amm {
         )
     }
 
-     #[test_only]
+    #[test_only]
     public fun swap_for_testing<X, Y>(
         global: &mut AMMGlobal,
         coin_in: Coin<X>,

@@ -1,16 +1,16 @@
 
-
+// Module for weighted math operations
 
 module legato::weighted_math {
   
     use legato::fixed_point64::{Self, FixedPoint64}; 
     use legato::math_fixed64;
 
-    const WEIGHT_SCALE: u64 = 10000;
-    const HALF_WEIGHT_SCALE: u64 = 5000;
+    const WEIGHT_SCALE: u64 = 10000; 
 
     const FIXED_1: u128 = 1_000_000; 
 
+    // Maximum values for u64 and u128
     const MAX_U64: u128 = 18446744073709551615;
     const MAX_U128: u256 = 340282366920938463463374607431768211455;
 
@@ -24,8 +24,7 @@ module legato::weighted_math {
     // - amount_out = amount_in * (reserve_out/reserve_in)^(weight_out/WEIGHT_SCALE)
     public fun compute_optimal_value(
         amount_in: u64,
-        reserve_in: u64,
-        _weight_in: u64, 
+        reserve_in: u64, 
         reserve_out: u64,
         weight_out: u64
     ) : u64 {
@@ -41,17 +40,12 @@ module legato::weighted_math {
     public fun get_amount_out(
         amount_in: u64,
         reserve_in: u64,
-        weight_in: u64,
-        _scaling_factor_in: u64,
+        weight_in: u64, 
         reserve_out: u64,
-        weight_out: u64,
-        _scaling_factor_out: u64
+        weight_out: u64, 
     ) : u64 {
 
         // Scale the amount to adjust for the provided scaling factor of the asset
-        // let amount_in_after_scaled = scale_amount(amount_in, scaling_factor_in);
-        // let reserve_in_after_scaled = scale_amount(reserve_in, scaling_factor_in);
-        // let reserve_out_after_scaled  = scale_amount(reserve_out, scaling_factor_out);
         let amount_in_after_scaled = (amount_in as u128);
         let reserve_in_after_scaled = (reserve_in as u128);
         let reserve_out_after_scaled  = (reserve_out as u128);
@@ -79,27 +73,13 @@ module legato::weighted_math {
     // Computes initial LP amount using the formula - total_share = (amount_x^weight_x) * (amount_y^weight_y)
     public fun compute_initial_lp(
         weight_x: u64,
-        weight_y: u64,
-        _scaling_factor_x: u64,
-        _scaling_factor_y: u64,
+        weight_y: u64, 
         amount_x: u64,
         amount_y: u64
     ): u64 {
 
-        // Scale the amounts by their respective scaling factors
-        // let amount_x_after_scaled = scale_amount(amount_x, scaling_factor_x);
-        // let amount_y_after_scaled = scale_amount(amount_y, scaling_factor_y);
-        // let amount_x_after_scaled = (amount_x as u128);
-        // let amount_y_after_scaled = (amount_y as u128);
-
-        // Weight the scaled amounts by their respective weights
-        // let amount_x_after_weighted = power( fixed_point64::create_from_rational((amount_x_after_scaled) , FIXED_1 ), fixed_point64::create_from_rational( (weight_x as u128), (WEIGHT_SCALE as u128) ));
-        // let amount_y_after_weighted = power( fixed_point64::create_from_rational((amount_y_after_scaled) , FIXED_1), fixed_point64::create_from_rational( (weight_y as u128), (WEIGHT_SCALE as u128) ));
-        
         let amount_x_after_weighted = power( fixed_point64::create_from_u128( (amount_x as u128)), fixed_point64::create_from_rational( (weight_x as u128), (WEIGHT_SCALE as u128) ));
         let amount_y_after_weighted = power( fixed_point64::create_from_u128( (amount_y as u128)), fixed_point64::create_from_rational( (weight_y as u128), (WEIGHT_SCALE as u128) ));
-
-        // let sum = math_fixed64::mul_div( amount_x_after_weighted, amount_y_after_weighted, fixed_point64::create_from_rational(1, FIXED_1) );
 
         let sum = math_fixed64::mul_div( amount_x_after_weighted, amount_y_after_weighted, fixed_point64::create_from_u128(1) );
 
@@ -172,9 +152,7 @@ module legato::weighted_math {
     // Function to assert that the LP value
     public fun assert_lp_value_is_increased( 
         weight_x: u64,
-        weight_y: u64,
-        scaling_factor_x: u64,
-        scaling_factor_y: u64,
+        weight_y: u64, 
         old_reserve_x: u64,
         old_reserve_y: u64,
         new_reserve_x: u64,
@@ -182,8 +160,8 @@ module legato::weighted_math {
     ) {
         
         // Compute the LP value using old and new reserves
-        let old_lp_value = compute_initial_lp( weight_x, weight_y, scaling_factor_x, scaling_factor_y, old_reserve_x, old_reserve_y);
-        let new_lp_value = compute_initial_lp( weight_x, weight_y, scaling_factor_x, scaling_factor_y, new_reserve_x, new_reserve_y);
+        let old_lp_value = compute_initial_lp( weight_x, weight_y, old_reserve_x, old_reserve_y);
+        let new_lp_value = compute_initial_lp( weight_x, weight_y,  new_reserve_x, new_reserve_y);
         
         // Assert that the new LP value is greater than or equal the old LP value 
         assert!(
@@ -324,9 +302,8 @@ module legato::weighted_math {
     }
 
     // calculate fee to treasury
-    public fun get_fee_to_treasury(current_fee: u64, input: u64): (u64,u64) {
-        let multiplier = fixed_point64::create_from_rational( (current_fee as u128) , (WEIGHT_SCALE as u128) );
-        let fee = (fixed_point64::multiply_u128( (input as u128) , multiplier ) as u64);
+    public fun get_fee_to_treasury(current_fee: FixedPoint64, input: u64): (u64,u64) { 
+        let fee = (fixed_point64::multiply_u128( (input as u128) , current_fee) as u64);
         return ( input-fee,fee)
     }
 
