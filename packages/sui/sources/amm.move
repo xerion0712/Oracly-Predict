@@ -34,9 +34,13 @@ module legato::amm {
     /// Minimal liquidity.
     const MINIMAL_LIQUIDITY: u64 = 1000;
     /// The integer scaling setting for weights
+    #[allow(unused_const)]
     const WEIGHT_SCALE: u64 = 10000;
      /// Max u64 value.
     const U64_MAX: u64 = 18446744073709551615;
+    /// The max value that can be held in one of the Balances of
+    /// a Pool. U64 MAX / WEIGHT_SCALE
+    const MAX_POOL_VALUE : u64 = 18446744073709551615;
 
     // ======== Errors ========
 
@@ -45,7 +49,7 @@ module legato::amm {
     const ERR_POOL_FULL: u64 = 202; 
     const ERR_INSUFFICIENT_COIN_X: u64 = 203; 
     const ERR_INSUFFICIENT_COIN_Y: u64 = 204; 
-    const ERR_DIVIDE_BY_ZERO: u64 = 205; 
+    // const ERR_DIVIDE_BY_ZERO: u64 = 205; 
     const ERR_OVERLIMIT: u64 = 206; 
     const ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM: u64 = 207; 
     const ERR_LIQUID_NOT_ENOUGH: u64 = 208; 
@@ -54,13 +58,13 @@ module legato::amm {
     const ERR_POOL_NOT_REGISTER: u64 = 211; 
     const ERR_MUST_BE_ORDER: u64 = 212; 
     const ERR_U64_OVERFLOW: u64 = 213; 
-    const ERR_INCORRECT_SWAP: u64 = 214; 
+    // const ERR_INCORRECT_SWAP: u64 = 214; 
     const ERR_INSUFFICIENT_LIQUIDITY_MINTED: u64 = 215;
     const ERR_NOT_FOUND: u64 = 216;
     const ERR_DUPLICATED_ENTRY: u64 = 217;
     const ERR_UNAUTHORISED: u64 = 218;
     const ERR_WEIGHTS_SUM: u64 = 219; 
-    const ERR_DECIMALS: u64 = 220;
+    // const ERR_DECIMALS: u64 = 220;
     const ERR_INVALID_FEE: u64 = 221;
     const ERR_PAUSED: u64 = 222;
     const ERR_NOT_REGISTERED: u64 = 223;
@@ -347,6 +351,9 @@ module legato::amm {
 
         let coin_x_amount = balance::join(&mut pool.coin_x, coin_x_balance);
         let coin_y_amount = balance::join(&mut pool.coin_y, coin_y_balance);
+
+        assert!(coin_x_amount < MAX_POOL_VALUE, ERR_POOL_FULL);
+        assert!(coin_y_amount < MAX_POOL_VALUE, ERR_POOL_FULL);
 
         let balance = balance::increase_supply(&mut pool.lp_supply, provided_liq);
 

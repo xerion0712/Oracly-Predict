@@ -8,7 +8,7 @@ module legato::weighted_math {
 
     const WEIGHT_SCALE: u64 = 10000; 
 
-    const FIXED_1: u128 = 1_000_000; 
+    // const FIXED_1: u128 = 1_000_000; 
 
     // Maximum values for u64 and u128
     const MAX_U64: u128 = 18446744073709551615;
@@ -16,9 +16,7 @@ module legato::weighted_math {
 
     const LOG_2_E: u128 = 26613026195707766742;
 
-    const ERR_INCORRECT_SWAP: u64 = 1;
-    const ERR_RATIO_OUT_OF_RANGE: u64 = 2;
-    const ERR_NEGATIVE_RESULT: u64 = 3;
+    const ERR_INCORRECT_SWAP: u64 = 1; 
 
     // Computes the optimal value for adding liquidity
     // - amount_out = amount_in * (reserve_out/reserve_in)^(weight_out/WEIGHT_SCALE)
