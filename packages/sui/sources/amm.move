@@ -331,12 +331,12 @@ module legato::amm {
             coin_x_reserve, 
             coin_y_reserve 
         );
-
+  
         let provided_liq = calculate_provided_liq<X,Y>(pool, lp_supply, coin_x_reserve, coin_y_reserve, optimal_coin_x, optimal_coin_y );
  
         assert!(provided_liq > 0, ERR_INSUFFICIENT_LIQUIDITY_MINTED);
 
-        if (optimal_coin_x < coin_x_value) {
+        if (optimal_coin_x < coin_x_value) { 
             transfer::public_transfer(
                 coin::from_balance(balance::split(&mut coin_x_balance, coin_x_value - optimal_coin_x), ctx),
                 tx_context::sender(ctx)
@@ -468,27 +468,31 @@ module legato::amm {
         } else { 
 
             if (!pool.is_stable) {
-                let coin_y_returned = weighted_math::compute_optimal_value(
+
+                let coin_y_needed = weighted_math::compute_optimal_value(
                     coin_x_desired,
-                    coin_x_reserve, 
                     coin_y_reserve,
                     pool.weight_y, 
+                    coin_x_reserve, 
+                    pool.weight_x
                 );
-
-                if (coin_y_returned <= coin_y_desired) {
-                    assert!(coin_y_returned >= coin_y_min, ERR_INSUFFICIENT_COIN_Y);
-                    return (coin_x_desired, coin_y_returned)
+ 
+                if (coin_y_needed <= coin_y_desired) {  
+                    assert!(coin_y_needed >= coin_y_min, ERR_INSUFFICIENT_COIN_Y);
+                    return (coin_x_desired, coin_y_needed)
                 } else {
-                    let coin_x_returned = weighted_math::compute_optimal_value(
+  
+                    let coin_x_needed = weighted_math::compute_optimal_value(
                         coin_y_desired,
-                        coin_y_reserve, 
-                        coin_x_reserve,
-                        pool.weight_x
+                        coin_x_reserve, 
+                        pool.weight_x,
+                        coin_y_reserve,
+                        pool.weight_y
                     );
-
-                    assert!(coin_x_returned <= coin_x_desired, ERR_OVERLIMIT);
-                    assert!(coin_x_returned >= coin_x_min, ERR_INSUFFICIENT_COIN_X);
-                    return (coin_x_returned, coin_y_desired) 
+ 
+                    assert!(coin_x_needed <= coin_x_desired, ERR_OVERLIMIT);
+                    assert!(coin_x_needed >= coin_x_min, ERR_INSUFFICIENT_COIN_X);
+                    return (coin_x_needed, coin_y_desired) 
                 } 
             } else {
                  let coin_y_returned = stable_math::get_amount_out(
@@ -534,10 +538,8 @@ module legato::amm {
 
                 initial_liq - MINIMAL_LIQUIDITY
             } else {
-    
-                let (x_liq, y_liq) = weighted_math::compute_derive_lp( optimal_coin_x, optimal_coin_y, pool.weight_x, pool.weight_y, coin_x_reserve, coin_y_reserve, lp_supply );
-    
-                (x_liq + y_liq)   
+      
+                weighted_math::compute_derive_lp( optimal_coin_x, optimal_coin_y, pool.weight_x, pool.weight_y, coin_x_reserve, coin_y_reserve, lp_supply )
             }
         } else {
             if (0 == lp_supply) {

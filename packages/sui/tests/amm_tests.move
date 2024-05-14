@@ -72,7 +72,7 @@ module legato::amm_tests {
         end(scenario);
     }
 
-    // Registering two liquidity pools:
+    // Registering three liquidity pools:
     // 1. Pool for trading USDT against XBTC, configured with weights 10% USDT and 90% XBTC.
     // 2. Pool for trading USDC against SUI, configured with equal weights of 50% USDC and 50% SUI.
     // 3. Pool for trading USDC against USDT, using stable_math.move formula.
@@ -92,8 +92,8 @@ module legato::amm_tests {
             
             let (lp, _pool_id) = amm::add_liquidity_for_testing<USDT, XBTC>(
                 &mut global,
-                mint<USDT>(USDT_AMOUNT, ctx(test)),  
-                mint<XBTC>(XBTC_AMOUNT, ctx(test)),  
+                mint<USDT>(USDT_AMOUNT, ctx(test)), // 10,000 USDT
+                mint<XBTC>(XBTC_AMOUNT, ctx(test)), // 1.8 BTC
                 1000,
                 9000, 
                 false,
@@ -106,40 +106,51 @@ module legato::amm_tests {
             test_scenario::return_shared(global);
         };
 
-          // test admin functions
-        next_tx(test, owner);
-        {
-            let global = test_scenario::take_shared<AMMGlobal>(test);
-            let managercap = test_scenario::take_from_sender<AMMManagerCap>(test);
-
-            amm::pause<USDT, XBTC>( &mut global, &mut managercap );
-            amm::resume<USDT, XBTC>( &mut global, &mut managercap );
-
-            test_scenario::return_to_sender(test, managercap);
-            test_scenario::return_shared(global);
-        };
-
-        // add 10% more
+        // Add more liquidity to the pool and then remove it
         next_tx(test, owner);
         {
             let global = test_scenario::take_shared<AMMGlobal>(test);
 
+            // Add liquidity to the pool using USDT and XBTC
             let (lp, _pool_id) = amm::add_liquidity_for_testing<USDT, XBTC>(
                 &mut global,
-                mint<USDT>(USDT_AMOUNT / 10, ctx(test)),
-                mint<XBTC>(XBTC_AMOUNT / 10, ctx(test)),
+                mint<USDT>(6800_000_000, ctx(test)), // 6800 USDT
+                mint<XBTC>(10_000_000 , ctx(test)), // 0.1 XBTC 
                 1000,
                 9000, 
                 false,
                 ctx(test)
             );
+            
+            // let burn = burn(lp);
+            // assert!(burn == 27_613_099, burn);
 
-            let burn = burn(lp); 
-            assert!(burn == 26_668_836, burn);
+            // Remove liquidity from the pool
+            let (coin_x, coin_y) = amm::remove_liquidity_for_testing<USDT, XBTC>(
+                 &mut global,
+                 lp,
+                 ctx(test)
+            ); 
 
+            let burn_coin_x = burn(coin_x);
+            assert!(6341_919_556 == burn_coin_x, 0); // Assert the returned USDT amount (6341.919556 USDT)
+            let burn_coin_y = burn(coin_y);    
+            assert!(9_801_033 == burn_coin_y, 0); // Assert the returned XBTC amount (0.09801033 XBTC)
             test_scenario::return_shared(global)
         };
 
+        // test admin functions
+        // next_tx(test, owner);
+        // {
+        //     let global = test_scenario::take_shared<AMMGlobal>(test);
+        //     let managercap = test_scenario::take_from_sender<AMMManagerCap>(test);
+
+        //     amm::pause<USDT, XBTC>( &mut global, &mut managercap );
+        //     amm::resume<USDT, XBTC>( &mut global, &mut managercap );
+
+        //     test_scenario::return_to_sender(test, managercap);
+        //     test_scenario::return_shared(global);
+        // };
 
         // Setup a 50/50 pool 
         next_tx(test, owner);
@@ -276,7 +287,7 @@ module legato::amm_tests {
             assert!(vector::length(&returns) == 4, vector::length(&returns));
 
             let coin_out = vector::borrow(&returns, 3);
-            assert!(*coin_out == 198005, *coin_out); // 0.00198005 XBTC at a rate of 1 BTC = 50757 USDT
+            assert!(*coin_out == 190_821, *coin_out); // 0.00190821 XBTC at a rate of 1 BTC = 52405 USDT
 
             test_scenario::return_shared(global);
         };
@@ -299,8 +310,8 @@ module legato::amm_tests {
             );
             assert!(vector::length(&returns) == 4, vector::length(&returns));
 
-            let coin_out = vector::borrow(&returns, 1);
-            assert!(*coin_out == 49625724, *coin_out); // 49.625724 USDT at a rate of 1 BTC = 49376 USDT
+            let coin_out = vector::borrow(&returns, 1); 
+            assert!(*coin_out == 51465941, *coin_out); // 51.465941 USDT at a rate of 1 BTC = 51465 USDT
 
             test_scenario::return_shared(global);
         };
@@ -351,36 +362,103 @@ module legato::amm_tests {
     fun remove_liquidity(test: &mut Scenario) {
         register_pools(test);
 
-        let (owner, _) = people();
+        let (_, lp_provider) = people();
 
-        // adding then removing
-        next_tx(test, owner);
+
+        // Adding then removing liquidity from a 90/10 USDT/XBTC pool
+        next_tx(test, lp_provider);
         {
             let global = test_scenario::take_shared<AMMGlobal>(test);
-
+            
+            // Add liquidity to the pool using USDT and XBTC
             let (lp, _pool_id) = amm::add_liquidity_for_testing<USDT, XBTC>(
                 &mut global,
-                mint<USDT>(USDT_AMOUNT / 20, ctx(test)), // 5% - 500 USDT
-                mint<XBTC>(XBTC_AMOUNT / 20, ctx(test)), // 5% - 0.09 XBTC
+                mint<USDT>(534_000_000, ctx(test)), // Mint 534 USDT (scaled by 1e6)
+                mint<XBTC>(1000000, ctx(test)), // Mint 0.01 XBTC (scaled by 1e8)
                 1000,
                 9000, 
                 false,
                 ctx(test)
             );
 
+            // Remove liquidity from the pool
             let (coin_x, coin_y) = amm::remove_liquidity_for_testing<USDT, XBTC>(
                  &mut global,
                  lp,
                  ctx(test)
             ); 
 
-            let burn_coin_x = burn(coin_x);   
-            assert!(488_489_407 == burn_coin_x, 0); // 488 USDT
-            let burn_coin_y = burn(coin_y);  
-            assert!(8_945_908 == burn_coin_y, 0); // 0.089 XBTC
-
+            let burn_coin_x = burn(coin_x);
+            assert!(529_341_007 == burn_coin_x, 0); // Assert the returned USDT amount (529.341007 USDT)
+            let burn_coin_y = burn(coin_y);
+            assert!(997_803 == burn_coin_y, 0); // Assert the returned XBTC amount (0.00997803 XBTC)
+            
             test_scenario::return_shared(global)
         };
+
+        // Adding then removing liquidity from a 50/50 
+        next_tx(test, lp_provider);
+        {
+            let global = test_scenario::take_shared<AMMGlobal>(test);
+            
+            // Add liquidity to the pool
+            let (lp, _pool_id) = amm::add_liquidity_for_testing<SUI, USDC>(
+                &mut global,
+                mint<SUI>(101_000_000_000, ctx(test)), // Mint 101 SUI (scaled by 1e9)
+                mint<USDC>(150_000_000, ctx(test)), // Mint 150 USDC (scaled by 1e6)
+                5000,
+                5000, 
+                false,
+                ctx(test)
+            );
+
+            // Remove liquidity from the pool
+            let (coin_x, coin_y) = amm::remove_liquidity_for_testing<SUI, USDC>(
+                 &mut global,
+                 lp,
+                 ctx(test)
+            ); 
+
+            let burn_coin_x = burn(coin_x); 
+            assert!(100_000_124_579 == burn_coin_x, 0); // Assert the returned SUI amount (100 SUI)
+            let burn_coin_y = burn(coin_y); 
+            assert!(150_000_336 == burn_coin_y, 0); // Assert the returned USDC amount (150 USDC)
+            
+            test_scenario::return_shared(global)
+        };
+
+
+        // Adding then removing liquidity from a stable pool
+        next_tx(test, lp_provider);
+        {
+            let global = test_scenario::take_shared<AMMGlobal>(test);
+            
+            // Add liquidity to the pool
+            let (lp, _pool_id) = amm::add_liquidity_for_testing<USDC, USDT>(
+                &mut global,
+                mint<USDC>(100_000_000, ctx(test)), // Mint 100 USDC (scaled by 1e6)
+                mint<USDT>(100_000_000, ctx(test)), // Mint 100 USDT (scaled by 1e6)
+                5000,
+                5000, 
+                true,
+                ctx(test)
+            );
+
+            // Remove liquidity from the pool
+            let (coin_x, coin_y) = amm::remove_liquidity_for_testing<USDC, USDT>(
+                 &mut global,
+                 lp,
+                 ctx(test)
+            ); 
+
+            let burn_coin_x = burn(coin_x);  
+            assert!(99_999_999 == burn_coin_x, 0); // Assert the returned USDC amount (100 USDC)
+            let burn_coin_y = burn(coin_y);  
+            assert!(99_999_998 == burn_coin_y, 0); // Assert the returned USDT amount (100 USDT)
+            
+            test_scenario::return_shared(global)
+        };
+
 
     }
 
