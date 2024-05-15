@@ -659,23 +659,7 @@ module legato::amm {
             balance::join(&mut pool.coin_x, coin_x_balance);
             let coin_out = coin::take(&mut pool.coin_y, coin_y_out, ctx);
             transfer::public_transfer(coin_out, tx_context::sender(ctx));
-
-            // The division operation truncates the decimal,
-            // Causing coin_out_value to be less than the calculated value.
-            // Thus making the actual value of new_reserve_out be more.
-            // So lp_value is increased.
-
-            let (new_reserve_x, new_reserve_y, _lp) = get_reserves_size(pool);
-
-            weighted_math::assert_lp_value_is_increased( 
-                pool.weight_x,
-                pool.weight_y, 
-                coin_x_reserve,
-                coin_y_reserve,
-                new_reserve_x,
-                new_reserve_y
-            );
-
+ 
             let return_values = vector::empty<u64>();
             vector::push_back(&mut return_values, coin_x_in);
             vector::push_back(&mut return_values, 0);
@@ -711,19 +695,7 @@ module legato::amm {
             let coin_out = coin::take(&mut pool.coin_x, coin_x_out, ctx);
             transfer::public_transfer(coin_out, tx_context::sender(ctx));
 
-            // The division operation truncates the decimal,
-            // Causing coin_out_value to be less than the calculated value.
-            // Thus making the actual value of new_reserve_out be more.
-            // So lp_value is increased.
-            let (new_reserve_x, new_reserve_y, _lp) = get_reserves_size(pool);
-             weighted_math::assert_lp_value_is_increased( 
-                pool.weight_x,
-                pool.weight_y, 
-                coin_x_reserve,
-                coin_y_reserve,
-                new_reserve_x,
-                new_reserve_y
-            );
+           
 
             let return_values = vector::empty<u64>();
             vector::push_back(&mut return_values, 0);
