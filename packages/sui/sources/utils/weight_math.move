@@ -202,28 +202,6 @@ module legato::weighted_math {
         fixed_point64::create_from_rational( ( (lp_supply-lp_amount) as u128 ), (lp_supply as u128) )
     }
 
-    // Function to assert that the LP value
-    public fun assert_lp_value_is_increased( 
-        weight_x: u64,
-        weight_y: u64, 
-        old_reserve_x: u64,
-        old_reserve_y: u64,
-        new_reserve_x: u64,
-        new_reserve_y: u64,
-    ) {
-        
-        // Compute the LP value using old and new reserves
-        let old_lp_value = compute_initial_lp( weight_x, weight_y, old_reserve_x, old_reserve_y);
-        let new_lp_value = compute_initial_lp( weight_x, weight_y,  new_reserve_x, new_reserve_y);
-        
-        // Assert that the new LP value is greater than or equal the old LP value 
-        assert!(
-            fixed_point64::greater_or_equal( fixed_point64::create_from_rational( (old_lp_value as u128), (new_lp_value as u128) ) , fixed_point64::create_from_rational( 99, 100 ) ),
-            ERR_INCORRECT_SWAP
-        )
-        
-    }
-
 
     // Helper function to calculate the power of a FixedPoint64 number to a FixedPoint64 exponent
     // - When `n` is > 1, it uses the formula `exp(y * ln(x))` instead of `x^y`.
