@@ -1,12 +1,13 @@
 // Copyright (c) Tamago Blockchain Labs, Inc.
 // SPDX-License-Identifier: MIT
 
-// AMM with custom weights, based on the OmniBTC AMM and upgraded using the Balancer V2 Lite formula from Ethereum. 
-// This allows for the creation of new pools with significantly less capital
-// Only whitelisted users are allowed to register new pools
+// AMM DEX with custom weights. It originated based on the OmniBTC AMM and upgraded the weights function using the Balancer V2 Lite formula from Ethereum. 
+// Having custom weights allows us to use much less capital to launch a new pool, as well as providing the capability of LBP.
+// Only whitelisted users can register new pools to ensure that high-priority LP pools are not registered by unknown parties.
 
 module legato::amm {
 
+    use std::option::{Self, Option};
     use std::vector;
     use std::string::{Self, String}; 
     use std::type_name::{get, into_string};
@@ -24,17 +25,19 @@ module legato::amm {
     use legato::weighted_math;
     use legato::stable_math;
     use legato::fixed_point64::{Self, FixedPoint64};
+    use legato::lbp::{LBPParams, Self};
 
     // ======== Constants ========
 
     // Default swap fee of 0.5% in fixed-point
     const DEFAULT_FEE: u128 = 92233720368547758;
+    // 0.25% for LBP
+    const LBP_FEE: u128 = 46116860184273879;
     // 0.1% for stable pools
     const STABLE_FEE: u128 = 18446744073709551;
     /// Minimal liquidity.
     const MINIMAL_LIQUIDITY: u64 = 1000;
     /// The integer scaling setting for weights
-    #[allow(unused_const)]
     const WEIGHT_SCALE: u64 = 10000;
      /// Max u64 value.
     const U64_MAX: u64 = 18446744073709551615;
@@ -48,8 +51,7 @@ module legato::amm {
     const ERR_RESERVES_EMPTY: u64 = 201; 
     const ERR_POOL_FULL: u64 = 202; 
     const ERR_INSUFFICIENT_COIN_X: u64 = 203; 
-    const ERR_INSUFFICIENT_COIN_Y: u64 = 204; 
-    // const ERR_DIVIDE_BY_ZERO: u64 = 205; 
+    const ERR_INSUFFICIENT_COIN_Y: u64 = 204;  
     const ERR_OVERLIMIT: u64 = 206; 
     const ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM: u64 = 207; 
     const ERR_LIQUID_NOT_ENOUGH: u64 = 208; 
@@ -58,18 +60,18 @@ module legato::amm {
     const ERR_POOL_NOT_REGISTER: u64 = 211; 
     const ERR_MUST_BE_ORDER: u64 = 212; 
     const ERR_U64_OVERFLOW: u64 = 213; 
-    // const ERR_INCORRECT_SWAP: u64 = 214; 
     const ERR_INSUFFICIENT_LIQUIDITY_MINTED: u64 = 215;
     const ERR_NOT_FOUND: u64 = 216;
     const ERR_DUPLICATED_ENTRY: u64 = 217;
     const ERR_UNAUTHORISED: u64 = 218;
-    const ERR_WEIGHTS_SUM: u64 = 219; 
-    // const ERR_DECIMALS: u64 = 220;
-    const ERR_INVALID_FEE: u64 = 221;
+    const ERR_WEIGHTS_SUM: u64 = 219;  
     const ERR_PAUSED: u64 = 222;
     const ERR_NOT_REGISTERED: u64 = 223;
-    const ERR_UNEXPECTED_RETURN: u64 = 224;
-    const ERR_INVALID_WEIGHT: u64 = 225;
+    const ERR_UNEXPECTED_RETURN: u64 = 224; 
+    const ERR_NOT_LBP: u64 = 225;
+    const ERR_INVALID_START_EPOCH: u64 = 227;
+    const ERR_LBP_NOT_STARTED: u64 = 228;
+   
 
     // ======== Structs =========
 
@@ -78,26 +80,29 @@ module legato::amm {
     /// coin held in the pool.
     struct LP<phantom X, phantom Y> has drop, store {}
 
-    /// Improved liquidity pool with custom weighting
+    // The liquidity pool with custom weighting
     struct Pool<phantom X, phantom Y> has store {
         global: ID,
         coin_x: Balance<X>,
         coin_y: Balance<Y>,
-        weight_x: u64, // 50% using 5000
-        weight_y: u64, // 50% using 5000 
+        weight_x: u64, // Weight on the X side, e.g., 50% using 5000
+        weight_y: u64, // Weight on the Y side, e.g., 50% using 5000
         lp_supply: Supply<LP<X, Y>>,
         min_liquidity: Balance<LP<X, Y>>,
         swap_fee: FixedPoint64,
+        lbp_params: Option<LBPParams>, // Params for a LBP pool
         has_paused: bool,
-        is_stable: bool
+        is_stable: bool,  // Indicates if the pool is a stable pool
+        is_lbp: bool // Indicates if the pool is a LBP
     }
 
-    // the global state of the AMM
+    // The global state of the AMM
     struct AMMGlobal has key {
         id: UID, 
-        pools: Bag,
-        whitelist: vector<address>, // who can setup a new pool
-        treasury: address // where all fees from all pools are collected for further LP staking
+        pools: Bag, // Collection of all LP pools in the system
+        archives: Bag, // Storage for archived pools 
+        whitelist: vector<address>, // Addresses that can set up a new pool
+        treasury: address // Address where all fees from all pools are collected for further LP staking
     }
 
     struct AMMManagerCap has key {
@@ -122,6 +127,7 @@ module legato::amm {
             id: object::new(ctx),
             whitelist: whitelist_list,
             pools: bag::new(ctx), 
+            archives: bag::new(ctx), 
             treasury: tx_context::sender(ctx)
         };
 
@@ -180,11 +186,11 @@ module legato::amm {
     ) {
         let is_order = is_order<X, Y>();
         
-        assert!(!has_registered<X, Y>(global), ERR_NOT_REGISTERED);
+        assert!(has_registered<X, Y>(global), ERR_NOT_REGISTERED);
         assert!(!is_paused<X,Y>(global, is_order), ERR_PAUSED);
         let pool = get_mut_pool<X, Y>(global, is_order);
 
-        let (lp, return_values) = add_liquidity_non_entry(
+        let (lp, return_values, is_pool_creator) = add_liquidity_non_entry(
             pool,
             coin_x,
             coin_x_min,
@@ -195,7 +201,13 @@ module legato::amm {
         );
         assert!(vector::length(&return_values) == 3, ERR_UNEXPECTED_RETURN);
 
-        transfer::public_transfer(lp, tx_context::sender(ctx));
+        // LP tokens of the pool creator are sent to the treasury and may receive another form of incentives
+        if (is_pool_creator) {
+            let treasury_address = get_treasury_address(global);
+            transfer::public_transfer(lp, treasury_address);
+        } else {
+            transfer::public_transfer(lp, tx_context::sender(ctx));
+        };
 
         // emit event
     }
@@ -208,9 +220,8 @@ module legato::amm {
         ctx: &mut TxContext
     ) {
         
-        let is_order = is_order<X, Y>();
-        // We allow removal of liquidity even when the pool is paused
-        // assert!(!is_emergency(global, is_order), ERR_EMERGENCY);
+        let is_order = is_order<X, Y>(); 
+        assert!(!is_paused<X,Y>(global, is_order), ERR_PAUSED);
         let pool = get_mut_pool<X, Y>(global, is_order);
 
         // let lp_val = value(&lp_coin);
@@ -235,12 +246,12 @@ module legato::amm {
 
     }
 
-    // Registers a new liquidity pool with custom weights (only whitelist)
+    // Allows authorized users to register a new liquidity pool with custom weights
+    // Note that stable pools and LBP are using separate functions below
     public entry fun register_pool<X, Y>(
         global: &mut AMMGlobal,
         weight_x: u64,
-        weight_y: u64,
-        is_stable: bool,
+        weight_y: u64, 
         ctx: &mut TxContext
     ) {
         let is_order = is_order<X, Y>();
@@ -256,44 +267,113 @@ module legato::amm {
 
         let lp_supply = balance::create_supply(LP<X, Y> {});
 
-        if ( !is_stable ) {
-            // Ensure that the normalized weights sum up to 100%
-            assert!( weight_x+weight_y == 10000, ERR_WEIGHTS_SUM);
+        // Ensure that the normalized weights sum up to 100%
+        assert!( weight_x+weight_y == 10000, ERR_WEIGHTS_SUM);
             
-            bag::add(&mut global.pools, lp_name, Pool {
-                global: object::uid_to_inner(&global.id),
-                coin_x: balance::zero<X>(),
-                coin_y: balance::zero<Y>(),
-                lp_supply,
-                min_liquidity: balance::zero<LP<X, Y>>(),
-                swap_fee: fixed_point64::create_from_raw_value( DEFAULT_FEE ),
-                weight_x,
-                weight_y,
-                is_stable: false,
-                has_paused: false
-            });
-
-        } else {
-
-            assert!( weight_x == 5000 && weight_y == 5000, ERR_WEIGHTS_SUM);
-
-            bag::add(&mut global.pools, lp_name, Pool {
-                global: object::uid_to_inner(&global.id),
-                coin_x: balance::zero<X>(),
-                coin_y: balance::zero<Y>(),
-                lp_supply,
-                min_liquidity: balance::zero<LP<X, Y>>(),
-                swap_fee: fixed_point64::create_from_raw_value( STABLE_FEE ),
-                weight_x,
-                weight_y,
-                is_stable: true,
-                has_paused: false
-            });
-
-        };
+        bag::add(&mut global.pools, lp_name, Pool {
+            global: object::uid_to_inner(&global.id),
+            coin_x: balance::zero<X>(),
+            coin_y: balance::zero<Y>(),
+            lp_supply,
+            min_liquidity: balance::zero<LP<X, Y>>(),
+            swap_fee: fixed_point64::create_from_raw_value( DEFAULT_FEE ),
+            weight_x,
+            weight_y,
+            lbp_params: option::none<LBPParams>(),
+            is_stable: false,
+            is_lbp: false,
+            has_paused: false
+        });
 
         // TODO: emit event
         
+    }
+
+    // Allows authorized users to register a stable pool, weights are fixed at 50/50
+    public entry fun register_stable_pool<X,Y>(
+        global: &mut AMMGlobal,
+        ctx: &mut TxContext
+    ) {
+        let is_order = is_order<X, Y>();
+        assert!(is_order, ERR_MUST_BE_ORDER);
+
+        // Check if authorized to register
+        check_whitelist(global, tx_context::sender(ctx));
+
+        // Check if the pool already exists
+        let lp_name = generate_lp_name<X, Y>();
+        let has_registered = bag::contains_with_type<String, Pool<X, Y>>(&global.pools, lp_name);
+        assert!(!has_registered, ERR_POOL_HAS_REGISTERED);
+
+        let lp_supply = balance::create_supply(LP<X, Y> {});
+
+        bag::add(&mut global.pools, lp_name, Pool {
+            global: object::uid_to_inner(&global.id),
+            coin_x: balance::zero<X>(),
+            coin_y: balance::zero<Y>(),
+            lp_supply,
+            min_liquidity: balance::zero<LP<X, Y>>(),
+            swap_fee: fixed_point64::create_from_raw_value( STABLE_FEE ),
+            weight_x: 5000,
+            weight_y: 5000,
+            lbp_params: option::none<LBPParams>(),
+            is_stable: true,
+            is_lbp: false,
+            has_paused: false
+        });
+
+        // TODO: emit event
+    }
+
+    // Allows authorized users to register an LBP pool.
+    // In LBP, weights apply only to the project token side and must be greater than 50%.
+    public entry fun register_lbp_pool<X,Y>(
+        global: &mut AMMGlobal,
+        proj_on_x: bool, // Indicates whether the project token is on the X or Y side
+        start_weight: u64,  // Initial weight of the project token.
+        final_weight: u64, // The weight when the pool is stabilized.  
+        is_vault: bool, // Determines the quota unit: false - by settlement collected, true - by staking rewards.
+        target_amount: u64, // The target amount required to fully shift the weight.
+        ctx: &mut TxContext
+    ) {
+
+        let is_order = is_order<X, Y>();
+        assert!(is_order, ERR_MUST_BE_ORDER);
+
+        // Check if authorized to register
+        check_whitelist(global, tx_context::sender(ctx));
+
+        // Check if the pool already exists
+        let lp_name = generate_lp_name<X, Y>();
+        let has_registered = bag::contains_with_type<String, Pool<X, Y>>(&global.pools, lp_name);
+        assert!(!has_registered, ERR_POOL_HAS_REGISTERED);
+
+        let lp_supply = balance::create_supply(LP<X, Y> {});
+
+        let params = lbp::construct_init_params(
+            proj_on_x,
+            start_weight,
+            final_weight, 
+            is_vault,
+            target_amount
+        );
+
+        bag::add(&mut global.pools, lp_name, Pool {
+            global: object::uid_to_inner(&global.id),
+            coin_x: balance::zero<X>(),
+            coin_y: balance::zero<Y>(),
+            lp_supply,
+            min_liquidity: balance::zero<LP<X, Y>>(),
+            swap_fee: fixed_point64::create_from_raw_value( LBP_FEE ),
+            weight_x: 0, // not used
+            weight_y: 0, // not used
+            lbp_params: option::some<LBPParams>(params),
+            is_stable: false,
+            is_lbp: true,
+            has_paused: false
+        });
+
+        // emit event
     }
 
     // ======== Public Functions =========
@@ -309,7 +389,7 @@ module legato::amm {
         coin_y_min: u64,
         is_order: bool,
         ctx: &mut TxContext
-    ): (Coin<LP<X, Y>>, vector<u64>) {
+    ): (Coin<LP<X, Y>>, vector<u64>, bool) {
         assert!(is_order, ERR_MUST_BE_ORDER);
 
         let coin_x_value = coin::value(&coin_x);
@@ -322,17 +402,17 @@ module legato::amm {
 
         let (coin_x_reserve, coin_y_reserve, lp_supply) = get_reserves_size(pool);
 
-        let (optimal_coin_x, optimal_coin_y) = calc_optimal_coin_values( 
+        let (optimal_coin_x, optimal_coin_y, is_pool_creator) = calc_optimal_coin_values( 
             pool, 
             coin_x_value, 
             coin_y_value, 
             coin_x_min, 
             coin_y_min, 
             coin_x_reserve, 
-            coin_y_reserve 
+            coin_y_reserve
         );
   
-        let provided_liq = calculate_provided_liq<X,Y>(pool, lp_supply, coin_x_reserve, coin_y_reserve, optimal_coin_x, optimal_coin_y );
+        let provided_liq = calculate_provided_liq<X,Y>(pool, lp_supply, coin_x_reserve, coin_y_reserve, optimal_coin_x, optimal_coin_y  );
  
         assert!(provided_liq > 0, ERR_INSUFFICIENT_LIQUIDITY_MINTED);
 
@@ -362,7 +442,7 @@ module legato::amm {
         vector::push_back(&mut return_values, coin_y_value);
         vector::push_back(&mut return_values, provided_liq);
 
-        (coin::from_balance(balance, ctx), return_values)
+        (coin::from_balance(balance, ctx), return_values, is_pool_creator)
     }
     
     public fun global_id<X, Y>(pool: &Pool<X, Y>): ID {
@@ -451,8 +531,8 @@ module legato::amm {
         )
     }
 
-    /// Calculate amounts needed for adding new liquidity for both `X` and `Y`.
-    /// Returns both `X` and `Y` coins amounts.
+    // Calculate the optimal amounts of `X` and `Y` coins needed for adding new liquidity.
+    // Returns both `X` and `Y` coins amounts.
     public fun calc_optimal_coin_values<X,Y>(
         pool: &Pool<X, Y>,
         coin_x_desired: u64,
@@ -461,40 +541,46 @@ module legato::amm {
         coin_y_min: u64,
         coin_x_reserve: u64,
         coin_y_reserve: u64
-    ): (u64, u64) {
+    ): (u64, u64, bool) {
 
+        // If the pool has no existing liquidity, return the desired amounts.
         if (coin_x_reserve == 0 && coin_y_reserve == 0) {
-            return (coin_x_desired, coin_y_desired)
+            return (coin_x_desired, coin_y_desired, true)
         } else { 
-
+            
+            // For non-stable pools, use weighted math to compute optimal values.
             if (!pool.is_stable) {
+
+                // Obtain the current weights of the pool
+                let (weight_x, weight_y ) = pool_current_weight<X,Y>(pool);
 
                 let coin_y_needed = weighted_math::compute_optimal_value(
                     coin_x_desired,
                     coin_y_reserve,
-                    pool.weight_y, 
+                    weight_y, 
                     coin_x_reserve, 
-                    pool.weight_x
+                    weight_x
                 );
  
                 if (coin_y_needed <= coin_y_desired) {  
                     assert!(coin_y_needed >= coin_y_min, ERR_INSUFFICIENT_COIN_Y);
-                    return (coin_x_desired, coin_y_needed)
+                    return (coin_x_desired, coin_y_needed, false)
                 } else {
   
                     let coin_x_needed = weighted_math::compute_optimal_value(
                         coin_y_desired,
                         coin_x_reserve, 
-                        pool.weight_x,
+                        weight_x,
                         coin_y_reserve,
-                        pool.weight_y
+                        weight_y
                     );
  
                     assert!(coin_x_needed <= coin_x_desired, ERR_OVERLIMIT);
                     assert!(coin_x_needed >= coin_x_min, ERR_INSUFFICIENT_COIN_X);
-                    return (coin_x_needed, coin_y_desired) 
+                    return (coin_x_needed, coin_y_desired, false) 
                 } 
             } else {
+                // For stable pools, use stable math to compute the optimal values.
                  let coin_y_returned = stable_math::get_amount_out(
                     coin_x_desired,
                     coin_x_reserve, 
@@ -503,7 +589,7 @@ module legato::amm {
 
                 if (coin_y_returned <= coin_y_desired) {
                     assert!(coin_y_returned >= coin_y_min, ERR_INSUFFICIENT_COIN_Y);
-                    return (coin_x_desired, coin_y_returned)
+                    return (coin_x_desired, coin_y_returned, false)
                 } else {
                     let coin_x_returned = stable_math::get_amount_out(
                         coin_y_desired,
@@ -513,7 +599,7 @@ module legato::amm {
 
                     assert!(coin_x_returned <= coin_x_desired, ERR_OVERLIMIT);
                     assert!(coin_x_returned >= coin_x_min, ERR_INSUFFICIENT_COIN_X);
-                    return (coin_x_returned, coin_y_desired) 
+                    return (coin_x_returned, coin_y_desired, false) 
                 } 
             }
             
@@ -525,9 +611,13 @@ module legato::amm {
     public fun calculate_provided_liq<X,Y>(pool: &mut Pool<X, Y>, lp_supply: u64, coin_x_reserve: u64, coin_y_reserve: u64, optimal_coin_x: u64, optimal_coin_y: u64 ) : u64 {
         
         if (!pool.is_stable) {
+
+            // Obtain the current weights of the pool
+            let (weight_x, weight_y ) = pool_current_weight<X,Y>(pool);
+
             if (0 == lp_supply) {
 
-                let initial_liq = weighted_math::compute_initial_lp(  pool.weight_x, pool.weight_y , optimal_coin_x , optimal_coin_y  );
+                let initial_liq = weighted_math::compute_initial_lp( weight_x, weight_y , optimal_coin_x , optimal_coin_y  );
                 assert!(initial_liq > MINIMAL_LIQUIDITY, ERR_LIQUID_NOT_ENOUGH);
 
                 let minimal_liquidity = balance::increase_supply(
@@ -538,8 +628,7 @@ module legato::amm {
 
                 initial_liq - MINIMAL_LIQUIDITY
             } else {
-      
-                weighted_math::compute_derive_lp( optimal_coin_x, optimal_coin_y, pool.weight_x, pool.weight_y, coin_x_reserve, coin_y_reserve, lp_supply )
+                weighted_math::compute_derive_lp( optimal_coin_x, optimal_coin_y, weight_x, weight_y, coin_x_reserve, coin_y_reserve, lp_supply )
             }
         } else {
             if (0 == lp_supply) {
@@ -586,13 +675,15 @@ module legato::amm {
 
         if (!pool.is_stable) {
 
+            let (weight_x, weight_y ) = pool_current_weight<X,Y>(pool);
+
             let (coin_x_out, coin_y_out) = weighted_math::compute_withdrawn_coins( 
                 lp_val, 
                 lp_supply, 
                 reserve_x_amount, 
                 reserve_y_amount, 
-                pool.weight_x, 
-                pool.weight_y
+                weight_x, 
+                weight_y
             ); 
 
             balance::decrease_supply(&mut pool.lp_supply, coin::into_balance(lp_coin));
@@ -631,6 +722,7 @@ module legato::amm {
         let treasury_address = get_treasury_address(global);
 
         if (is_order) {
+
             let pool = get_mut_pool<X, Y>(global, is_order);
             let (coin_x_reserve, coin_y_reserve, _lp) = get_reserves_size(pool);
             assert!(coin_x_reserve > 0 && coin_y_reserve > 0, ERR_RESERVES_EMPTY);
@@ -638,18 +730,28 @@ module legato::amm {
 
             let (coin_x_after_fees, coin_x_fee) = weighted_math::get_fee_to_treasury( pool.swap_fee , coin_x_in);
 
+            // Obtain the current weights of the pool
+            let (weight_x, weight_y ) = pool_current_weight<X,Y>(pool);
+ 
             let coin_y_out = get_amount_out(
                 pool.is_stable,
                 coin_x_after_fees,
                 coin_x_reserve,
-                pool.weight_x, 
+                weight_x, 
                 coin_y_reserve,
-                pool.weight_y
+                weight_y
             );
+             
             assert!(
                 coin_y_out >= coin_out_min,
                 ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM
             );
+
+            if (pool.is_lbp) {
+                let params = option::borrow_mut(&mut pool.lbp_params);
+                let is_buy = lbp::is_buy(params);  
+                lbp::verify_and_adjust_amount(params, is_buy, coin_x_in, coin_y_out );
+            };
 
             let coin_x_balance = coin::into_balance(coin_in);
             transfer::public_transfer(
@@ -667,24 +769,34 @@ module legato::amm {
             vector::push_back(&mut return_values, coin_y_out);
             return_values
         } else {
+
             let pool = get_mut_pool<Y, X>(global, !is_order);
             let (coin_x_reserve, coin_y_reserve, _lp) = get_reserves_size(pool);
             assert!(coin_x_reserve > 0 && coin_y_reserve > 0, ERR_RESERVES_EMPTY);
             let coin_y_in = coin::value(&coin_in);
+
+            // Obtain the current weights of the pool
+            let (weight_x, weight_y ) = pool_current_weight(pool);
 
             let (coin_y_after_fees, coin_y_fee) =  weighted_math::get_fee_to_treasury( pool.swap_fee , coin_y_in);
             let coin_x_out = get_amount_out(
                 pool.is_stable,
                 coin_y_after_fees,
                 coin_y_reserve,
-                pool.weight_y, 
+                weight_y, 
                 coin_x_reserve,
-                pool.weight_x
+                weight_x
             );
             assert!(
                 coin_x_out >= coin_out_min,
                 ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM
             );
+
+            if (pool.is_lbp) {
+                let params = option::borrow_mut(&mut pool.lbp_params);
+                let is_buy = lbp::is_buy(params);   
+                lbp::verify_and_adjust_amount(params, !is_buy, coin_y_in, coin_x_out);
+            };
 
             let coin_y_balance = coin::into_balance(coin_in);
             transfer::public_transfer(
@@ -694,8 +806,6 @@ module legato::amm {
             balance::join(&mut pool.coin_y, coin_y_balance);
             let coin_out = coin::take(&mut pool.coin_x, coin_x_out, ctx);
             transfer::public_transfer(coin_out, tx_context::sender(ctx));
-
-           
 
             let return_values = vector::empty<u64>();
             vector::push_back(&mut return_values, 0);
@@ -724,56 +834,113 @@ module legato::amm {
         }
     }
 
+    // Retrieve the current weights of the pool
+    public fun pool_current_weight<X,Y>(pool: &Pool<X, Y> ): (u64, u64)  {
+        
+        if (!pool.is_lbp) {
+            ( pool.weight_x, pool.weight_y )
+        } else {
+            let params = *option::borrow(&pool.lbp_params);
+            lbp::current_weight( &params ) 
+        }
+
+    }
+
+    // Retrieves information about the LBP pool
+    public fun lbp_info<X,Y>( global: &mut AMMGlobal) : (u64, u64, u64, u64) {
+        let is_order = is_order<X, Y>();
+
+        if (is_order) {
+            let pool = get_mut_pool<X, Y>(global, is_order);
+
+            assert!( pool.is_lbp == true , ERR_NOT_LBP);
+            
+            let ( weight_x, weight_y ) = pool_current_weight(pool);
+            let params = *option::borrow(&pool.lbp_params);
+
+            (
+                weight_x,
+                weight_y,
+                lbp::total_amount_collected(&params), 
+                lbp::total_target_amount(&params)
+            )
+        } else {
+            let pool = get_mut_pool<Y, X>(global, true);
+            assert!( pool.is_lbp == true , ERR_NOT_LBP);
+
+            let ( weight_y, weight_x ) = pool_current_weight(pool);
+            let params = *option::borrow(&pool.lbp_params);
+
+            (
+                weight_x,
+                weight_y,
+                lbp::total_amount_collected(&params), 
+                lbp::total_target_amount(&params)
+            )
+        }
+    }
+
     // ======== Only Governance =========
 
-    // update the pool fee
+    // Updates the swap fee for the specified pool
     public entry fun update_pool_fee<X, Y>(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap, fee_numerator: u128, fee_denominator: u128 ) {
         let is_order = is_order<X, Y>();
         let pool = get_mut_pool<X, Y>(global, is_order);
         pool.swap_fee = fixed_point64::create_from_rational( fee_numerator, fee_denominator )
     }
 
-    // add whitelist
+    // Adds a user to the whitelist
     public entry fun add_whitelist(global: &mut AMMGlobal,  _manager_cap: &mut AMMManagerCap, user: address) {
         assert!(!vector::contains(&global.whitelist, &user),ERR_DUPLICATED_ENTRY);
         vector::push_back<address>(&mut global.whitelist, user);
     }
 
-    // remove whitelist
+    // Removes a user from the whitelist
     public entry fun remove_whitelist(global: &mut AMMGlobal,  _manager_cap: &mut AMMManagerCap, user: address) {
         let (contained, index) = vector::index_of<address>(&global.whitelist, &user);
         assert!(contained,ERR_NOT_FOUND);
         vector::remove<address>(&mut global.whitelist, index);
     }
 
-    // pause the given pool
+    // Pauses the specified pool
     public entry fun pause<X, Y>(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap) {
         let is_order = is_order<X, Y>();
         let pool = get_mut_pool<X, Y>(global, is_order);
         pool.has_paused = true
     }
 
-    // unpause
+    // Resumes the specified pool
     public entry fun resume<X, Y>( global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap) {
         let is_order = is_order<X, Y>();
         let pool = get_mut_pool<X, Y>(global, is_order);
         pool.has_paused = false
     }
 
-    // update treasury address
+    // Updates the treasury address
     public entry fun update_treasury(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap, treasury_address: address) {
         global.treasury = treasury_address;
     }
 
-    // update pool weights
-    public entry fun update_pool_weights<X, Y>(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap, weight_x: u64, weight_y: u64,) {
-        assert!( weight_x+weight_y == 10000, ERR_WEIGHTS_SUM); 
+    // Updates the weights of the specified pool
+    // public entry fun update_pool_weights<X, Y>(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap, weight_x: u64, weight_y: u64) {
+    //     assert!( weight_x+weight_y == 10000, ERR_WEIGHTS_SUM); 
 
-        let is_order = is_order<X, Y>();
-        let pool = get_mut_pool<X, Y>(global, is_order);
+    //     let is_order = is_order<X, Y>();
+    //     let pool = get_mut_pool<X, Y>(global, is_order);
         
-        pool.weight_x = weight_x;
-        pool.weight_y = weight_y;
+    //     pool.weight_x = weight_x;
+    //     pool.weight_y = weight_y;
+    // }
+
+    // Moves a pool to the archive 
+    public entry fun move_to_archive<X, Y>(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap) {
+        let is_order = is_order<X, Y>();
+        assert!(is_order, ERR_MUST_BE_ORDER);
+
+        let lp_name = generate_lp_name<X, Y>();
+        let pool = bag::remove<String, Pool<X, Y>>(&mut global.pools, lp_name);
+
+        bag::add(&mut global.archives, lp_name, pool );
     }
 
     // ======== Internal Functions =========
@@ -812,10 +979,14 @@ module legato::amm {
         weight_y: u64, 
         is_stable: bool,
         ctx: &mut TxContext
-    ): (Coin<LP<X, Y>>, vector<u64>) {
+    ): (Coin<LP<X, Y>>, vector<u64>, bool) {
         let is_order = is_order<X, Y>();
         if (!has_registered<X, Y>(global)) {
-            register_pool<X, Y>(global, weight_x, weight_y, is_stable, ctx)
+            if (!is_stable) {
+                register_pool<X, Y>(global, weight_x, weight_y, ctx);
+            } else {
+                register_stable_pool<X,Y>( global, ctx );
+            };
         };
 
         let pool = get_mut_pool<X, Y>(global, is_order);

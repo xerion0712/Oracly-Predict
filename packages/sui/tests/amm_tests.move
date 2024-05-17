@@ -90,7 +90,7 @@ module legato::amm_tests {
         {
             let global = test_scenario::take_shared<AMMGlobal>(test);
             
-            let (lp, _pool_id) = amm::add_liquidity_for_testing<USDT, XBTC>(
+            let (lp, _pool_id, _) = amm::add_liquidity_for_testing<USDT, XBTC>(
                 &mut global,
                 mint<USDT>(USDT_AMOUNT, ctx(test)), // 10,000 USDT
                 mint<XBTC>(XBTC_AMOUNT, ctx(test)), // 1.8 BTC
@@ -112,7 +112,7 @@ module legato::amm_tests {
             let global = test_scenario::take_shared<AMMGlobal>(test);
 
             // Add liquidity to the pool using USDT and XBTC
-            let (lp, _pool_id) = amm::add_liquidity_for_testing<USDT, XBTC>(
+            let (lp, _pool_id, _) = amm::add_liquidity_for_testing<USDT, XBTC>(
                 &mut global,
                 mint<USDT>(6800_000_000, ctx(test)), // 6800 USDT
                 mint<XBTC>(10_000_000 , ctx(test)), // 0.1 XBTC 
@@ -157,7 +157,7 @@ module legato::amm_tests {
         {
             let global = test_scenario::take_shared<AMMGlobal>(test);
 
-            let (lp, _pool_id) = amm::add_liquidity_for_testing<SUI, USDC>(
+            let (lp, _pool_id, _) = amm::add_liquidity_for_testing<SUI, USDC>(
                 &mut global,
                 mint<SUI>(SUI_AMOUNT, ctx(test)),  
                 mint<USDC>(USDC_AMOUNT, ctx(test)),  
@@ -178,7 +178,7 @@ module legato::amm_tests {
         {
             let global = test_scenario::take_shared<AMMGlobal>(test);
 
-            let (lp, _pool_id) = amm::add_liquidity_for_testing<USDC, USDT>(
+            let (lp, _pool_id, _) = amm::add_liquidity_for_testing<USDC, USDT>(
                 &mut global,
                 mint<USDC>(50000_000_000, ctx(test)),  // 50,000 USDC
                 mint<USDT>(50000_000_000, ctx(test)), // 50,000 USDT
@@ -241,7 +241,7 @@ module legato::amm_tests {
         {
             let global = test_scenario::take_shared<AMMGlobal>(test);
 
-            let (lp, _pool_id) = amm::add_liquidity_for_testing<USDC, USDT>(
+            let (lp, _pool_id, _) = amm::add_liquidity_for_testing<USDC, USDT>(
                 &mut global,
                 mint<USDC>(5000_000_000, ctx(test)),  // 5,000 USDC
                 mint<USDT>(5000_000_000, ctx(test)), // 5,000 USDT
@@ -371,7 +371,7 @@ module legato::amm_tests {
             let global = test_scenario::take_shared<AMMGlobal>(test);
             
             // Add liquidity to the pool using USDT and XBTC
-            let (lp, _pool_id) = amm::add_liquidity_for_testing<USDT, XBTC>(
+            let (lp, _pool_id, _) = amm::add_liquidity_for_testing<USDT, XBTC>(
                 &mut global,
                 mint<USDT>(534_000_000, ctx(test)), // Mint 534 USDT (scaled by 1e6)
                 mint<XBTC>(1000000, ctx(test)), // Mint 0.01 XBTC (scaled by 1e8)
@@ -402,7 +402,7 @@ module legato::amm_tests {
             let global = test_scenario::take_shared<AMMGlobal>(test);
             
             // Add liquidity to the pool
-            let (lp, _pool_id) = amm::add_liquidity_for_testing<SUI, USDC>(
+            let (lp, _pool_id, _) = amm::add_liquidity_for_testing<SUI, USDC>(
                 &mut global,
                 mint<SUI>(101_000_000_000, ctx(test)), // Mint 101 SUI (scaled by 1e9)
                 mint<USDC>(150_000_000, ctx(test)), // Mint 150 USDC (scaled by 1e6)
@@ -434,7 +434,7 @@ module legato::amm_tests {
             let global = test_scenario::take_shared<AMMGlobal>(test);
             
             // Add liquidity to the pool
-            let (lp, _pool_id) = amm::add_liquidity_for_testing<USDC, USDT>(
+            let (lp, _pool_id, _) = amm::add_liquidity_for_testing<USDC, USDT>(
                 &mut global,
                 mint<USDC>(100_000_000, ctx(test)), // Mint 100 USDC (scaled by 1e6)
                 mint<USDT>(100_000_000, ctx(test)), // Mint 100 USDT (scaled by 1e6)

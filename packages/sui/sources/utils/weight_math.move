@@ -194,15 +194,7 @@ module legato::weighted_math {
         math_fixed64::mul_div(  fixed_point64::create_from_u128(  (lp_supply as u128) ), fixed_point64::sub( power,  fixed_point64::create_from_u128(1) ), fixed_point64::create_from_u128(1)  )
     }
 
-    fun balance_ratio( amount: u64, reserve: u64, weight: u64 ) : FixedPoint64 {
-        fixed_point64::create_from_rational( ( (reserve+amount) as u128 ), (reserve as u128) )
-    }
-
-    fun lp_ratio(lp_amount: u64, lp_supply: u64, weight: u64) : FixedPoint64 {
-        fixed_point64::create_from_rational( ( (lp_supply-lp_amount) as u128 ), (lp_supply as u128) )
-    }
-
-
+    
     // Helper function to calculate the power of a FixedPoint64 number to a FixedPoint64 exponent
     // - When `n` is > 1, it uses the formula `exp(y * ln(x))` instead of `x^y`.
     // - When `n` is < 1, it employs the Newton-Raphson method.
