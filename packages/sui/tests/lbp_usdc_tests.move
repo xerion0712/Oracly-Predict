@@ -9,8 +9,7 @@ module legato::lbp_usdc_tests {
     use sui::test_scenario::{Self, Scenario, next_tx, ctx, end};
     use sui::tx_context::{Self};
     
-    use legato::fixed_point64::{Self};
-    use legato::amm::{Self, AMMGlobal, AMMManagerCap, LP};
+    use legato::amm::{Self, AMMGlobal};
 
     // Setting up a LBP pool to distribute 60 mil. LEGATO tokens 
     // Weight starts at a 90/10 ratio and gradually shifts to a 60/40 ratio.
@@ -128,7 +127,7 @@ module legato::lbp_usdc_tests {
             assert!( target_amount == 50000_000000 , target_amount); // 50000 USDC 
 
             let pool = amm::get_mut_pool<USDC,  LEGATO>(&mut global, true);
-            let (usdc_reserve, legato_reserve, _) = amm::get_reserves_size<USDC, LEGATO>(pool);
+            let (usdc_reserve, legato_reserve, _) = amm::get_reserves_size<USDC, LEGATO>(pool, true);
             
             assert!( legato_reserve == 17741339_88106594 , 0); // 17.74 million LEGATO tokens remain in the pool
             assert!( usdc_reserve == 50384_975051 , 0); // 50384 USDC has been received as liquidity after the weight is stabilized
@@ -191,8 +190,7 @@ module legato::lbp_usdc_tests {
         // Registering an LBP pool for LEGATO token against USDC
         next_tx(test, owner);
         {
-            let global = test_scenario::take_shared<AMMGlobal>(test);
-            let current_epoch = tx_context::epoch(ctx(test));
+            let global = test_scenario::take_shared<AMMGlobal>(test); 
 
             amm::register_lbp_pool<USDC, LEGATO >( 
                 &mut global, 
@@ -259,9 +257,6 @@ module legato::lbp_usdc_tests {
             
             test_scenario::return_shared(global)
         };
-
-        
-
 
     }
 

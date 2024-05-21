@@ -148,53 +148,10 @@ module legato::vault {
         ctx: &mut TxContext
     ) {
         
-        let vault_config = get_vault_config<P>(&mut global.vault_config);
-        let vault_reserve = get_vault_reserve<P>(&mut global.vault_reserves);
+        let (pt_token, _) = mint_non_entry<P>(wrapper, global, staked_sui, ctx);
 
-        // Ensure minting is enabled for the vault
-        assert!(vault_config.enable_mint == true, E_NOT_ENABLED);
-        // Ensure the vault has not yet matured
-        assert!(vault_config.maturity_epoch-COOLDOWN_EPOCH > tx_context::epoch(ctx), E_VAULT_MATURED);
-        // Ensure staked SUI amount is above the minimum threshold
-        assert!(staking_pool::staked_sui_amount(&staked_sui) >= MIN_SUI_TO_STAKE, E_MIN_THRESHOLD);
-
-        // Check if the staked SUI is staked on a valid staking pool
-        let pool_id = staking_pool::pool_id(&staked_sui);
-        assert!(vector::contains(&global.staking_pool_ids, &pool_id), E_UNAUTHORIZED_POOL);
-
-        let _asset_object_id = object::id(&staked_sui);
-
-        // Extract principal amount of staked SUI
-        let principal_amount = staking_pool::staked_sui_amount(&staked_sui);
-
-        // Apply deposit cap if defined
-        if (option::is_some(&global.deposit_cap)) {
-            assert!( *option::borrow(&global.deposit_cap) >= principal_amount, E_DEPOSIT_CAP);
-            *option::borrow_mut(&mut global.deposit_cap) = *option::borrow(&global.deposit_cap)-principal_amount;
-        };
-
-        // Calculate total earned amount until current epoch
-        let total_earned = 
-            if (tx_context::epoch(ctx) > staking_pool::stake_activation_epoch(&staked_sui))
-                stake_data_provider::earnings_from_staked_sui(wrapper, &staked_sui, tx_context::epoch(ctx))
-            else 0;
-
-        // Receive staked SUI
-        vector::push_back<StakedSui>(&mut vault_config.staked_sui, staked_sui); 
-        if (vector::length(&vault_config.staked_sui) > 1) sort_items(&mut vault_config.staked_sui);
-
-        // Calculate PT debt amount to send out 
-        let minted_pt_amount = calculate_pt_debt_amount(vault_config.vault_apy, tx_context::epoch(ctx), vault_config.maturity_epoch, principal_amount+total_earned);
-        let debt_amount = minted_pt_amount-principal_amount; 
-        
-        // Sanity check
-        assert!(minted_pt_amount >= MIN_SUI_TO_STAKE, E_MINT_PT_ERROR);
-
-        // Mint PT to the user
-        transfer::public_transfer( mint_pt<P>(vault_reserve, minted_pt_amount, ctx), tx_context::sender(ctx));
-        
-        // Update vault's debt balance
-        vault_config.debt_balance = vault_config.debt_balance+debt_amount;
+        // Transfer PT to the user
+        transfer::public_transfer( pt_token , tx_context::sender(ctx));
 
         // TODO: emit event
     }
@@ -202,23 +159,14 @@ module legato::vault {
     // Redeem SUI back at a 1:1 ratio with PT tokens when the vault reaches its maturity date
     public entry fun redeem<P>(wrapper: &mut SuiSystemState, global: &mut Global, pt: Coin<PT_TOKEN<P>>, ctx: &mut TxContext) {
         
-        let vault_config = get_vault_config<P>(&mut global.vault_config);
-        assert!(vault_config.enable_redeem == true, E_NOT_ENABLED);
-        assert!(tx_context::epoch(ctx) > vault_config.maturity_epoch, E_VAULT_NOT_MATURED);
-        assert!(coin::value<PT_TOKEN<P>>(&pt) >= MIN_PT_TO_REDEEM, E_MIN_THRESHOLD);
+        let (sui_token, _) = redeem_non_entry<P>(
+            wrapper,
+            global,
+            pt,
+            ctx
+        );
 
-        let paidout_amount = coin::value<PT_TOKEN<P>>(&pt);
-
-        // Initiates withdrawal by unstaking locked Staked SUI items that have the closest value 
-        // to the input PT amount and puts them into the shared pool
-        prepare_withdrawal(wrapper, global, paidout_amount, ctx);
-
-        // give SUI to sender
-        transfer::public_transfer(withdraw_sui(global, paidout_amount, ctx), tx_context::sender(ctx));
-        
-        // burn PT tokens
-        let vault_reserve = get_vault_reserve<P>(&mut global.vault_reserves);
-        let _burned_balance = balance::decrease_supply(&mut vault_reserve.pt_supply, coin::into_balance(pt));
+        transfer::public_transfer(sui_token, tx_context::sender(ctx));
 
         // TODO: emit event
 
@@ -335,6 +283,94 @@ module legato::vault {
     //     };
     //     total_sum
     // }
+
+    public fun staking_pools(global: &Global) : vector<address> {
+        global.staking_pools
+    }
+
+    public fun mint_non_entry<P>(
+        wrapper: &mut SuiSystemState, 
+        global: &mut Global, 
+        staked_sui: StakedSui, 
+        ctx: &mut TxContext
+    ) : (Coin<PT_TOKEN<P>>, u64) {
+
+        let vault_config = get_vault_config<P>(&mut global.vault_config);
+        let vault_reserve = get_vault_reserve<P>(&mut global.vault_reserves);
+
+        // Ensure minting is enabled for the vault
+        assert!(vault_config.enable_mint == true, E_NOT_ENABLED);
+        // Ensure the vault has not yet matured
+        assert!(vault_config.maturity_epoch-COOLDOWN_EPOCH > tx_context::epoch(ctx), E_VAULT_MATURED);
+        // Ensure staked SUI amount is above the minimum threshold
+        assert!(staking_pool::staked_sui_amount(&staked_sui) >= MIN_SUI_TO_STAKE, E_MIN_THRESHOLD);
+
+        // Check if the staked SUI is staked on a valid staking pool
+        let pool_id = staking_pool::pool_id(&staked_sui);
+        assert!(vector::contains(&global.staking_pool_ids, &pool_id), E_UNAUTHORIZED_POOL);
+
+        let _asset_object_id = object::id(&staked_sui);
+
+        // Extract principal amount of staked SUI
+        let principal_amount = staking_pool::staked_sui_amount(&staked_sui);
+
+        // Apply deposit cap if defined
+        if (option::is_some(&global.deposit_cap)) {
+            assert!( *option::borrow(&global.deposit_cap) >= principal_amount, E_DEPOSIT_CAP);
+            *option::borrow_mut(&mut global.deposit_cap) = *option::borrow(&global.deposit_cap)-principal_amount;
+        };
+
+        // Calculate total earned amount until current epoch
+        let total_earned = 
+            if (tx_context::epoch(ctx) > staking_pool::stake_activation_epoch(&staked_sui))
+                stake_data_provider::earnings_from_staked_sui(wrapper, &staked_sui, tx_context::epoch(ctx))
+            else 0;
+
+        // Receive staked SUI
+        vector::push_back<StakedSui>(&mut vault_config.staked_sui, staked_sui); 
+        if (vector::length(&vault_config.staked_sui) > 1) sort_items(&mut vault_config.staked_sui);
+
+        // Calculate PT debt amount to send out 
+        let minted_pt_amount = calculate_pt_debt_amount(vault_config.vault_apy, tx_context::epoch(ctx), vault_config.maturity_epoch, principal_amount+total_earned);
+        let debt_amount = minted_pt_amount-principal_amount; 
+        let yield_amount = minted_pt_amount-(principal_amount+total_earned);
+        
+        // Sanity check
+        assert!(minted_pt_amount >= MIN_SUI_TO_STAKE, E_MINT_PT_ERROR);
+
+        // Update vault's debt balance
+        vault_config.debt_balance = vault_config.debt_balance+debt_amount;
+
+        (mint_pt<P>(vault_reserve, minted_pt_amount, ctx), yield_amount)
+    }
+
+    public fun redeem_non_entry<P>(
+        wrapper: &mut SuiSystemState,
+        global: &mut Global,
+        pt: Coin<PT_TOKEN<P>>,
+        ctx: &mut TxContext
+    ) : (Coin<SUI>, u64) {
+
+        let vault_config = get_vault_config<P>(&mut global.vault_config);
+        assert!(vault_config.enable_redeem == true, E_NOT_ENABLED);
+        assert!(tx_context::epoch(ctx) > vault_config.maturity_epoch, E_VAULT_NOT_MATURED);
+        assert!(coin::value<PT_TOKEN<P>>(&pt) >= MIN_PT_TO_REDEEM, E_MIN_THRESHOLD);
+
+        let paidout_amount = coin::value<PT_TOKEN<P>>(&pt);
+
+        // Initiates withdrawal by unstaking locked Staked SUI items that have the closest value 
+        // to the input PT amount and puts them into the shared pool
+        prepare_withdrawal(wrapper, global, paidout_amount, ctx);
+
+        // give SUI to sender
+        let sui_token = withdraw_sui(global, paidout_amount, ctx);
+        
+        // burn PT tokens
+        let vault_reserve = get_vault_reserve<P>(&mut global.vault_reserves);
+        let burned_balance = balance::decrease_supply(&mut vault_reserve.pt_supply, coin::into_balance(pt));
+
+        ( sui_token , burned_balance )
+    }
 
     // ======== Only Governance =========
 

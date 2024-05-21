@@ -8,37 +8,59 @@
 
 module legato::lbp {
 
-    use std::option::{Self, Option};
-    use legato::fixed_point64::{Self, FixedPoint64};
-    use legato::weighted_math;
+    use std::vector;
+    use std::string::{Self, String}; 
+    use std::type_name::{get, into_string};
+    use std::ascii::into_bytes;
 
-    const MIN_TRIGGER_AMOUNT: u64 = 10000;
-    const MAX_EPOCH_SPAN: u64 = 100;
+    use sui::coin::{Self, Coin};
+    use sui::balance::{ Self, Supply, Balance}; 
+    use sui::bag::{Self, Bag};
+    use sui::tx_context::{ Self, TxContext}; 
+
+    use legato::fixed_point64::{Self};
+    use legato::weighted_math;
+    use legato::vault::{  PT_TOKEN};
+ 
     /// The integer scaling setting for weights
     const WEIGHT_SCALE: u64 = 10000;
 
-    const ERR_TOO_LOW_VALUE: u64 = 301;
-    const ERR_INVALID_WEIGHT: u64 = 302; 
-    const ERR_EXCEED_AVAILABLE: u64 = 303; 
+    // ======== Errors ========
+ 
+    const ERR_INVALID_WEIGHT: u64 = 301;  
+    const ERR_INVALID_SENDER: u64 = 302;
+    const ERR_EMPTY: u64 = 303;
+    const ERR_INVALID_POOL: u64 = 304;
+    const ERR_INSUFFICIENT_AMOUNT : u64 = 305;
+    const ERR_INVALID_AMOUNT: u64 = 306;
 
     friend legato::amm;
- 
+
+    // ======== Structs =========
+
     // Defines the settings for the LBP pool.
-    struct LBPParams has copy, store, drop {
+    struct LBPParams has store {
         is_proj_on_x: bool, // Indicates if the project token is on the X side of the pool.
         start_weight: u64,  // Initial weight of the project token.
         final_weight: u64, // The weight when the pool is stabilized.  
-        is_vault: bool, // Determines the settlement asset: false - coins, true - staking rewards.
+        is_vault: bool, // Accepts vault tokens
         target_amount: u64, // The target amount required to fully shift the weight.
         total_amount_collected: u64,  // Total amount accumulated in the pool.
     }
 
-    // Constructs initialization parameters for an LBP
+    // Storage for vault-related coins when accepting vault tokens
+    struct LBPStorage has store {
+        coins: Bag, // Storage for coins pending in and out
+        pending_in: vector<String>, // List of coins pending to be added to the pool
+        pending_in_amount: u64 // Total amount of coins pending to be added to the pool
+    }
+
+    // Constructs initialization parameters for an Lpending_amountBP
     public(friend) fun construct_init_params(
         proj_on_x: bool, // Indicates whether the project token is on the X or Y side
         start_weight: u64, 
         final_weight: u64,  
-        is_vault: bool, // Determines if the pool accepts coins or future staking rewards.
+        is_vault: bool, // Determines if future staking rewards.
         target_amount: u64
     ) : LBPParams {
 
@@ -56,8 +78,17 @@ module legato::lbp {
             total_amount_collected: 0
         }
     }
- 
 
+    public(friend) fun create_empty_storage(ctx: &mut TxContext) : LBPStorage {
+        LBPStorage {
+            coins: bag::new(ctx), 
+            pending_in: vector::empty<String>(),
+            pending_in_amount: 0,
+            // pending_out: vector::empty<String>(),
+            // pending_out_amount: 0
+        }
+    }
+ 
     // Calculates the current weight of the project token.
     // -  decline_ratio = (total_collected / target_amount)^(stablized_weight / start_weight)
     public(friend) fun current_weight(params: &LBPParams ) : (u64, u64) {
@@ -115,24 +146,81 @@ module legato::lbp {
         }
     }
 
+    public(friend) fun add_pending_in<X>(storage: &mut LBPStorage, coin_in: Coin<PT_TOKEN<X>>, amount_in: u64) {
+        let token_name = token_to_name<X>();
+
+         if (!bag::contains_with_type<String, Balance<PT_TOKEN<X>>>(&storage.coins, token_name)) {
+            let new_balance = balance::zero<PT_TOKEN<X>>();
+            balance::join(&mut new_balance, coin::into_balance(coin_in));
+            bag::add(&mut storage.coins, token_name, new_balance );
+        } else {
+            let current_balance = bag::borrow_mut<String, Balance<PT_TOKEN<X>>>(&mut storage.coins, token_name);
+            balance::join( current_balance, coin::into_balance(coin_in) );
+        };
+
+        storage.pending_in_amount = storage.pending_in_amount+amount_in;
+
+        if (!vector::contains(&storage.pending_in , &token_name)) {
+            vector::push_back<String>(&mut storage.pending_in, token_name);
+        };
+
+    }
+
+    // public(friend) fun add_pending_out<Y>(storage: &mut LBPStorage, coin_out: Coin<Y>, amount_out: u64 ) {
+
+    //     let project_token_name =  token_to_name<Y>();
+
+    //     if (!bag::contains_with_type<String, Balance<Y>>(&storage.coins, project_token_name)) {
+    //         let new_balance = balance::zero<Y>();
+    //         balance::join(&mut new_balance, coin::into_balance(coin_out));
+    //         bag::add(&mut storage.coins, project_token_name, new_balance );
+    //     } else {
+    //         let current_balance = bag::borrow_mut<String, Balance<Y>>(&mut storage.coins, project_token_name);
+    //         balance::join( current_balance, coin::into_balance(coin_out) );
+    //     };
+
+    //     storage.pending_out_amount = storage.pending_out_amount+amount_out;
+
+    //     if (!vector::contains(&storage.pending_out, &project_token_name)) {
+    //         vector::push_back<String>(&mut storage.pending_out, project_token_name);
+    //     };
+
+    //     // update_pending_out_table( &mut storage.pending_out_table, project_token_name, amount_out, sender_address );
+
+    // }
+
     // Verifies and adjusts the amount for weight calculation
     public(friend) fun verify_and_adjust_amount(params: &mut LBPParams, is_buy: bool, amount_in: u64, _amount_out: u64 ) {
         // Works when the weight is not stabilized
         if ( params.target_amount >  params.total_amount_collected) {
-            // Triggered by token sold
-            if (!params.is_vault) {
-                // Considered only buy transactions
-                if (is_buy) {
-                    // Update the total amount collected
-                    params.total_amount_collected = params.total_amount_collected+amount_in;
-                };
-            } else {
-                // Triggered by staking rewards
+            // Considered only buy transactions
+            if (is_buy) {
+                assert!( params.target_amount > amount_in, ERR_INVALID_AMOUNT );
+                // Update the total amount collected
+                params.total_amount_collected = params.total_amount_collected+amount_in;
             };
         };
     }
- 
 
+    public(friend) fun withdraw_pending_in<X>(storage: &mut LBPStorage, ctx: &mut TxContext) : Coin<PT_TOKEN<X>> {
+        
+        let token_name = token_to_name<X>();
+        
+        assert!(bag::contains_with_type<String, Balance<PT_TOKEN<X>>>(&storage.coins, token_name), ERR_INVALID_POOL);
+
+        let current_balance = bag::borrow_mut<String, Balance<PT_TOKEN<X>>>(&mut storage.coins, token_name);
+
+        // Get the total locked amount of PT tokens.
+        let total_locked = balance::value(current_balance);
+
+        // Locked amount must greater than 0, otherwise return an error.
+        assert!(total_locked > 0 , ERR_EMPTY );
+        
+        storage.pending_in_amount = storage.pending_in_amount - total_locked;
+
+        coin::from_balance(balance::split(current_balance, total_locked ), ctx)
+    }
+ 
     public fun is_vault(params: &LBPParams) : bool {
         params.is_vault
     }
@@ -148,36 +236,91 @@ module legato::lbp {
     public fun proj_on_x(params: &LBPParams) : bool {
         params.is_proj_on_x
     }
- 
-    fun increase_total_amount_collected(params: &mut LBPParams, amount: u64) {
-        params.total_amount_collected = params.total_amount_collected+amount;
+
+    public fun pending_in_amount(storage: &LBPStorage) : u64 {
+        storage.pending_in_amount
     }
 
-    #[test]
-    public fun test_current_weight() {
+    public fun token_to_name<X>(): String {
+        string::utf8(into_bytes(into_string(get<X>())))
+    }
 
-        let params = construct_init_params(
-            false,
-            9000, // start weight
-            6000, // end weight 
-            false,
-            50000_000000 // 50,000 USDC
-        );
-
-        increase_total_amount_collected( &mut params, 2000_000000 ); // 2,000 USDC
-        let current_weight = 10000;
-
-        // Keep acquiring
-        while ( total_amount_collected(&params) <= 50000_000000) { 
-            let (_, weight_pair) = current_weight( &params );
- 
-            // Check that the weight is continuously declining
-            assert!( current_weight >= weight_pair , weight_pair);
+    // Updates the pending balance of a user for a given token.
+    // fun update_pending_out_table(table: &mut Table<address, UserBalance>, token_name: String, amount: u64, sender: address) {
+        
+    //     // Check if the user (sender) already has a balance entry in the table
+    //     if (table::contains(table, sender)) {
             
-            current_weight = weight_pair;
-            increase_total_amount_collected( &mut params, 2000_000000 );
-        };
+    //         let user_balance = table::borrow_mut(table, sender );
 
-    }
+    //         // Check if the token is already in the user's token list
+    //         if (!vector::contains(&user_balance.token_names , &token_name)) {
+    //             // If the token is not in the list, add it along with the amount
+    //             vector::push_back( &mut user_balance.token_names, token_name);
+    //             vector::push_back( &mut user_balance.token_amounts, amount);
+    //         } else {
+    //              // If the token is already in the list, find its index
+    //             let (_, index) = vector::index_of(&user_balance.token_names, &token_name );
+    //             let current_amount = *vector::borrow( &user_balance.token_amounts, index );
+    //             // Update the amount of the token by adding the new amount
+    //             *vector::borrow_mut( &mut user_balance.token_amounts, index ) = current_amount+amount;
+    //         };
+    //     } else {
+    //         // If the user does not have a balance entry, create new lists for token names and amounts
+    //         let token_list = vector::empty<String>();
+    //         let balance_list = vector::empty<u64>();
+
+    //         // Add the token name and amount to the new lists
+    //         vector::push_back( &mut token_list, token_name );
+    //         vector::push_back( &mut balance_list, amount);
+
+    //         let user_balance = UserBalance {    
+    //             token_names: token_list,
+    //             token_amounts: balance_list
+    //         };
+
+    //         // Add the new user balance entry to the table
+    //         table::add(table, sender, user_balance);
+    //     };
+    // }
+
+    // public(friend) fun pending_out_balances(storage: &LBPStorage, sender: address) : (vector<String>, vector<u64>) {
+    //     assert!( table::contains(&storage.pending_out_table , sender), ERR_INVALID_SENDER );
+        
+    //     let user_balance = table::borrow(&storage.pending_out_table, sender );
+
+    //     (user_balance.token_names, user_balance.token_amounts)
+    // }
+ 
+    // fun increase_total_amount_collected(params: &mut LBPParams, amount: u64) {
+    //     params.total_amount_collected = params.total_amount_collected+amount;
+    // }
+
+    // #[test]
+    // public fun test_current_weight() {
+
+    //     let params = construct_init_params(
+    //         false,
+    //         9000, // start weight
+    //         6000, // end weight 
+    //         false,
+    //         50000_000000 // 50,000 USDC
+    //     );
+
+    //     increase_total_amount_collected( &mut params, 2000_000000 ); // 2,000 USDC
+    //     let current_weight = 10000;
+
+    //     // Keep acquiring
+    //     while ( total_amount_collected(&params) <= 50000_000000) { 
+    //         let (_, weight_pair) = current_weight( &params );
+ 
+    //         // Check that the weight is continuously declining
+    //         assert!( current_weight >= weight_pair , weight_pair);
+            
+    //         current_weight = weight_pair;
+    //         increase_total_amount_collected( &mut params, 2000_000000 );
+    //     };
+
+    // }
 
 }

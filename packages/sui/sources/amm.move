@@ -20,12 +20,19 @@ module legato::amm {
     use sui::tx_context::{ Self, TxContext};
     use sui::coin::{Self, Coin};
     use sui::transfer;
+    use sui::sui::SUI;
+    use sui::random::{ Random}; 
+
+    use sui_system::sui_system::{ Self, SuiSystemState };
+    use sui_system::staking_pool::{ Self, StakedSui};
 
     use legato::comparator; 
     use legato::weighted_math;
     use legato::stable_math;
     use legato::fixed_point64::{Self, FixedPoint64};
-    use legato::lbp::{LBPParams, Self};
+    use legato::lbp::{LBPParams, LBPStorage, Self};
+    use legato::vault::{Self, Global, PT_TOKEN};
+    use legato::stake_data_provider::{Self};
 
     // ======== Constants ========
 
@@ -44,6 +51,8 @@ module legato::amm {
     /// The max value that can be held in one of the Balances of
     /// a Pool. U64 MAX / WEIGHT_SCALE
     const MAX_POOL_VALUE : u64 = 18446744073709551615;
+
+    const MIN_SUI_TO_STAKE : u64 = 1_000_000_000; // 1 Sui
 
     // ======== Errors ========
 
@@ -69,9 +78,10 @@ module legato::amm {
     const ERR_NOT_REGISTERED: u64 = 223;
     const ERR_UNEXPECTED_RETURN: u64 = 224; 
     const ERR_NOT_LBP: u64 = 225;
-    const ERR_INVALID_START_EPOCH: u64 = 227;
-    const ERR_LBP_NOT_STARTED: u64 = 228;
-   
+    const ERR_INVALID_START_EPOCH: u64 = 227; 
+    const ERR_SUI_TOO_LOW: u64 = 228;
+    const ERR_ZERO_FUTURE_YIELD: u64 = 229; 
+    const ERR_NOT_ACCEPT_VAULT: u64 = 230;
 
     // ======== Structs =========
 
@@ -91,6 +101,7 @@ module legato::amm {
         min_liquidity: Balance<LP<X, Y>>,
         swap_fee: FixedPoint64,
         lbp_params: Option<LBPParams>, // Params for a LBP pool
+        lbp_storage: Option<LBPStorage>, // Extra storage for a LBP pool
         has_paused: bool,
         is_stable: bool,  // Indicates if the pool is a stable pool
         is_lbp: bool // Indicates if the pool is a LBP
@@ -246,6 +257,103 @@ module legato::amm {
 
     }
 
+    // This allows swaps future yield from yield-bearing assets (Staked SUI) 
+    // for Y tokens on the LBP pool at a lower rate. When swapped, the vault 
+    // tokens (PT) are returned to the sender at a 1:1 while the yield is used 
+    // to get Y tokens. X refers to Legato vaults to be used.
+    public entry fun future_swap<X,Y>(
+        wrapper: &mut SuiSystemState,
+        amm_global: &mut AMMGlobal,
+        vault_global: &mut Global,
+        staked_sui: StakedSui,
+        ctx: &mut TxContext
+    ) {
+        assert!( has_registered<SUI, Y>(amm_global)  , ERR_NOT_REGISTERED);
+
+        let is_order = is_order<SUI, Y>(); 
+        assert!(!is_paused<SUI,Y>(amm_global, is_order), ERR_PAUSED); 
+        
+        // Mint PT 
+        let (pt_token, future_yield_amount) = vault::mint_non_entry<X>( wrapper, vault_global, staked_sui, ctx );
+        let pt_token_value = coin::value(&pt_token);
+
+        // Transfer PT tokens with deducted future yield back to the sender
+        transfer::public_transfer(
+            coin::split(&mut pt_token, pt_token_value-future_yield_amount, ctx),
+            tx_context::sender(ctx)
+        );
+
+        let pt_token_remaining = coin::value(&pt_token);
+        assert!( pt_token_remaining  > 0, ERR_ZERO_FUTURE_YIELD);
+        
+        // The future yield tokens are immediately used to acquire Y tokens at the early stage.
+        // The Y tokens are locked and can be claimed according to the permitted timeframe of the vault staked in.
+        // For example, staking at Q1 to Q4 vault will allow claiming Y tokens at the end of Q1, Q2, Q3 and Q4.
+
+        // We're also waiving swap fees for future swaps.
+
+        let pool = get_mut_pool<SUI, Y>(amm_global, is_order);
+        assert!( pool.is_lbp , ERR_NOT_LBP);
+
+        let (coin_x_reserve, coin_y_reserve, _lp) = get_reserves_size(pool, true);
+        assert!(coin_x_reserve > 0 && coin_y_reserve > 0, ERR_RESERVES_EMPTY);
+
+        // Obtain the current weights of the pool
+        let (weight_x, weight_y ) = pool_current_weight<SUI,Y>(pool);
+
+        let params = option::borrow_mut(&mut pool.lbp_params);
+
+        // Ensure the pool's parameters accept a vault.
+        assert!(  lbp::is_vault( params ), ERR_NOT_ACCEPT_VAULT);
+
+        let storage = option::borrow_mut(&mut pool.lbp_storage);
+
+        // Calculate the amount of Y tokens using the remaining PT tokens
+        let coin_y_out = get_amount_out(
+            pool.is_stable,
+            pt_token_remaining,
+            coin_x_reserve,
+            weight_x, 
+            coin_y_reserve,
+            weight_y
+        );
+
+        lbp::verify_and_adjust_amount(params, true, pt_token_remaining, coin_y_out );
+
+        // Store the PT tokens in the pool's pending storage.
+        lbp::add_pending_in<X>( storage, pt_token, pt_token_remaining );
+
+        // Transfer Y tokens to the sender.
+        let coin_out = coin::take(&mut pool.coin_y, coin_y_out, ctx);
+        
+        transfer::public_transfer(
+            coin_out,
+            tx_context::sender(ctx)
+        );
+        
+        // emit event
+       
+    }
+
+    // Similar to above but uses SUI tokens as input.
+    #[allow(lint(public_random))]
+    public entry fun future_swap_with_sui<X,Y>(
+        wrapper: &mut SuiSystemState,
+        amm_global: &mut AMMGlobal,
+        vault_global: &mut Global,
+        r: &Random,
+        sui: Coin<SUI>,
+        ctx: &mut TxContext
+    ) {
+        assert!(coin::value(&sui) >= MIN_SUI_TO_STAKE, ERR_SUI_TOO_LOW);
+
+        let validator_address = stake_data_provider::random_active_validator( wrapper, r, vault::staking_pools(vault_global) , ctx );
+        let staked_sui = sui_system::request_add_stake_non_entry(wrapper, sui, validator_address, ctx);
+
+        future_swap<X,Y>( wrapper, amm_global, vault_global, staked_sui, ctx );
+
+    }
+
     // Allows authorized users to register a new liquidity pool with custom weights
     // Note that stable pools and LBP are using separate functions below
     public entry fun register_pool<X, Y>(
@@ -280,6 +388,7 @@ module legato::amm {
             weight_x,
             weight_y,
             lbp_params: option::none<LBPParams>(),
+            lbp_storage: option::none<LBPStorage>(), 
             is_stable: false,
             is_lbp: false,
             has_paused: false
@@ -317,6 +426,7 @@ module legato::amm {
             weight_x: 5000,
             weight_y: 5000,
             lbp_params: option::none<LBPParams>(),
+            lbp_storage: option::none<LBPStorage>(), 
             is_stable: true,
             is_lbp: false,
             has_paused: false
@@ -368,12 +478,46 @@ module legato::amm {
             weight_x: 0, // not used
             weight_y: 0, // not used
             lbp_params: option::some<LBPParams>(params),
+            lbp_storage: option::some<LBPStorage>(lbp::create_empty_storage(ctx)),
             is_stable: false,
             is_lbp: true,
             has_paused: false
         });
 
         // emit event
+    }
+
+    // The process of redeeming PT tokens from the matured vault and using SUI to unblock tokens in the LBP's reserve. 
+    // X refers to the project token.
+    // Y refers to the matured vault.
+    // Anyone can execute this function, but there are no incentives for doing so.
+    public entry fun lbp_replenish<X,Y>(
+        wrapper: &mut SuiSystemState,
+        amm_global: &mut AMMGlobal,
+        vault_global: &mut Global, 
+        ctx: &mut TxContext
+    ) {
+        assert!( has_registered<SUI, X>(amm_global)  , ERR_NOT_REGISTERED);
+
+        let is_order = is_order<SUI, X>(); 
+        assert!(!is_paused<SUI,X>(amm_global, is_order), ERR_PAUSED); 
+
+        let pool = get_mut_pool<SUI, X>(amm_global, is_order);
+        assert!( pool.is_lbp , ERR_NOT_LBP);
+
+        let storage = option::borrow_mut(&mut pool.lbp_storage);
+
+        let pt_to_redeem = lbp::withdraw_pending_in<Y>( storage, ctx );
+
+        // Redeem
+        let (sui_token, _) = vault::redeem_non_entry( wrapper, vault_global, pt_to_redeem, ctx );
+
+        let sui_balance = coin::into_balance(sui_token);
+
+        balance::join(&mut pool.coin_x, sui_balance);
+
+        // emit event
+
     }
 
     // ======== Public Functions =========
@@ -400,7 +544,7 @@ module legato::amm {
         let coin_x_balance = coin::into_balance(coin_x);
         let coin_y_balance = coin::into_balance(coin_y);
 
-        let (coin_x_reserve, coin_y_reserve, lp_supply) = get_reserves_size(pool);
+        let (coin_x_reserve, coin_y_reserve, lp_supply) = get_reserves_size(pool, is_order);
 
         let (optimal_coin_x, optimal_coin_y, is_pool_creator) = calc_optimal_coin_values( 
             pool, 
@@ -523,13 +667,54 @@ module legato::amm {
     /// - amount of Coin<X>
     /// - amount of Coin<Y>
     /// - total supply of LP<X,Y>
-    public fun get_reserves_size<X, Y>(pool: &Pool<X, Y>): (u64, u64, u64) {
-        (
-            balance::value(&pool.coin_x),
-            balance::value(&pool.coin_y),
-            balance::supply_value(&pool.lp_supply)
-        )
+    public fun get_reserves_size<X, Y>(pool: &Pool<X, Y>, is_order: bool): (u64, u64, u64) {
+
+        if (!pool.is_lbp) {
+            (
+                balance::value(&pool.coin_x),
+                balance::value(&pool.coin_y),
+                balance::supply_value(&pool.lp_supply)
+            )
+        } else {
+
+            let params = option::borrow(&pool.lbp_params);
+            let is_vault = lbp::is_vault(params);
+
+            // Initialize virtual amounts for X and Y tokens
+            let virtual_amount_x = 0;
+            let virtual_amount_y = 0;
+            
+            if (is_vault) {
+                
+                // Check if the current transaction is a buy transaction.
+                let is_buy = if (is_order) {
+                    lbp::is_buy(params)  
+                } else {
+                    !lbp::is_buy(params)
+                };
+
+                let storage = option::borrow(&pool.lbp_storage);
+                let pending_in_amount = lbp::pending_in_amount(storage);
+
+                // If the transaction is for X tokens and is a buy, set the virtual amount for X tokens.
+                if (comparator::is_equal(&comparator::compare(&get<SUI>(), &get<X>())) && is_buy) {
+                    virtual_amount_x = pending_in_amount;
+                };
+
+                // If the transaction is for Y tokens and is a buy, set the virtual amount for Y tokens.
+                if (comparator::is_equal(&comparator::compare(&get<SUI>(), &get<Y>())) && is_buy) {
+                    virtual_amount_y = pending_in_amount
+                };
+            };
+
+            (
+                balance::value(&pool.coin_x)+virtual_amount_x,
+                balance::value(&pool.coin_y)+virtual_amount_y,
+                balance::supply_value(&pool.lp_supply)
+            )
+        }
     }
+
 
     // Calculate the optimal amounts of `X` and `Y` coins needed for adding new liquidity.
     // Returns both `X` and `Y` coins amounts.
@@ -671,7 +856,7 @@ module legato::amm {
         let lp_val = coin::value(&lp_coin);
         assert!(lp_val > 0, ERR_ZERO_AMOUNT);
 
-        let (reserve_x_amount, reserve_y_amount, lp_supply) = get_reserves_size(pool); 
+        let (reserve_x_amount, reserve_y_amount, lp_supply) = get_reserves_size(pool, is_order); 
 
         if (!pool.is_stable) {
 
@@ -724,7 +909,7 @@ module legato::amm {
         if (is_order) {
 
             let pool = get_mut_pool<X, Y>(global, is_order);
-            let (coin_x_reserve, coin_y_reserve, _lp) = get_reserves_size(pool);
+            let (coin_x_reserve, coin_y_reserve, _lp) = get_reserves_size(pool, is_order);
             assert!(coin_x_reserve > 0 && coin_y_reserve > 0, ERR_RESERVES_EMPTY);
             let coin_x_in = coin::value(&coin_in);
 
@@ -741,7 +926,7 @@ module legato::amm {
                 coin_y_reserve,
                 weight_y
             );
-             
+            
             assert!(
                 coin_y_out >= coin_out_min,
                 ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM
@@ -771,7 +956,7 @@ module legato::amm {
         } else {
 
             let pool = get_mut_pool<Y, X>(global, !is_order);
-            let (coin_x_reserve, coin_y_reserve, _lp) = get_reserves_size(pool);
+            let (coin_x_reserve, coin_y_reserve, _lp) = get_reserves_size(pool, is_order);
             assert!(coin_x_reserve > 0 && coin_y_reserve > 0, ERR_RESERVES_EMPTY);
             let coin_y_in = coin::value(&coin_in);
 
@@ -840,11 +1025,35 @@ module legato::amm {
         if (!pool.is_lbp) {
             ( pool.weight_x, pool.weight_y )
         } else {
-            let params = *option::borrow(&pool.lbp_params);
-            lbp::current_weight( &params ) 
+            let params = option::borrow(&pool.lbp_params);
+            lbp::current_weight( params ) 
         }
 
     }
+
+    // public fun total_pending_in_amount<X,Y>(pool: &Pool<X, Y>, is_x: bool) : u64 {
+        
+    //     let coin_count = 0;
+    //     let total_amount = 0;
+
+    //     while (coin_count < vector::length(&pool.lbp_pending_in)) {
+    //         let token_name = *vector::borrow(&pool.lbp_pending_in, coin_count);
+    //         std::debug::print(&(token_name));
+    //         if (is_x) {
+    //             // let token_balance = bag::borrow<String, Balance<PT_TOKEN<X>>>(&pool.lbp_coins, token_name);
+    //             // std::debug::print(token_balance);
+    //             // std::debug::print(&(balance::value(bag::borrow(&pool.lbp_coins, token_name))));
+    //         } else {
+
+    //         };
+            
+
+
+    //         coin_count = coin_count+1;
+    //     };
+
+    //     total_amount
+    // }
 
     // Retrieves information about the LBP pool
     public fun lbp_info<X,Y>( global: &mut AMMGlobal) : (u64, u64, u64, u64) {
@@ -856,29 +1065,34 @@ module legato::amm {
             assert!( pool.is_lbp == true , ERR_NOT_LBP);
             
             let ( weight_x, weight_y ) = pool_current_weight(pool);
-            let params = *option::borrow(&pool.lbp_params);
+            let params = option::borrow(&pool.lbp_params);
 
-            (
-                weight_x,
-                weight_y,
-                lbp::total_amount_collected(&params), 
-                lbp::total_target_amount(&params)
-            )
+            (weight_x,  weight_y, lbp::total_amount_collected(params), lbp::total_target_amount(params))
         } else {
             let pool = get_mut_pool<Y, X>(global, true);
             assert!( pool.is_lbp == true , ERR_NOT_LBP);
 
             let ( weight_y, weight_x ) = pool_current_weight(pool);
-            let params = *option::borrow(&pool.lbp_params);
+            let params = option::borrow(&pool.lbp_params);
 
-            (
-                weight_x,
-                weight_y,
-                lbp::total_amount_collected(&params), 
-                lbp::total_target_amount(&params)
-            )
+            ( weight_x, weight_y, lbp::total_amount_collected(params), lbp::total_target_amount(params))
         }
     }
+
+
+    // public fun lbp_pending_out_balances<P>( amm_global: &mut AMMGlobal, sender_address: address ) : (vector<String>, vector<u64>) {
+    //     assert!( has_registered<SUI, P>(amm_global)  , ERR_NOT_REGISTERED);
+
+    //     let is_order = is_order<SUI, P>(); 
+    //     assert!(!is_paused<SUI,P>(amm_global, is_order), ERR_PAUSED); 
+
+    //     let pool = get_mut_pool<SUI, P>(amm_global, is_order);
+    //     assert!( pool.is_lbp , ERR_NOT_LBP);
+
+    //     let storage = option::borrow_mut(&mut pool.lbp_storage);
+
+    //     lbp::pending_out_balances( storage, sender_address  )
+    // }
 
     // ======== Only Governance =========
 
@@ -921,17 +1135,6 @@ module legato::amm {
         global.treasury = treasury_address;
     }
 
-    // Updates the weights of the specified pool
-    // public entry fun update_pool_weights<X, Y>(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap, weight_x: u64, weight_y: u64) {
-    //     assert!( weight_x+weight_y == 10000, ERR_WEIGHTS_SUM); 
-
-    //     let is_order = is_order<X, Y>();
-    //     let pool = get_mut_pool<X, Y>(global, is_order);
-        
-    //     pool.weight_x = weight_x;
-    //     pool.weight_y = weight_y;
-    // }
-
     // Moves a pool to the archive 
     public entry fun move_to_archive<X, Y>(global: &mut AMMGlobal, _manager_cap: &mut AMMManagerCap) {
         let is_order = is_order<X, Y>();
@@ -953,8 +1156,6 @@ module legato::amm {
     fun get_treasury_address(global: &AMMGlobal) : address {
         global.treasury
     }
-
-    
 
     // ======== Test-related Functions =========
 
