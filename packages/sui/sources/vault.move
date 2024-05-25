@@ -31,6 +31,7 @@ module legato::vault {
     use legato::fixed_point64::{Self, FixedPoint64};
     use legato::stake_data_provider::{Self};
     use legato::vault_lib::{calculate_pt_debt_amount, get_amount_with_rewards, calculate_exit_amount, sort_items, matching_asset_to_ratio, reduce_pool_list, filter_asset_ids};
+    use legato::event::{new_vault_event, update_vault_apy_event, mint_event, migrate_event, redeem_event, exit_event};
 
     // ======== Constants ========
     
@@ -46,22 +47,22 @@ module legato::vault {
 
     // ======== Errors ========
 
-    const E_DUPLICATED_ENTRY: u64 =  1;
-    const E_NOT_FOUND: u64  = 2;
-    const E_INVALID_FLAG: u64 = 3;
-    const E_NOT_REGISTERED: u64 = 4;
-    const E_INVALID_QUARTER: u64 = 5;
-    const E_NOT_ENABLED: u64 = 6;
-    const E_MIN_THRESHOLD: u64 = 7;
-    const E_VAULT_MATURED: u64 = 8;
-    const E_UNAUTHORIZED_POOL: u64 = 9;
-    const E_DEPOSIT_CAP: u64 = 10;
-    const E_MINT_PT_ERROR: u64 = 11;
-    const E_VAULT_NOT_MATURED: u64 = 12;
-    const E_INVALID_AMOUNT: u64 = 13;
-    const E_VAULT_NOT_ORDER: u64 = 14;
-    const E_EXIT_DISABLED: u64 = 15;
-    const E_INSUFFICIENT: u64 = 16;
+    const E_DUPLICATED_ENTRY: u64 =  101;
+    const E_NOT_FOUND: u64  = 102;
+    const E_INVALID_FLAG: u64 = 103;
+    const E_NOT_REGISTERED: u64 = 104;
+    const E_INVALID_QUARTER: u64 = 105;
+    const E_NOT_ENABLED: u64 = 106;
+    const E_MIN_THRESHOLD: u64 = 107;
+    const E_VAULT_MATURED: u64 = 108;
+    const E_UNAUTHORIZED_POOL: u64 = 109;
+    const E_DEPOSIT_CAP: u64 = 110;
+    const E_MINT_PT_ERROR: u64 = 111;
+    const E_VAULT_NOT_MATURED: u64 = 112;
+    const E_INVALID_AMOUNT: u64 = 113;
+    const E_VAULT_NOT_ORDER: u64 = 114;
+    const E_EXIT_DISABLED: u64 = 115;
+    const E_INSUFFICIENT: u64 = 116;
 
     // ======== Structs =========
 
@@ -148,27 +149,50 @@ module legato::vault {
         ctx: &mut TxContext
     ) {
         
+        let vault_name = token_to_name<P>();
+        let asset_object_id = object::id(&staked_sui);
+        let input_amount = staking_pool::staked_sui_amount(&staked_sui);
+
         let (pt_token, _) = mint_non_entry<P>(wrapper, global, staked_sui, ctx);
+
+        let pt_amount = coin::value(&pt_token);
 
         // Transfer PT to the user
         transfer::public_transfer( pt_token , tx_context::sender(ctx));
 
-        // TODO: emit event
+        mint_event(
+            vault_name,
+            input_amount,
+            pt_amount,
+            asset_object_id,
+            tx_context::sender(ctx),
+            tx_context::epoch(ctx)
+        );
     }
 
     // Redeem SUI back at a 1:1 ratio with PT tokens when the vault reaches its maturity date
     public entry fun redeem<P>(wrapper: &mut SuiSystemState, global: &mut Global, pt: Coin<PT_TOKEN<P>>, ctx: &mut TxContext) {
         
-        let (sui_token, _) = redeem_non_entry<P>(
+        let vault_name = token_to_name<P>();
+        
+        let (sui_token, burned_balance) = redeem_non_entry<P>(
             wrapper,
             global,
             pt,
             ctx
         );
 
+        let output_amount = coin::value(&(sui_token));
+
         transfer::public_transfer(sui_token, tx_context::sender(ctx));
 
-        // TODO: emit event
+        redeem_event(
+            vault_name,
+            burned_balance,
+            output_amount,
+            tx_context::sender(ctx),
+            tx_context::epoch(ctx)
+        );
 
     }
 
@@ -176,6 +200,9 @@ module legato::vault {
     public entry fun migrate<X,Y>(global: &mut Global, pt: Coin<PT_TOKEN<X>>, ctx: &mut TxContext) {
         check_vault_order<X,Y>(global);
         assert!(coin::value<PT_TOKEN<X>>(&pt) >= MIN_PT_TO_MIGRATE, E_MIN_THRESHOLD);
+
+        let from_vault_name = token_to_name<X>();
+        let to_vault_name = token_to_name<Y>();
 
         // PT burning in the 1st vault
         let from_vault_config = get_vault_config<X>(&mut global.vault_config);
@@ -202,8 +229,14 @@ module legato::vault {
 
         transfer::public_transfer( mint_pt<Y>(to_vault_reserve, minted_pt_amount, ctx), tx_context::sender(ctx));
         
-
-        // TODO: emit event
+        migrate_event(
+            from_vault_name,
+            amount_to_migrate,
+            to_vault_name,
+            minted_pt_amount,
+            tx_context::sender(ctx),
+            tx_context::epoch(ctx)
+        );
     }
 
     // Exit the position before the vault matures. SUI tokens won't be received in full amount but obtained from the following formula, with the exit fee subtracted
@@ -211,6 +244,7 @@ module legato::vault {
     public entry fun exit<P>(wrapper: &mut SuiSystemState, global: &mut Global, pt: Coin<PT_TOKEN<P>>, ctx: &mut TxContext) {
         assert!(coin::value<PT_TOKEN<P>>(&pt) >= MIN_PT_TO_EXIT, E_MIN_THRESHOLD);
         
+        let vault_name = token_to_name<P>();
         let vault_config = get_vault_config<P>(&mut global.vault_config); 
     
         assert!(vault_config.enable_exit == true, E_EXIT_DISABLED);
@@ -230,9 +264,15 @@ module legato::vault {
         
         // burn PT tokens
         let vault_reserve = get_vault_reserve<P>(&mut global.vault_reserves);
-        let _burned_balance = balance::decrease_supply(&mut vault_reserve.pt_supply, coin::into_balance(pt));
+        let burned_balance = balance::decrease_supply(&mut vault_reserve.pt_supply, coin::into_balance(pt));
 
-        // emit event
+        exit_event(
+            vault_name,
+            burned_balance,
+            paidout_amount,
+            tx_context::sender(ctx),
+            tx_context::epoch(ctx)
+        );
 
     }
 
@@ -271,7 +311,7 @@ module legato::vault {
     }
 
     // return accumulated rewards for the given vault config
-    // fun vault_rewards(wrapper: &mut SuiSystemState, vault_config: &PoolConfig, epoch: u64): u64 {
+    // public fun vault_rewards(wrapper: &mut SuiSystemState, vault_config: &PoolConfig, epoch: u64): u64 {
     //     let count = vector::length(&vault_config.deposit_items);
     //     let i = 0;
     //     let total_sum = 0;
@@ -308,8 +348,6 @@ module legato::vault {
         // Check if the staked SUI is staked on a valid staking pool
         let pool_id = staking_pool::pool_id(&staked_sui);
         assert!(vector::contains(&global.staking_pool_ids, &pool_id), E_UNAUTHORIZED_POOL);
-
-        let _asset_object_id = object::id(&staked_sui);
 
         // Extract principal amount of staked SUI
         let principal_amount = staking_pool::staked_sui_amount(&staked_sui);
@@ -384,12 +422,14 @@ module legato::vault {
         let has_registered = bag::contains_with_type<String, VaultReserve<P>>(&global.vault_reserves, vault_name);
         assert!(!has_registered, E_DUPLICATED_ENTRY);
 
+        let vault_apy = fixed_point64::create_from_rational(apy_numerator, apy_denominator);
+        let maturity_epoch = global.first_epoch_of_the_year+(EPOCH_PER_QUARTER*quarter);
+
         let config = VaultConfig {
             started_epoch: tx_context::epoch(ctx),
-            maturity_epoch: global.first_epoch_of_the_year+(EPOCH_PER_QUARTER*quarter),
-            vault_apy: fixed_point64::create_from_rational(apy_numerator, apy_denominator),
+            maturity_epoch,
+            vault_apy,
             debt_balance: 0,
-            // staked_sui_ids: vector::empty<ID>(),
             staked_sui: vector::empty<StakedSui>(),
             enable_exit : true,
             enable_mint: true,
@@ -404,15 +444,13 @@ module legato::vault {
         table::add(&mut global.vault_config, vault_name, config);
         vector::push_back<String>(&mut global.vault_list, vault_name);
 
-        // emit event
-        // new_vault_event(
-        //     object::id(global),
-        //     vault_name,
-        //     tx_context::epoch(ctx),
-        //     started_epoch,
-        //     maturity_epoch,
-        //     initial_apy
-        // )
+        new_vault_event(
+            object::id(global),
+            vault_name,
+            tx_context::epoch(ctx),
+            maturity_epoch,
+            fixed_point64::get_raw_value(vault_apy)
+        )
 
     }
 
@@ -467,7 +505,14 @@ module legato::vault {
     // To setup vault's fixed rate
     public entry fun update_vault_apy<P>(global: &mut Global, _manager_cap: &mut ManagerCap,  value_numerator: u128, value_denominator: u128) {
         let vault_config = get_vault_config<P>( &mut global.vault_config);
-        vault_config.vault_apy = fixed_point64::create_from_rational( value_numerator, value_denominator);
+        let new_vault_apy = fixed_point64::create_from_rational( value_numerator, value_denominator);
+        vault_config.vault_apy = new_vault_apy;
+    
+        update_vault_apy_event(
+            object::id(global),
+            token_to_name<P>(),
+            fixed_point64::get_raw_value(new_vault_apy)
+        )
     }
 
     // To top-up the redemption pool

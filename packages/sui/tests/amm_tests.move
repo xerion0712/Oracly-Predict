@@ -10,7 +10,8 @@ module legato::amm_tests {
     use sui::test_scenario::{Self, Scenario, next_tx, ctx, end};
     use sui::sui::SUI;
 
-    use legato::amm::{Self, AMMGlobal, AMMManagerCap};
+    use legato::amm::{Self, AMMGlobal};
+    use legato::vault::{ManagerCap, Self};
     
     // When setting up a 90/10 pool of ~$100k
     // Initial allocation at 1 XBTC = 50,000 USDT
@@ -82,6 +83,7 @@ module legato::amm_tests {
         next_tx(test, owner);
         {
             amm::test_init(ctx(test));
+            vault::test_init(ctx(test));
         };
 
       
@@ -140,17 +142,17 @@ module legato::amm_tests {
         };
 
         // test admin functions
-        // next_tx(test, owner);
-        // {
-        //     let global = test_scenario::take_shared<AMMGlobal>(test);
-        //     let managercap = test_scenario::take_from_sender<AMMManagerCap>(test);
+        next_tx(test, owner);
+        {
+            let global = test_scenario::take_shared<AMMGlobal>(test);
+            let managercap = test_scenario::take_from_sender<ManagerCap>(test);
 
-        //     amm::pause<USDT, XBTC>( &mut global, &mut managercap );
-        //     amm::resume<USDT, XBTC>( &mut global, &mut managercap );
+            amm::pause<USDT, XBTC>( &mut global, &mut managercap );
+            amm::resume<USDT, XBTC>( &mut global, &mut managercap );
 
-        //     test_scenario::return_to_sender(test, managercap);
-        //     test_scenario::return_shared(global);
-        // };
+            test_scenario::return_to_sender(test, managercap);
+            test_scenario::return_shared(global);
+        };
 
         // Setup a 50/50 pool 
         next_tx(test, owner);
