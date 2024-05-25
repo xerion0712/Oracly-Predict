@@ -14,9 +14,9 @@ module legato::lbp_staked_sui_tests {
     use sui::random::{Random};
     use sui_system::sui_system::{ SuiSystemState };
  
-    use legato::amm::{Self, AMMGlobal, AMMManagerCap, LP};
+    use legato::amm::{Self, AMMGlobal, LP};
     use legato::vault_token_name::{  MAR_2024, JUN_2024 };
-    use legato::vault::{Global, PT_TOKEN};
+    use legato::vault::{Global, PT_TOKEN, ManagerCap};
 
     use legato::vault_utils::{
         scenario, 
