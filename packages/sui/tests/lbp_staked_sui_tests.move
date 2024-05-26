@@ -10,8 +10,7 @@ module legato::lbp_staked_sui_tests {
     use sui::coin::{ Self, Coin, mint_for_testing as mint, burn_for_testing as burn}; 
     use sui::test_scenario::{Self, Scenario, next_tx, ctx, end};
     use sui::tx_context::{Self};
-    use sui::sui::SUI;
-    use sui::random::{Random};
+    use sui::sui::SUI; 
     use sui_system::sui_system::{ SuiSystemState };
  
     use legato::amm::{Self, AMMGlobal, LP};
@@ -22,8 +21,7 @@ module legato::lbp_staked_sui_tests {
         scenario, 
         advance_epoch,
         set_up_sui_system_state,
-        setup_vault,
-        set_up_random
+        setup_vault
     };
 
     // Setting up a LBP pool to distribute 25 mil. LEGATO tokens
@@ -342,7 +340,7 @@ module legato::lbp_staked_sui_tests {
 
     fun setup_all_system( test: &mut Scenario ) {
         set_up_sui_system_state();
-        set_up_random(test);
+        // set_up_random(test);
         advance_epoch(test, 40);
 
         let (admin, _, _) = people();
@@ -402,22 +400,19 @@ module legato::lbp_staked_sui_tests {
         {
             let amm_global = test_scenario::take_shared<AMMGlobal>(test);
             let vault_global = test_scenario::take_shared<Global>(test);
-            let system_state = test_scenario::take_shared<SuiSystemState>(test);
-            let random_state = test_scenario::take_shared<Random>(test);    
+            let system_state = test_scenario::take_shared<SuiSystemState>(test); 
 
             amm::future_swap_with_sui<P, LEGATO>(
                 &mut system_state,
                 &mut amm_global,
-                &mut vault_global,
-                &random_state,
+                &mut vault_global, 
                 coin::mint_for_testing<SUI>( amount, ctx(test)), // 1000 SUI
                 ctx(test)
             );
 
             test_scenario::return_shared(amm_global);
             test_scenario::return_shared(vault_global);
-            test_scenario::return_shared(system_state);
-            test_scenario::return_shared(random_state);
+            test_scenario::return_shared(system_state); 
         };
 
     }

@@ -19,8 +19,7 @@ module legato::vault {
 
     use sui::object::{ Self, ID, UID };
     use sui_system::staking_pool::{ Self, StakedSui};
-    use sui_system::sui_system::{ Self, SuiSystemState };
-    use sui::random::{ Random};
+    use sui_system::sui_system::{ Self, SuiSystemState }; 
 
     use std::string::{  Self, String }; 
     use std::option::{  Self, Option};
@@ -129,12 +128,12 @@ module legato::vault {
 
     // ======== Public Functions =========
 
-    // Convert SUI to Staked SUI and then PT on the given vault
-    #[allow(lint(public_random))]
-    public entry fun mint_from_sui<P>(wrapper: &mut SuiSystemState, global: &mut Global, r: &Random, sui: Coin<SUI>, ctx: &mut TxContext) {
+    // Convert SUI to Staked SUI and then PT on the given vault 
+    public entry fun mint_from_sui<P>(wrapper: &mut SuiSystemState, global: &mut Global, sui: Coin<SUI>, ctx: &mut TxContext) {
         assert!(coin::value(&sui) >= MIN_SUI_TO_STAKE, E_MIN_THRESHOLD);
 
-        let validator_address = stake_data_provider::random_active_validator( wrapper, r, global.staking_pools , ctx );
+        // let validator_address = stake_data_provider::random_active_validator( wrapper, r, global.staking_pools , ctx );
+        let validator_address = get_random_validator_address( global.staking_pools, ctx );
 
         let staked_sui = sui_system::request_add_stake_non_entry(wrapper, sui, validator_address, ctx);
         mint<P>(wrapper, global, staked_sui , ctx);
@@ -410,6 +409,11 @@ module legato::vault {
         ( sui_token , burned_balance )
     }
 
+
+    public fun get_random_validator_address(whitelist: vector<address>, ctx: &mut TxContext) : address {
+        *vector::borrow( &whitelist, (100+tx_context::epoch(ctx)) % vector::length(&whitelist) )
+    }
+
     // ======== Only Governance =========
 
     // Create a new vault for the given quarter. Note that the fixed-apy input is in fixed-point format
@@ -528,9 +532,8 @@ module legato::vault {
     }
 
     // Restake SUI from the redemption pool to a randomly chosen validator 
-    // in the most recent vault
-    #[allow(lint(public_random))]
-    public entry fun restake(wrapper: &mut SuiSystemState, global: &mut Global, _manager_cap: &mut ManagerCap, r: &Random, restake_amount: u64, ctx: &mut TxContext ) {
+    // in the most recent vault 
+    public entry fun restake(wrapper: &mut SuiSystemState, global: &mut Global, _manager_cap: &mut ManagerCap,  restake_amount: u64, ctx: &mut TxContext ) {
         assert!(restake_amount >= MIN_SUI_TO_STAKE, E_MIN_THRESHOLD);
         assert!(balance::value( &global.pending_withdrawal ) >= restake_amount , E_INSUFFICIENT);
 
@@ -540,7 +543,8 @@ module legato::vault {
         let vault_config = table::borrow_mut<String, VaultConfig>( &mut global.vault_config , pool_name);
 
         // Randomly select an active validator from the staking pools
-        let validator_address = stake_data_provider::random_active_validator( wrapper, r, global.staking_pools , ctx );
+        // let validator_address = stake_data_provider::random_active_validator( wrapper, r, global.staking_pools , ctx );
+        let validator_address = get_random_validator_address( global.staking_pools, ctx );
         let restake_balance = balance::split<SUI>(&mut global.pending_withdrawal, restake_amount);
 
         // Request to add stake
@@ -811,6 +815,8 @@ module legato::vault {
         assert!(to_contained,E_NOT_REGISTERED);
         assert!( to_id > from_id ,E_VAULT_NOT_ORDER);
     }
+
+
 
     // ======== Test-related Functions =========
 

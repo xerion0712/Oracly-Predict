@@ -3,8 +3,7 @@ module legato::vault_utils {
 
     use sui::test_scenario::{Self as test, Scenario , next_tx, ctx};
     use sui::sui::SUI;
-    use sui::coin::{Self, Coin};
-    use sui::random::{Self, update_randomness_state_for_testing, Random};
+    use sui::coin::{Self, Coin}; 
     use sui::tx_context::{Self};
  
     use sui_system::sui_system::{  SuiSystemState, validator_staking_pool_id };
@@ -112,41 +111,39 @@ module legato::vault_utils {
         test::return_to_sender(test, usdc_token);
     }
 
-    public fun set_up_random(test: &mut Scenario) {
-        // Setup randomness
-        next_tx(test, @0x0);
-        {
-            random::create_for_testing(ctx(test)); 
-        };
+    // public fun set_up_random(test: &mut Scenario) {
+    //     // Setup randomness
+    //     next_tx(test, @0x0);
+    //     {
+    //         random::create_for_testing(ctx(test)); 
+    //     };
 
-        next_tx(test, @0x0);
-        {
-            let random_state = test::take_shared<Random>(test);  
+    //     next_tx(test, @0x0);
+    //     {
+    //         let random_state = test::take_shared<Random>(test);  
 
-            update_randomness_state_for_testing(
-                &mut random_state,
-                0,
-                x"1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F",
-                ctx(test),
-            );
+    //         update_randomness_state_for_testing(
+    //             &mut random_state,
+    //             0,
+    //             x"1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F",
+    //             ctx(test),
+    //         );
 
-            test::return_shared(random_state);
-        };
-    }
+    //         test::return_shared(random_state);
+    //     };
+    // }
 
     public fun mint_pt<P>(test: &mut Scenario, staker_address: address, amount: u64) {
         
         next_tx(test, staker_address);
         {
             let system_state = test::take_shared<SuiSystemState>(test);
-            let global = test::take_shared<Global>(test); 
-            let random_state = test::take_shared<Random>(test);    
+            let global = test::take_shared<Global>(test);  
 
-            vault::mint_from_sui<P>(&mut system_state, &mut global, &random_state, coin::mint_for_testing<SUI>( amount , ctx(test)), ctx(test));
+            vault::mint_from_sui<P>(&mut system_state, &mut global, coin::mint_for_testing<SUI>( amount , ctx(test)), ctx(test));
 
             test::return_shared(global);
-            test::return_shared(system_state);
-            test::return_shared(random_state);
+            test::return_shared(system_state); 
         };
 
     }

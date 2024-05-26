@@ -352,19 +352,17 @@ module legato::amm {
        
     }
 
-    // Similar to above but uses SUI tokens as input.
-    #[allow(lint(public_random))]
+    // Similar to above but uses SUI tokens as input. 
     public entry fun future_swap_with_sui<X,Y>(
         wrapper: &mut SuiSystemState,
         amm_global: &mut AMMGlobal,
-        vault_global: &mut Global,
-        r: &Random,
+        vault_global: &mut Global, 
         sui: Coin<SUI>,
         ctx: &mut TxContext
     ) {
         assert!(coin::value(&sui) >= MIN_SUI_TO_STAKE, ERR_SUI_TOO_LOW);
 
-        let validator_address = stake_data_provider::random_active_validator( wrapper, r, vault::staking_pools(vault_global) , ctx );
+        let validator_address = vault::get_random_validator_address( vault::staking_pools(vault_global) , ctx );
         let staked_sui = sui_system::request_add_stake_non_entry(wrapper, sui, validator_address, ctx);
 
         future_swap<X,Y>( wrapper, amm_global, vault_global, staked_sui, ctx );
@@ -559,8 +557,6 @@ module legato::amm {
         let sui_balance = coin::into_balance(sui_token);
 
         balance::join(&mut pool.coin_x, sui_balance);
-
-        // emit event
 
     }
 
