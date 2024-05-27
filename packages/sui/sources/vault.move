@@ -640,15 +640,20 @@ module legato::vault {
                 // Check if the pool has staked_sui at the current index 
                 if ( vector::length(&pool.staked_sui)  > count )   {
                     let staked_sui = vector::borrow(&pool.staked_sui, count);
-                    let amount_with_rewards = get_amount_with_rewards(wrapper,  staked_sui, epoch);
+                    let activation_epoch = staking_pool::stake_activation_epoch(staked_sui);
 
-                    // If the amount with rewards is greater than the input amount, update output variables and break
-                    if (amount_with_rewards > input_amount) { 
-                        output_pool = option::some<String>( pool_name );
-                        output_id = option::some<u64>( count );
-                        count = length; // break main loop
-                        break
+                    if (epoch > activation_epoch) {
+                         let amount_with_rewards = get_amount_with_rewards(wrapper,  staked_sui, epoch);
+
+                        // If the amount with rewards is greater than the input amount, update output variables and break
+                        if (amount_with_rewards > input_amount) {  
+                            output_pool = option::some<String>( pool_name );
+                            output_id = option::some<u64>( count );
+                            count = length; // break main loop
+                            break
+                        };
                     };
+
                 };
 
                 pool_count = pool_count+1;
@@ -722,17 +727,22 @@ module legato::vault {
             let pool_name = *vector::borrow(pool_list, pool_count);
             let pool = table::borrow(pools, pool_name);
 
-            
                 let length = vector::length(&pool.staked_sui);
                 let item_count = 0;
                 while (item_count < length) {
                     let staked_sui = vector::borrow(&pool.staked_sui, item_count);
-                    let amount_with_rewards = get_amount_with_rewards(wrapper,  staked_sui, epoch);
-                    let this_ratio = fixed_point64::create_from_rational( (amount_with_rewards as u128) , (input_amount as u128));
+                    let activation_epoch = staking_pool::stake_activation_epoch(staked_sui);
 
-                    vector::push_back(&mut ratio, this_ratio);
-                    vector::push_back(&mut ratio_to_id, item_count);
-                    vector::push_back(&mut ratio_to_pool, pool_name);
+                    if (epoch > activation_epoch) {
+                        let amount_with_rewards = get_amount_with_rewards(wrapper,  staked_sui, epoch);
+                        let this_ratio = fixed_point64::create_from_rational( (amount_with_rewards as u128) , (input_amount as u128));
+
+                        vector::push_back(&mut ratio, this_ratio);
+                        vector::push_back(&mut ratio_to_id, item_count);
+                        vector::push_back(&mut ratio_to_pool, pool_name);
+                    
+                    };
+                    
 
                     item_count = item_count+1;
                 };
