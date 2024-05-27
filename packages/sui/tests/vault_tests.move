@@ -6,15 +6,13 @@ module legato::vault_tests {
     use sui::test_scenario::{Self as test, Scenario, next_tx, ctx  }; 
     use sui_system::sui_system::{ SuiSystemState  };
     use sui::coin::{Self, Coin};
-    use sui::sui::SUI;
-    use sui::random::{Random};
+    use sui::sui::SUI; 
  
     use legato::vault_utils::{
         scenario, 
         advance_epoch,
         set_up_sui_system_state,
-        setup_vault,
-        set_up_random,
+        setup_vault, 
         mint_pt
     };
 
@@ -54,8 +52,7 @@ module legato::vault_tests {
     }
 
     fun mint_redeem_flow( test: &mut Scenario ) {
-        set_up_sui_system_state();
-        set_up_random(test);
+        set_up_sui_system_state(); 
         advance_epoch(test, 40); // <-- overflow when less than 40
  
         // setup vaults
@@ -113,7 +110,7 @@ module legato::vault_tests {
 
             let remaining_amount = vault::get_pending_withdrawal_amount(&global);   
    
-            assert!( remaining_amount == 299374307, 2); // 0.299374307 SUI
+            assert!( remaining_amount == 745389023, 2); // 0.745 SUI
 
             vault::withdraw_redemption_pool(&mut global, &mut managercap, remaining_amount, ctx(test) );
 
@@ -137,7 +134,7 @@ module legato::vault_tests {
 
     fun mint_migrate_flow( test: &mut Scenario ) {
         set_up_sui_system_state();
-        set_up_random(test);
+        // set_up_random(test);
         advance_epoch(test, 40); // <-- overflow when less than 40
 
         // setup vaults
@@ -185,7 +182,7 @@ module legato::vault_tests {
 
     fun mint_exit_flow( test: &mut Scenario ) {
         set_up_sui_system_state();
-        set_up_random(test);
+        // set_up_random(test);
         advance_epoch(test, 40); // <-- overflow when less than 40
 
         // setup vaults
@@ -218,21 +215,19 @@ module legato::vault_tests {
         {
             let system_state = test::take_shared<SuiSystemState>(test);
             let managercap = test::take_from_sender<ManagerCap>(test);
-            let global = test::take_shared<Global>(test); 
-            let random_state = test::take_shared<Random>(test);    
+            let global = test::take_shared<Global>(test);  
 
             let remaining_amount = vault::get_pending_withdrawal_amount(&global);   
-
-            assert!( remaining_amount == 3578277803, 5); // 3.578277803 SUI
+            
+            assert!( remaining_amount == 3697886522, 5); // 3.697 SUI
 
             // add 7 SUI before restake
             vault::topup_redemption_pool(&mut global, &mut managercap, coin::mint_for_testing<SUI>( 7*MIST_PER_SUI , ctx(test)) , ctx(test) );
 
-            vault::restake(&mut system_state, &mut global, &mut managercap, &random_state, 10*MIST_PER_SUI, ctx(test));
+            vault::restake(&mut system_state, &mut global, &mut managercap, 10*MIST_PER_SUI, ctx(test));
 
             test::return_to_sender(test, managercap);
-            test::return_shared(global);
-            test::return_shared(random_state);
+            test::return_shared(global); 
             test::return_shared(system_state);
         };
 
