@@ -11,16 +11,14 @@ module legato::amm {
     use std::string::{Self, String}; 
     use std::type_name::{get, into_string};
     use std::ascii::into_bytes;
-
-    use sui::math::{pow};
+ 
     use sui::bag::{Self, Bag};
     use sui::object::{Self, ID, UID};
     use sui::balance::{ Self, Supply, Balance}; 
     use sui::tx_context::{ Self, TxContext};
     use sui::coin::{Self, Coin};
     use sui::transfer;
-    use sui::sui::SUI;
-    use sui::random::{ Random}; 
+    use sui::sui::SUI; 
 
     use sui_system::sui_system::{ Self, SuiSystemState };
     use sui_system::staking_pool::{ Self, StakedSui};
@@ -28,10 +26,10 @@ module legato::amm {
     use legato::comparator; 
     use legato::weighted_math;
     use legato::stable_math;
-    use legato::fixed_point64::{Self, FixedPoint64};
+    use legato_math::fixed_point64::{Self, FixedPoint64};
     use legato::lbp::{LBPParams, LBPStorage, Self};
-    use legato::vault::{Self, Global, PT_TOKEN, ManagerCap};
-    use legato::stake_data_provider::{Self};
+    use legato::vault::{Self, Global, ManagerCap};
+    // use legato::stake_data_provider::{Self};
     use legato::event::{register_pool_event, swapped_event, future_swapped_event, add_liquidity_event, remove_liquidity_event};
 
     // ======== Constants ========
@@ -43,9 +41,7 @@ module legato::amm {
     // 0.1% for stable pools
     const STABLE_FEE: u128 = 18446744073709551;
     /// Minimal liquidity.
-    const MINIMAL_LIQUIDITY: u64 = 1000;
-    /// The integer scaling setting for weights
-    const WEIGHT_SCALE: u64 = 10000;
+    const MINIMAL_LIQUIDITY: u64 = 1000; 
      /// Max u64 value.
     const U64_MAX: u64 = 18446744073709551615;
     /// The max value that can be held in one of the Balances of
@@ -77,8 +73,7 @@ module legato::amm {
     const ERR_PAUSED: u64 = 222;
     const ERR_NOT_REGISTERED: u64 = 223;
     const ERR_UNEXPECTED_RETURN: u64 = 224; 
-    const ERR_NOT_LBP: u64 = 225;
-    const ERR_INVALID_START_EPOCH: u64 = 227; 
+    const ERR_NOT_LBP: u64 = 225; 
     const ERR_SUI_TOO_LOW: u64 = 228;
     const ERR_ZERO_FUTURE_YIELD: u64 = 229; 
     const ERR_NOT_ACCEPT_VAULT: u64 = 230;
@@ -633,7 +628,8 @@ module legato::amm {
         pool.global
     }
 
-    #[allow(unused_variable)]
+
+    #[allow(unused_type_parameter, unused_variable)]
     public fun id<X, Y>(global: &AMMGlobal): ID {
         object::uid_to_inner(&global.id)
     }

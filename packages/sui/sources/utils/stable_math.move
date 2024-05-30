@@ -5,7 +5,7 @@
 
 module legato::stable_math {
 
-    use legato::math128;
+    use legato_math::math128;
 
     // Computes initial LP amount using the formula - total_share = sqrt( amount_x * amount_y )
     public fun compute_initial_lp( 

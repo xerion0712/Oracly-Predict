@@ -18,8 +18,8 @@ module legato::lbp {
     use sui::bag::{Self, Bag};
     use sui::tx_context::{ Self, TxContext}; 
 
-    use legato::fixed_point64::{Self};
-    use legato::weighted_math;
+    use legato_math::fixed_point64::{Self}; 
+    use legato_math::legato_math::{power};
     use legato::vault::{  PT_TOKEN};
  
     /// The integer scaling setting for weights
@@ -125,7 +125,7 @@ module legato::lbp {
             let total_target_amount = (params.target_amount as u128);
 
             // Calculate the decline ratio for weight adjustment
-            let decline_ratio = weighted_math::power( fixed_point64::create_from_rational( accumulated_amount, total_target_amount )  , fixed_point64::create_from_rational( (params.final_weight as u128), (params.start_weight as u128) ));
+            let decline_ratio = power( fixed_point64::create_from_rational( accumulated_amount, total_target_amount )  , fixed_point64::create_from_rational( (params.final_weight as u128), (params.start_weight as u128) ));
             
             // Adjust the start weight by the decline ratio to get the current weight
             params.start_weight-(fixed_point64::multiply_u128((weight_diff as u128), decline_ratio) as u64)

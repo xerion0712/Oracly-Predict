@@ -5,7 +5,7 @@ version = "0.2.0"
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
 SuiSystem = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-system", rev = "framework/testnet" }
-
+LegatoMath = {  git = "https://github.com/tamago-labs/legato-math.git", subdir = "packages/sui", rev = "main"  }
 
 [addresses]
 legato = "0x0" 

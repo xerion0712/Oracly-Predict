@@ -27,7 +27,7 @@ module legato::vault {
     use std::ascii::{ into_bytes};
     use std::type_name::{get, into_string};
 
-    use legato::fixed_point64::{Self, FixedPoint64};
+    use legato_math::fixed_point64::{Self, FixedPoint64};
     use legato::stake_data_provider::{Self};
     use legato::vault_lib::{calculate_pt_debt_amount, get_amount_with_rewards, calculate_exit_amount, sort_items, matching_asset_to_ratio, reduce_pool_list, filter_asset_ids};
     use legato::event::{new_vault_event, update_vault_apy_event, mint_event, migrate_event, redeem_event, exit_event};
