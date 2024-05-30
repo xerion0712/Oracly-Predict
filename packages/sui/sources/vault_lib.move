@@ -11,8 +11,8 @@ module legato::vault_lib {
     use sui_system::staking_pool::{ Self, StakedSui};
     use sui_system::sui_system::{  SuiSystemState };
     
-    use legato::fixed_point64::{ Self, FixedPoint64};
-    use legato::math_fixed64::{Self};
+    use legato_math::fixed_point64::{ Self, FixedPoint64};
+    use legato_math::math_fixed64::{Self};
     use legato::stake_data_provider;
      
     
