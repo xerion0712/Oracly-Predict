@@ -35,7 +35,7 @@ In Legato LBP, projects have the option to pair their tokens with two types of s
 
 - SUI staking rewards via Legato Vault - This option allows project tokens to be paired with the staking rewards earned through the Legato Vault. By using staking rewards as settlement assets, it makes the weight shift cliff on the sell transactions, thereby keeping slippage high until accrued rewards are deposited into the pool.
 
-Anyway, the project can run in two phases, starting with staking rewards and then transitioning to coins.
+We recommend that projects run in two phases, starting with staking rewards and then transitioning to coins for a smoother token launch.
 
 ## Legato Math
 
