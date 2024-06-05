@@ -470,7 +470,7 @@ module legato::amm {
         proj_on_x: bool, // Indicates whether the project token is on the X or Y side
         start_weight: u64,  // Initial weight of the project token.
         final_weight: u64, // The weight when the pool is stabilized.  
-        is_vault: bool, // Determines the quota unit: false - by settlement collected, true - by staking rewards.
+        is_vault: bool, // false - only common coins, true - coins+staking rewards.
         target_amount: u64, // The target amount required to fully shift the weight.
         ctx: &mut TxContext
     ) {
@@ -1161,7 +1161,7 @@ module legato::amm {
         lbp::set_new_target_amount(  params, new_target_amount );
     }
 
-    // Set a new target amount for LBP
+    // Enable/Disable buy with pair or with vault tokens
     public entry fun lbp_enable_buy_with_pair_and_vault<Y>(global: &mut AMMGlobal, _manager_cap: &mut ManagerCap, enable_pair: bool, enable_vault: bool) {
         assert!( has_registered<SUI, Y>(global)  , ERR_NOT_REGISTERED);
         

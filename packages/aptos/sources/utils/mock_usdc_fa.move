@@ -1,15 +1,16 @@
 
-// Mock Legato coins in fungible asset
 
-module legato_addr::mock_legato {
-    
+// Mock USDC coins in fungible asset
+
+module legato_addr::mock_usdc_fa {
+
     use aptos_framework::object;
-    use aptos_framework::fungible_asset::{Self, Metadata, FungibleAsset};
+    use aptos_framework::fungible_asset::{Self, Metadata};
     use aptos_framework::object::Object;
     use legato_addr::base_fungible_asset;
     use std::string::utf8;
 
-    const ASSET_SYMBOL: vector<u8> = b"LEGATO";
+    const ASSET_SYMBOL: vector<u8> = b"USDC";
 
     /// Initialize metadata object and store the refs.
     fun init_module(admin: &signer) {
@@ -17,9 +18,9 @@ module legato_addr::mock_legato {
         base_fungible_asset::initialize(
             constructor_ref,
             0, /* maximum_supply. 0 means no maximum */
-            utf8(b"Mock Legato Tokens"), /* name */
+            utf8(b"Mock USDC Tokens"), /* name */
             utf8(ASSET_SYMBOL), /* symbol */
-            8, /* decimals */
+            6, /* decimals */
             utf8(b"http://example.com/favicon.ico"), /* icon */
             utf8(b"http://example.com"), /* project */
         );
@@ -43,28 +44,11 @@ module legato_addr::mock_legato {
         base_fungible_asset::burn_from_primary_stores(  get_metadata(), vector[from], vector[amount]);
     }
 
-    #[test_only]
-    use aptos_framework::primary_fungible_store;
-    #[test_only]
-    use std::signer;
+    // ======== Test-related Functions =========
 
-    #[test(creator = @legato_addr, alice = @0xface)]
-    fun test_basic_flow(creator: &signer, alice: &signer) {
-        init_module(creator);
-        let creator_address = signer::address_of(creator);
-        let alice_address = signer::address_of(alice); 
-
-        mint( creator_address, 100);
-        let metadata = get_metadata();
-        assert!(primary_fungible_store::balance(creator_address, metadata) == 100, 1); 
-
-        primary_fungible_store::transfer(creator, metadata, alice_address, 5);
-        assert!(primary_fungible_store::balance(alice_address, metadata) == 5, 2); 
-
-        burn( creator_address, 95);
-        burn( alice_address, 5);
-        assert!(primary_fungible_store::balance(creator_address, metadata) == 0, 3); 
-        assert!(primary_fungible_store::balance(alice_address, metadata) == 0, 4); 
+    #[test_only] 
+    public fun init_module_for_testing(deployer: &signer) {
+        init_module(deployer)
     }
 
 }

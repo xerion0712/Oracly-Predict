@@ -1,47 +1,61 @@
 
-
-// Mock USDC coins in fungible asset
+// Mock Legato coins 
 
 module legato_addr::mock_usdc {
 
-    use aptos_framework::object;
-    use aptos_framework::fungible_asset::{Self, Metadata, FungibleAsset};
-    use aptos_framework::object::Object;
-    use legato_addr::base_fungible_asset;
-    use std::string::utf8;
+    use std::signer;
+    use std::string::{Self, String };  
 
-    const ASSET_SYMBOL: vector<u8> = b"USDC";
+    use aptos_framework::account;
+    use aptos_framework::coin::{Self, Coin, MintCapability, BurnCapability}; 
 
-    /// Initialize metadata object and store the refs.
-    fun init_module(admin: &signer) {
-        let constructor_ref = &object::create_named_object(admin, ASSET_SYMBOL);
-        base_fungible_asset::initialize(
-            constructor_ref,
-            0, /* maximum_supply. 0 means no maximum */
-            utf8(b"Mock USDC Tokens"), /* name */
-            utf8(ASSET_SYMBOL), /* symbol */
-            6, /* decimals */
-            utf8(b"http://example.com/favicon.ico"), /* icon */
-            utf8(b"http://example.com"), /* project */
-        );
+    const TOKEN_NAME: vector<u8> = b"USDC Token";
+
+    struct USDC_TOKEN has drop, store {}
+
+    struct MockManager has key {
+        mint_cap: MintCapability<USDC_TOKEN>,
+        burn_cap: BurnCapability<USDC_TOKEN>
     }
 
-    #[view]
-    /// Return the address of the metadata that's created when this module is deployed.
-    public fun get_metadata(): Object<Metadata> {
-        let metadata_address = object::create_object_address(&@legato_addr, ASSET_SYMBOL);
-        object::address_to_object<Metadata>(metadata_address)
+    fun init_module(sender: &signer) {
+
+        let token_name = string::utf8(b"USDC Token");
+        let token_symbol = string::utf8(b"USDC");
+
+        let (burn_cap, freeze_cap, mint_cap) = coin::initialize<USDC_TOKEN>(sender, token_name, token_symbol, 6, true);
+        coin::destroy_freeze_cap(freeze_cap);
+
+        move_to( sender, MockManager { 
+            mint_cap,
+            burn_cap
+        });
     }
 
-    /// Mint as the owner of metadata object.
-    public entry fun mint(   to: address, amount: u64) {
-        base_fungible_asset::mint_to_primary_stores( get_metadata(), vector[to], vector[amount]);
+    public entry fun mint(sender: &signer , amount: u64) acquires MockManager {
+        let mock_manager = borrow_global_mut<MockManager>(@legato_addr);
+        let coins = coin::mint<USDC_TOKEN>(amount, &mock_manager.mint_cap );
+
+        let sender_address = signer::address_of(sender);
+
+        if (!coin::is_account_registered<USDC_TOKEN>(sender_address)) {
+            coin::register<USDC_TOKEN>(sender);
+        };
+        coin::deposit(sender_address, coins);
     }
 
+    public entry fun burn(sender: &signer, amount: u64)  acquires MockManager {
+        let mock_manager = borrow_global_mut<MockManager>(@legato_addr);
 
-    /// Burn fungible assets as the owner of metadata object.
-    public entry fun burn( from: address, amount: u64) {
-        base_fungible_asset::burn_from_primary_stores(  get_metadata(), vector[from], vector[amount]);
+        let burn_coin = coin::withdraw<USDC_TOKEN>(sender, amount);
+        coin::burn(burn_coin, &mock_manager.burn_cap);
+    }
+
+    // ======== Test-related Functions =========
+
+    #[test_only] 
+    public fun init_module_for_testing(sender: &signer) {
+        init_module(sender)
     }
 
 }
