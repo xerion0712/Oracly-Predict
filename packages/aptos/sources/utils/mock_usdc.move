@@ -4,10 +4,9 @@
 module legato_addr::mock_usdc {
 
     use std::signer;
-    use std::string::{Self, String };  
+    use std::string::{Self };  
 
-    use aptos_framework::account;
-    use aptos_framework::coin::{Self, Coin, MintCapability, BurnCapability}; 
+    use aptos_framework::coin::{Self, MintCapability, BurnCapability}; 
 
     const TOKEN_NAME: vector<u8> = b"USDC Token";
 

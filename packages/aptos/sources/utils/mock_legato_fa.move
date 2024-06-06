@@ -6,6 +6,7 @@ module legato_addr::mock_legato_fa {
     use aptos_framework::object;
     use aptos_framework::fungible_asset::{  Metadata};
     use aptos_framework::object::Object;
+    
     use legato_addr::base_fungible_asset;
     use std::string::utf8;
 
