@@ -8,9 +8,8 @@ module legato::amm {
 
     use std::option::{Self, Option};
     use std::vector;
-    use std::string::{Self, String}; 
-    use std::type_name::{get, into_string};
-    use std::ascii::into_bytes;
+    use std::string::{ String};  
+    use std::type_name::{get};
  
     use sui::bag::{Self, Bag};
     use sui::object::{Self, ID, UID};
@@ -26,11 +25,14 @@ module legato::amm {
     use legato::comparator; 
     use legato::weighted_math;
     use legato::stable_math;
-    use legato_math::fixed_point64::{Self, FixedPoint64};
+    
+    use legato::amm_lib::{ is_order, generate_lp_name };
     use legato::lbp::{LBPParams, LBPStorage, Self};
     use legato::vault::{Self, Global, ManagerCap};
-    // use legato::stake_data_provider::{Self};
+    
     use legato::event::{register_pool_event, swapped_event, future_swapped_event, add_liquidity_event, remove_liquidity_event};
+
+    use legato_math::fixed_point64::{Self, FixedPoint64};
 
     // ======== Constants ========
 
@@ -660,33 +662,6 @@ module legato::amm {
         bag::contains_with_type<String, Pool<X, Y>>(&global.pools, lp_name)
     }
 
-    public fun generate_lp_name<X, Y>(): String {
-        let lp_name = string::utf8(b"");
-        string::append_utf8(&mut lp_name, b"LP-");
-
-        if (is_order<X, Y>()) {
-            string::append_utf8(&mut lp_name, into_bytes(into_string(get<X>())));
-            string::append_utf8(&mut lp_name, b"-");
-            string::append_utf8(&mut lp_name, into_bytes(into_string(get<Y>())));
-        } else {
-            string::append_utf8(&mut lp_name, into_bytes(into_string(get<Y>())));
-            string::append_utf8(&mut lp_name, b"-");
-            string::append_utf8(&mut lp_name, into_bytes(into_string(get<X>())));
-        };
-
-        lp_name
-    }
-
-    public fun is_order<X, Y>(): bool {
-        let comp = comparator::compare(&get<X>(), &get<Y>());
-        assert!(!comparator::is_equal(&comp), ERR_THE_SAME_COIN);
-
-        if (comparator::is_smaller_than(&comp)) {
-            true
-        } else {
-            false
-        }
-    }
 
     public fun is_paused<X,Y>(global: &mut AMMGlobal, is_order: bool): bool { 
         if (is_order) { 
@@ -1265,5 +1240,6 @@ module legato::amm {
             ctx
         )
     }
+
 
 }
