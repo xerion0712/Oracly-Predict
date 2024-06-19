@@ -2,11 +2,11 @@
 #[test_only]
 module legato_addr::delegation_pool_tests {
 
-    // use std::features;
+    use std::features;
     use std::signer;
 
     use aptos_std::bls12381;
-    use aptos_std::stake;
+    use aptos_framework::stake;
     use aptos_std::vector;
 
     use aptos_framework::account;
@@ -33,6 +33,9 @@ module legato_addr::delegation_pool_tests {
 
     #[test_only]
     const COMMISSION_CHANGE_DELEGATION_POOL: u64 = 42;
+    
+    #[test_only]
+    const COIN_TO_FUNGIBLE_ASSET_MIGRATION: u64 = 60;
 
     #[test_only]
     const ONE_APT: u64 = 100000000; // 1x10**8
@@ -42,7 +45,6 @@ module legato_addr::delegation_pool_tests {
     const VALIDATOR_STATUS_ACTIVE: u64 = 2;
     const VALIDATOR_STATUS_PENDING_INACTIVE: u64 = 3;
     const VALIDATOR_STATUS_INACTIVE: u64 = 4;
-
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
     public entry fun test_validator_staking(
@@ -136,6 +138,16 @@ module legato_addr::delegation_pool_tests {
         voting_power_increase_limit: u64,
     ) {
         account::create_account_for_test(signer::address_of(aptos_framework));
+
+        features::change_feature_flags_for_testing(aptos_framework, vector[
+            COIN_TO_FUNGIBLE_ASSET_MIGRATION,
+            DELEGATION_POOLS,
+            MODULE_EVENT,
+            OPERATOR_BENEFICIARY_CHANGE,
+            COMMISSION_CHANGE_DELEGATION_POOL
+        ], vector[ ]);
+
+        reconfiguration::initialize_for_test(aptos_framework); 
         stake::initialize_for_test_custom(
             aptos_framework,
             minimum_stake,
@@ -146,13 +158,7 @@ module legato_addr::delegation_pool_tests {
             rewards_rate_denominator,
             voting_power_increase_limit
         );
-        reconfiguration::initialize_for_test(aptos_framework);
-        // features::change_feature_flags(aptos_framework, vector[
-        //     DELEGATION_POOLS, 
-        //     MODULE_EVENT,
-        //     OPERATOR_BENEFICIARY_CHANGE,
-        //     COMMISSION_CHANGE_DELEGATION_POOL
-        // ], vector[]);
+        
     }
 
     #[test_only]
