@@ -47,6 +47,8 @@ module legato_addr::vault {
     const ERR_INVALID_TYPE: u64 = 109;
     const ERR_INSUFFICIENT_AMOUNT: u64 = 110;
     const ERR_DISABLED: u64 = 111;
+    const ERR_TOO_LARGE: u64 = 112;
+    const ERR_INVALID_MULTIPLIER: u64 = 113;
 
     // ======== Structs =========
 
@@ -180,7 +182,9 @@ module legato_addr::vault {
         // Update
         vault_config.pt_total_supply = vault_config.pt_total_supply+pt_amount;
 
-        transfer_stake();
+        if (config.enable_auto_stake == true) {
+            transfer_stake();
+        };
 
         // Emit an event 
         event::emit(
@@ -326,6 +330,32 @@ module legato_addr::vault {
         let config = borrow_global_mut<VaultManager>(@legato_addr);
         let vault_config = table::borrow_mut( &mut config.vault_config, type_info::type_name<P>() );
         vault_config.metadata
+    }
+
+    // Return the total unstake request amount
+    #[view]
+    public fun get_total_unstake_request(): u64 acquires VaultManager {
+
+        let output = 0;
+
+        let config = borrow_global_mut<VaultManager>(@legato_addr);
+        let config_object_signer = object::generate_signer_for_extending(&config.extend_ref);
+        let total_requester = smart_vector::length( &config.requesters );
+
+        if (total_requester > 0) {
+
+            let requester_count = 0;
+            let total_unlock = 0;
+
+            while ( requester_count < total_requester) {
+                let requester_address = *smart_vector::borrow( &config.requesters, requester_count );
+                output = output+*table::borrow( &config.pending_unstake, requester_address  );
+                requester_count = requester_count+1;
+            };
+
+        };
+
+        output
     }
 
     // ======== Only Governance =========
@@ -476,7 +506,126 @@ module legato_addr::vault {
         global_config.pending_stake = global_config.pending_stake - withdraw_amount;
     }
 
+    // Admin proceeds to unlock APT for further withdrawal.
+    public entry fun admin_proceed_unlock(sender: &signer, unlock_amount: u64) acquires VaultManager {
+        assert!( signer::address_of(sender) == @legato_addr , ERR_UNAUTHORIZED);
 
+        let config = borrow_global_mut<VaultManager>(@legato_addr);
+        let config_object_signer = object::generate_signer_for_extending(&config.extend_ref);
+        let total_delegators = smart_vector::length(&config.delegator_pools);
+    
+        let delegator_count = 0;
+        let remaining_unlock = unlock_amount;
+
+        while ( delegator_count < total_delegators) {
+
+            let delegator_address = *smart_vector::borrow( &config.delegator_pools, delegator_count );
+            let pool_address = dp::get_owned_pool_address(delegator_address); 
+
+            let (staked_amount,_,_) = dp::get_stake( pool_address, signer::address_of( &config_object_signer ) );
+            
+            if (remaining_unlock != 0 && staked_amount > 0) {
+                let amount_to_unlock = if (staked_amount >= remaining_unlock) {
+                    remaining_unlock
+                } else {
+                    staked_amount
+                };
+                remaining_unlock = remaining_unlock-amount_to_unlock;
+                dp::unlock(&config_object_signer, pool_address, amount_to_unlock);
+            };
+
+            delegator_count = delegator_count+1;
+        };
+
+        assert!( remaining_unlock == 0, ERR_TOO_LARGE );
+    }
+
+    // Admin proceeds to unstake APT from the respective validator pool
+    public entry fun admin_proceed_unstake(sender: &signer, unstake_amount: u64) acquires VaultManager {
+        assert!( signer::address_of(sender) == @legato_addr , ERR_UNAUTHORIZED);
+
+        let config = borrow_global_mut<VaultManager>(@legato_addr);
+        let config_object_signer = object::generate_signer_for_extending(&config.extend_ref);
+        let total_delegators = smart_vector::length(&config.delegator_pools);
+
+        let delegator_count = 0;
+        let remaining_withdraw = unstake_amount;
+
+        while ( delegator_count < total_delegators) {
+        
+            let delegator_address = *smart_vector::borrow( &config.delegator_pools, delegator_count );
+            let pool_address = dp::get_owned_pool_address(delegator_address); 
+
+            let (_,inactive_amount,_) = dp::get_stake( pool_address, signer::address_of( &config_object_signer ) );
+
+            if (remaining_withdraw != 0 && inactive_amount > 0) {
+                let amount_to_withdraw = if (inactive_amount >= remaining_withdraw) {
+                    remaining_withdraw
+                } else {
+                    inactive_amount
+                };
+                remaining_withdraw = remaining_withdraw-amount_to_withdraw;
+                dp::withdraw(&config_object_signer, pool_address, amount_to_withdraw);
+            };
+        
+            delegator_count = delegator_count+1;
+        };
+    
+        assert!( remaining_withdraw == 0, ERR_TOO_LARGE );
+    }
+
+    // Admin transfers APT to requesters per the withdrawal amounts they want sent out
+    public entry fun admin_proceed_withdrawal(sender: &signer, withdraw_amount: u64, multiplier: u128) acquires VaultManager {
+        assert!( signer::address_of(sender) == @legato_addr , ERR_UNAUTHORIZED);
+        assert!( 10000 >= multiplier, ERR_INVALID_MULTIPLIER );
+
+        let config = borrow_global_mut<VaultManager>(@legato_addr);
+        let config_object_signer = object::generate_signer_for_extending(&config.extend_ref);
+        
+        let total_requester = smart_vector::length( &config.requesters ); 
+        let requester_count = 0;
+        let remaining_withdraw = withdraw_amount;
+
+        // Loop through each requester and process their withdrawal.
+        while ( requester_count < total_requester) {
+            let requester_address = *smart_vector::borrow( &config.requesters, requester_count );
+            let withdraw_amount = *table::borrow( &config.pending_unstake, requester_address );
+
+            if (withdraw_amount > 0) {
+                let sendout_amount = ( fixed_point64::multiply_u128( (withdraw_amount as u128), fixed_point64::create_from_rational( multiplier, 10000 ) ) as u64 );
+                let current_apt_balance = coin::balance<AptosCoin>(  signer::address_of(&config_object_signer)  );
+
+                if ( current_apt_balance >= sendout_amount && remaining_withdraw >= sendout_amount) {
+                    let apt_coin = coin::withdraw<AptosCoin>(&config_object_signer, sendout_amount);
+                    coin::deposit(requester_address, apt_coin);
+
+                    // Emit an event 
+                    event::emit(
+                        Withdrawn {
+                            withdraw_amount: sendout_amount,
+                            requester: requester_address
+                        }
+                    );
+
+                    *table::borrow_mut(&mut config.pending_unstake, requester_address) = 0;
+
+                    remaining_withdraw = remaining_withdraw - sendout_amount;
+                };
+
+            };
+
+            requester_count = requester_count+1;
+        };
+
+    } 
+
+    // Admin updates the request table on a emergency case
+    public entry fun admin_update_request_table(sender: &signer, requester: address, new_amount: u64) acquires VaultManager {
+        assert!( signer::address_of(sender) == @legato_addr , ERR_UNAUTHORIZED);
+
+        let config = borrow_global_mut<VaultManager>(@legato_addr); 
+        *table::borrow_mut(&mut config.pending_unstake, requester) = new_amount;
+    }
 
     // ======== Internal Functions =========
 

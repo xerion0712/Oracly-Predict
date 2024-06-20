@@ -1,4 +1,4 @@
- 
+
 #[test_only]
 module legato_addr::vault_tests {
 
@@ -15,10 +15,11 @@ module legato_addr::vault_tests {
     use aptos_framework::reconfiguration;
     use aptos_framework::delegation_pool as dp;
     use aptos_framework::timestamp;
- 
+    use aptos_framework::primary_fungible_store;
+
     use legato_addr::vault;
     use legato_addr::vault_token_name::{MAR_2024, JUN_2024};
-    
+
     #[test_only]
     const EPOCH_DURATION: u64 = 86400;
 
@@ -33,6 +34,15 @@ module legato_addr::vault_tests {
 
     #[test_only]
     const MODULE_EVENT: u64 = 26;
+ 
+    #[test_only]
+    const OPERATOR_BENEFICIARY_CHANGE: u64 = 39;
+
+    #[test_only]
+    const COMMISSION_CHANGE_DELEGATION_POOL: u64 = 42;
+
+    #[test_only]
+    const COIN_TO_FUNGIBLE_ASSET_MIGRATION: u64 = 60;
 
     #[test(deployer = @legato_addr,aptos_framework = @aptos_framework, validator_1 = @0xdead, validator_2 = @0x1111, user_1 = @0xbeef, user_2 = @0xfeed)]
     fun test_mint_redeem(
@@ -44,10 +54,10 @@ module legato_addr::vault_tests {
         user_2: &signer
     ) {
         initialize_for_test(aptos_framework, validator_1, validator_2);
-        
+
         // Setup Legato vaults
         setup_vaults(deployer, signer::address_of(validator_1), signer::address_of(validator_2));
-
+    
         // Prepare test accounts
         create_test_accounts( deployer, user_1, user_2);
 
@@ -57,17 +67,16 @@ module legato_addr::vault_tests {
 
         assert!(coin::balance<AptosCoin>(signer::address_of(user_1)) == 100 * ONE_APT, 0);
         assert!(coin::balance<AptosCoin>(signer::address_of(user_2)) == 200 * ONE_APT, 1);
-    
+
         // Stake PT tokens.
         vault::mint<MAR_2024>( user_1, 100 * ONE_APT);
         vault::mint<MAR_2024>( user_2, 200 * ONE_APT);
 
         // Check PT token balances.
-        let pt_amount_1 = vault::get_pt_balance<MAR_2024>(signer::address_of(user_1));
-        let pt_amount_2 = vault::get_pt_balance<MAR_2024>(signer::address_of(user_2));
-        assert!( pt_amount_1 == 101_37836771, 2); // 101.378 PT
-        assert!( pt_amount_2 == 202_75673543, 3); // 202.756 PT
-
+        let metadata = vault::get_vault_metadata<MAR_2024>();
+        assert!( (primary_fungible_store::balance( signer::address_of(user_1), metadata )) == 101_37836771, 2); // 101.378 PT
+        assert!( (primary_fungible_store::balance( signer::address_of(user_2), metadata )) == 202_75673543, 3); // 202.756 PT
+        
         // Fast forward 100 epochs.
         let i:u64=1;  
         while(i <= 100) 
@@ -86,18 +95,24 @@ module legato_addr::vault_tests {
         // Request redemption of PT tokens.
         vault::request_redeem<MAR_2024>( user_1, 101_37836771 ); 
 
-        // Perform admin tasks.
-        vault::admin_proceed_unstake(deployer, signer::address_of(validator_1)  );
-        
+        assert!( vault::get_total_unstake_request() == 101_37836771, 5 );
+
+        // Unlock assets to prepare for withdrawal
+        vault::admin_proceed_unlock(deployer, 101_37836771);
+
         // Fast forward one epoch.
         timestamp::fast_forward_seconds(EPOCH_DURATION);
         end_epoch();
 
-        vault::admin_proceed_withdrawal( deployer , signer::address_of(validator_1));
+        // Unstake assets to prepare for withdrawal
+        vault::admin_proceed_unstake(deployer, 101_37836771);
+
+        // Proceed send out APT 
+        vault::admin_proceed_withdrawal( deployer, 101_37836771, 9900 ); 
 
         // Verify has the correct amount of APT tokens after redemption.
-        let apt_amount = coin::balance<AptosCoin>(signer::address_of(user_1)); 
-        assert!( apt_amount == 101_37836770, 5);
+        let apt_amount = coin::balance<AptosCoin>(signer::address_of(user_1));
+        assert!( apt_amount == 100_36458403, 5);
     }
 
     #[test(deployer = @legato_addr,aptos_framework = @aptos_framework, validator_1 = @0xdead, validator_2 = @0x1111, user_1 = @0xbeef, user_2 = @0xfeed)]
@@ -133,61 +148,29 @@ module legato_addr::vault_tests {
             i=i+1; // Incrementing the counter
         };
 
-        let amount_before = vault::get_pt_balance<MAR_2024>(signer::address_of(user_1));
+        let metadata = vault::get_vault_metadata<MAR_2024>();  
+        let amount_before = primary_fungible_store::balance( signer::address_of(user_1), metadata);
         assert!( amount_before == 101_37836771, 0); // 101.378 PT
         
         // Request exit
         vault::request_exit<MAR_2024>( user_1, amount_before ); 
 
         // Perform admin tasks.
-        vault::admin_proceed_unstake(deployer, signer::address_of(validator_1)  );
-        
+        /// Unlock assets to prepare for amount_before
+        vault::admin_proceed_unlock(deployer, 101_37836771);
+
         // Fast forward one epoch.
         timestamp::fast_forward_seconds(EPOCH_DURATION);
         end_epoch();
 
-        vault::admin_proceed_withdrawal( deployer , signer::address_of(validator_1));
+        // Unstake assets to prepare for withdrawal
+        vault::admin_proceed_unstake(deployer, amount_before);
+
+        // Proceed send out APT 
+        vault::admin_proceed_withdrawal( deployer, amount_before, 9900 ); 
 
         let apt_amount = coin::balance<AptosCoin>(signer::address_of(user_1)); 
-        assert!( apt_amount == 100_13708438, 0); // 100.137 PT
-        
-    }
-
-    #[test_only]
-    public fun setup_vaults(sender: &signer, validator_1: address, validator_2: address) {
-
-        vault::init_module_for_testing(sender);
-
-        // Update the batch amount to 200 APT.
-        vault::update_batch_amount(sender, 200 * ONE_APT );
-
-        // Add the validators to the whitelist.
-        vault::add_whitelist(sender, validator_1);
-        vault::add_whitelist(sender, validator_2);
-
-        // Vault #1 matures in 100 epochs.
-        let maturity_1 = timestamp::now_seconds()+(100*EPOCH_DURATION);
-
-        // Create Vault #1 with an APY of 5%.
-        vault::new_vault<MAR_2024>(sender, maturity_1, 5, 100);
-
-        // Vault #2 matures in 200 epochs.
-        let maturity_2 = timestamp::now_seconds()+(200*EPOCH_DURATION);
-
-        // Create Vault #2 with an APY of 4%.
-        vault::new_vault<JUN_2024>(sender, maturity_2, 4, 100);
-    }
-
-    #[test_only]
-    public fun create_test_accounts(
-        deployer: &signer,
-        user_1: &signer,
-        user_2: &signer
-    ) {
-        account::create_account_for_test(signer::address_of(user_1));
-        account::create_account_for_test(signer::address_of(user_2)); 
-        account::create_account_for_test(signer::address_of(deployer)); 
-        account::create_account_for_test( vault::get_config_object_address() ); 
+        assert!( apt_amount == 99_13571354, 0); // 99.13 APT
     }
 
     #[test_only]
@@ -219,7 +202,7 @@ module legato_addr::vault_tests {
         reconfiguration::reconfigure_for_test_custom();
     }
 
-    // Convenient function for setting up all required stake initializations.
+    // Convenient function for setting up the mock system
     #[test_only]
     public fun initialize_for_test_custom(
         aptos_framework: &signer,
@@ -229,9 +212,19 @@ module legato_addr::vault_tests {
         allow_validator_set_change: bool,
         rewards_rate_numerator: u64,
         rewards_rate_denominator: u64,
-        voting_power_increase_limit: u64,
+        voting_power_increase_limit: u64
     ) {
         account::create_account_for_test(signer::address_of(aptos_framework));
+        
+        features::change_feature_flags_for_testing(aptos_framework, vector[
+            COIN_TO_FUNGIBLE_ASSET_MIGRATION,
+            DELEGATION_POOLS,
+            MODULE_EVENT,
+            OPERATOR_BENEFICIARY_CHANGE,
+            COMMISSION_CHANGE_DELEGATION_POOL
+        ], vector[ ]);
+
+        reconfiguration::initialize_for_test(aptos_framework);
         stake::initialize_for_test_custom(
             aptos_framework,
             minimum_stake,
@@ -242,8 +235,6 @@ module legato_addr::vault_tests {
             rewards_rate_denominator,
             voting_power_increase_limit
         );
-        reconfiguration::initialize_for_test(aptos_framework);
-        // features::change_feature_flags(aptos_framework, vector[DELEGATION_POOLS, MODULE_EVENT], vector[]);
     }
 
     #[test_only]
@@ -285,6 +276,43 @@ module legato_addr::vault_tests {
         if (should_end_epoch) {
             end_epoch();
         };
+    }
+
+    #[test_only]
+    public fun create_test_accounts(
+        deployer: &signer,
+        user_1: &signer,
+        user_2: &signer
+    ) {
+        account::create_account_for_test(signer::address_of(user_1));
+        account::create_account_for_test(signer::address_of(user_2)); 
+        account::create_account_for_test(signer::address_of(deployer)); 
+        account::create_account_for_test( vault::get_config_object_address() ); 
+    }
+
+    #[test_only]
+    public fun setup_vaults(sender: &signer , validator_1: address, validator_2: address) {
+        
+        vault::init_module_for_testing(sender);
+
+        // Update the batch amount to 200 APT.
+        vault::update_batch_amount(sender, 200 * ONE_APT );
+
+        // Add the validators to the whitelist.
+        vault::add_whitelist(sender, validator_1);
+        vault::add_whitelist(sender, validator_2);
+
+        // Vault #1 matures in 100 epochs.
+        let maturity_1 = timestamp::now_seconds()+(100*EPOCH_DURATION);
+
+        // Create Vault #1 with an APY of 5%.
+        vault::new_vault<MAR_2024>(sender, maturity_1, 5, 100);
+
+        // Vault #2 matures in 200 epochs.
+        let maturity_2 = timestamp::now_seconds()+(200*EPOCH_DURATION);
+
+        // Create Vault #2 with an APY of 4%.
+        vault::new_vault<JUN_2024>(sender, maturity_2, 4, 100);
     }
 
     #[test_only]
