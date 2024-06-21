@@ -50,4 +50,7 @@ module legato_addr::legato_lib {
 
         ( fixed_point64::divide_u128( (output_amount as u128), denominator  ) as u64 )
     }
+
+    
+
 }
