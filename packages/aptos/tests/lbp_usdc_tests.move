@@ -13,7 +13,7 @@ module legato_addr::lbp_usdc_tests {
     use legato_addr::amm::{Self};
 
     const LEGATO_AMOUNT: u64 = 60000000_00000000; // 60 mil. LEGATO
-    const USDC_AMOUNT: u64 = 500_000_000; // 500 USDC for bootstrap LP
+    const USDC_AMOUNT: u64 = 500_000000; // 500 USDC for bootstrap LP
 
     // Registering pools
     #[test(deployer = @legato_addr, lp_provider = @0xdead, user = @0xbeef )]
@@ -50,13 +50,11 @@ module legato_addr::lbp_usdc_tests {
         // LEGATO 
         mock_legato_fa::mint( lp_provider_address, LEGATO_AMOUNT );
  
-        // Setup a 50/50 pool
-
         amm::register_lbp_pool(
             deployer,
-            false,
-            mock_usdc_fa::get_metadata(),
+            true,
             mock_legato_fa::get_metadata(),
+            mock_usdc_fa::get_metadata(), 
             9000,
             6000, 
             false,
@@ -65,11 +63,11 @@ module legato_addr::lbp_usdc_tests {
 
         amm::add_liquidity(
             lp_provider,
-            mock_usdc_fa::get_metadata(),
             mock_legato_fa::get_metadata(),
-            USDC_AMOUNT,
-            1,
+            mock_usdc_fa::get_metadata(), 
             LEGATO_AMOUNT,
+            1,
+            USDC_AMOUNT,
             1
         );
  
@@ -96,7 +94,7 @@ module legato_addr::lbp_usdc_tests {
             mock_legato_fa::burn( user_address, current_balance );
 
             // Check weights
-            let (weight_usdc, weight_legato, _, _ ) = amm::lbp_info( mock_usdc_fa::get_metadata(), mock_legato_fa::get_metadata());
+            let (weight_legato, weight_usdc, _, _ ) = amm::lbp_info( mock_legato_fa::get_metadata(), mock_usdc_fa::get_metadata());
             // Keep lowering
             assert!( current_weight_legato >= weight_legato, counter );
             assert!( current_weight_usdc <= weight_usdc, counter );
@@ -108,7 +106,7 @@ module legato_addr::lbp_usdc_tests {
         };
 
         // Check final weights
-        let (weight_usdc, weight_legato, _, _ ) = amm::lbp_info( mock_usdc_fa::get_metadata(), mock_legato_fa::get_metadata());
+        let (weight_legato, weight_usdc, _, _ ) = amm::lbp_info( mock_legato_fa::get_metadata(), mock_usdc_fa::get_metadata() );
         assert!( weight_usdc == 4000, 0 );
         assert!( weight_legato == 6000, 1 );
 
