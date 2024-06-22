@@ -70,6 +70,7 @@ module legato_addr::amm {
     const ERR_INSUFFICIENT_AMOUNT: u64 = 115;
     const ERR_RESERVES_EMPTY: u64 = 116;
     const ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM: u64 = 117;
+    const ERR_MUST_BE_ORDER: u64 = 118;
 
     // ======== Structs =========
 
@@ -225,7 +226,7 @@ module legato_addr::amm {
                 constructor_ref,
                 0, /* maximum_supply. 0 means no maximum */
                 lp_name, /* name */
-                lp_symbol, /* symbol */
+                utf8(b"LP"), /* symbol */
                 8, /* decimals */
                 utf8(b"https://www.legato.finance/assets/images/favicon.ico"), /* icon */
                 utf8(b"https://legato.finance"), /* project */
@@ -299,15 +300,17 @@ module legato_addr::amm {
     // is_vault specifies if staking rewards from Legato Vault are accepted
     public entry fun register_lbp_pool(
         sender: &signer,
+        proj_on_x: bool, // Indicates whether the project token is on the X or Y side
         token_1: Object<Metadata>,
+        token_2: Object<Metadata>,
         start_weight: u64,  // Initial weight of the project token.
         final_weight: u64, // The weight when the pool is stabilized. 
         is_vault: bool, // false - only common coins, true - coins+staking rewards.
         target_amount: u64, // The target amount required to fully shift the weight.
     ) acquires AMMManager {
 
-        let metadata = object::address_to_object<Metadata>(@aptos_fungible_asset);
-        let is_order = is_order(token_1, metadata);
+        let is_order = is_order(token_1, token_2);
+        assert!(is_order, ERR_MUST_BE_ORDER);
 
         let config = borrow_global_mut<AMMManager>(@legato_addr);
         let config_object_signer = object::generate_signer_for_extending(&config.extend_ref);
@@ -316,71 +319,34 @@ module legato_addr::amm {
             assert!( smart_vector::contains(&config.whitelist, &(signer::address_of(sender))) , ERR_UNAUTHORIZED);
         };
 
-        if (is_order) {
-            let proj_on_x = true; // Indicates whether the project token is on the X or Y side
+        let (lp_name, lp_symbol) = generate_lp_name_and_symbol(token_1, token_2);
+        assert!( !table::contains(&config.pool_list, lp_name), ERR_POOL_HAS_REGISTERED);
 
-            let (lp_name, lp_symbol) = generate_lp_name_and_symbol(token_1, metadata);
-            assert!( !table::contains(&config.pool_list, lp_name), ERR_POOL_HAS_REGISTERED);
-
-            let constructor_ref = &object::create_named_object(&config_object_signer, *bytes(&lp_symbol) );
+        let constructor_ref = &object::create_named_object(&config_object_signer, *bytes(&lp_symbol) );
         
-            base_fungible_asset::initialize(
-                constructor_ref,
-                0, /* maximum_supply. 0 means no maximum */
-                lp_name, /* name */
-                lp_symbol, /* symbol */
-                8, /* decimals */
-                utf8(b"https://www.legato.finance/assets/images/favicon.ico"), /* icon */
-                utf8(b"https://legato.finance"), /* project */
-            );
+        base_fungible_asset::initialize(
+            constructor_ref,
+            0, /* maximum_supply. 0 means no maximum */
+            lp_name, /* name */
+            utf8(b"LP"), /* symbol */
+            8, /* decimals */
+            utf8(b"https://www.legato.finance/assets/images/favicon.ico"), /* icon */
+            utf8(b"https://legato.finance"), /* project */
+        );
 
-            let params = lbp::construct_init_params( proj_on_x, start_weight, final_weight, is_vault, target_amount );
+        let params = lbp::construct_init_params( proj_on_x, start_weight, final_weight, is_vault, target_amount );
 
-            let pool = init_pool_params(constructor_ref, token_1, metadata, 0, 0, fixed_point64::create_from_raw_value( LBP_FEE ), false, true, option::some<LBPParams>(params)  );
+        let pool = init_pool_params(constructor_ref, token_1, token_2, 0, 0, fixed_point64::create_from_raw_value( LBP_FEE ), false, true, option::some<LBPParams>(params)  );
 
-            // Add to the table.
-            table::add(
-                &mut config.pool_list,
-                lp_name,
-                pool
-            );
+        // Add to the table.
+        table::add(
+            &mut config.pool_list,
+            lp_name,
+            pool
+        );
 
-            // Emit an event
-            event::emit(RegisterPool { pool_name: lp_name, token_1 : fungible_asset::symbol(token_1), token_2 : fungible_asset::symbol(metadata),  weight_1: start_weight, weight_2: final_weight, is_stable: false,  is_lbp: true });
-
-        } else {
-            let proj_on_x = false;
-
-            let (lp_name, lp_symbol) = generate_lp_name_and_symbol(metadata, token_1);
-            assert!( !table::contains(&config.pool_list, lp_name), ERR_POOL_HAS_REGISTERED);
-
-            let constructor_ref = &object::create_named_object(&config_object_signer, *bytes(&lp_symbol) );
-        
-            base_fungible_asset::initialize(
-                constructor_ref,
-                0, /* maximum_supply. 0 means no maximum */
-                lp_name, /* name */
-                lp_symbol, /* symbol */
-                8, /* decimals */
-                utf8(b"https://www.legato.finance/assets/images/favicon.ico"), /* icon */
-                utf8(b"https://legato.finance"), /* project */
-            );
-
-            let params = lbp::construct_init_params( proj_on_x, start_weight, final_weight, is_vault, target_amount );
-
-            let pool = init_pool_params(constructor_ref, metadata, token_1, 0, 0, fixed_point64::create_from_raw_value( LBP_FEE ), false, true, option::some<LBPParams>(params)  );
-
-            // Add to the table.
-            table::add(
-                &mut config.pool_list,
-                lp_name,
-                pool
-            );
-
-            // Emit an event
-            event::emit(RegisterPool { pool_name: lp_name, token_1 : fungible_asset::symbol(metadata), token_2 : fungible_asset::symbol(token_1),  weight_1: start_weight, weight_2: final_weight, is_stable: false,  is_lbp: true });
-
-        }
+        // Emit an event
+        event::emit(RegisterPool { pool_name: lp_name, token_1 : fungible_asset::symbol(token_1), token_2 : fungible_asset::symbol(token_2),  weight_1: start_weight, weight_2: final_weight, is_stable: false,  is_lbp: true });
 
     }
 
@@ -565,6 +531,24 @@ module legato_addr::amm {
         let config = borrow_global_mut<AMMManager>(@legato_addr);
         let pool = get_mut_pool( &mut config.pool_list, token_1, token_2);
         pool.lp_metadata
+    }
+
+    // Retrieves information about the LBP pool
+    #[view]
+    public fun lbp_info(token_1:Object<Metadata>, token_2:Object<Metadata>) : (u64, u64, u64, u64) acquires AMMManager {
+        let is_order = is_order(token_1, token_2);
+        assert!(is_order, ERR_MUST_BE_ORDER);
+
+        let config = borrow_global_mut<AMMManager>(@legato_addr);
+        let pool_config = get_mut_pool( &mut config.pool_list, token_1, token_2);
+    
+        assert!( pool_config.is_lbp == true , ERR_NOT_LBP);
+
+        let ( weight_1, weight_2 ) = pool_current_weight(pool_config);
+        let params = option::borrow(&pool_config.lbp_params);
+
+        (weight_1,  weight_2, lbp::total_amount_collected(params), lbp::total_target_amount(params))
+ 
     }
 
     // Calculate amounts needed for adding new liquidity for both `X` and `Y`.
