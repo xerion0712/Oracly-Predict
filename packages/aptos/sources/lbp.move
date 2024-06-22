@@ -12,7 +12,6 @@ module legato_addr::lbp {
 
     friend legato_addr::amm;
 
-
     /// The integer scaling setting for weights
     const WEIGHT_SCALE: u64 = 10000;
 

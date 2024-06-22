@@ -14,9 +14,9 @@ module legato::lbp {
     use std::ascii::into_bytes;
 
     use sui::coin::{Self, Coin};
-    use sui::balance::{ Self, Supply, Balance}; 
+    use sui::balance::{ Self, Balance}; 
     use sui::bag::{Self, Bag};
-    use sui::tx_context::{ Self, TxContext}; 
+    use sui::tx_context::{ TxContext}; 
 
     use legato_math::fixed_point64::{Self}; 
     use legato_math::legato_math::{power};
@@ -27,15 +27,13 @@ module legato::lbp {
 
     // ======== Errors ========
  
-    const ERR_INVALID_WEIGHT: u64 = 301;  
-    const ERR_INVALID_SENDER: u64 = 302;
-    const ERR_EMPTY: u64 = 303;
-    const ERR_INVALID_POOL: u64 = 304;
-    const ERR_INSUFFICIENT_AMOUNT : u64 = 305;
-    const ERR_INVALID_AMOUNT: u64 = 306;
-    const ERR_TOO_LOW_AMOUNT: u64 = 307;
-    const ERR_BUY_DISABLED_WITH_TOKEN: u64 = 308;
-    const ERR_BUY_DISABLED_WITH_VAULT: u64 = 309;
+    const ERR_INVALID_WEIGHT: u64 = 301;   
+    const ERR_EMPTY: u64 = 302;
+    const ERR_INVALID_POOL: u64 = 303;
+    const ERR_INVALID_AMOUNT: u64 = 304;
+    const ERR_TOO_LOW_AMOUNT: u64 = 305;
+    const ERR_BUY_DISABLED_WITH_TOKEN: u64 = 306;
+    const ERR_BUY_DISABLED_WITH_VAULT: u64 = 307;
 
     friend legato::amm;
 
