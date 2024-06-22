@@ -172,30 +172,24 @@ module legato_addr::amm {
             token_out_min,
             is_order
         );
+
         let amount_out = fungible_asset::amount(&token_out);
 
         let config = borrow_global_mut<AMMManager>(@legato_addr);
         let pool_config = get_mut_pool( &mut config.pool_list, token_1, token_2);
 
-        if (is_order) {
-            primary_fungible_store::ensure_primary_store_exists(signer::address_of(sender), pool_config.token_2);
-            let store = primary_fungible_store::primary_store(signer::address_of(sender), pool_config.token_2);
-            fungible_asset::deposit(store, token_out);
+        primary_fungible_store::ensure_primary_store_exists(signer::address_of(sender), token_2);
+        let store = primary_fungible_store::primary_store(signer::address_of(sender), token_2);
+        fungible_asset::deposit(store, token_out);
 
-            let (lp_name, _) = generate_lp_name_and_symbol(token_1, token_2);
-
-            // Emit an event
-            event::emit(Swapped { pool_name: lp_name, token_in: fungible_asset::symbol(token_1), token_out: fungible_asset::symbol(token_2), amount_in: token_in, amount_out });
+        let (lp_name, _) = if (is_order) {
+            generate_lp_name_and_symbol(token_1, token_2)
         } else {
-            primary_fungible_store::ensure_primary_store_exists(signer::address_of(sender), pool_config.token_1);
-            let store = primary_fungible_store::primary_store(signer::address_of(sender), pool_config.token_1);
-            fungible_asset::deposit(store, token_out);
-
-            let (lp_name, _) = generate_lp_name_and_symbol(token_2, token_1);
-
-            // Emit an event
-            event::emit(Swapped { pool_name: lp_name, token_in: fungible_asset::symbol(token_2), token_out: fungible_asset::symbol(token_1) , amount_in: token_in, amount_out });
+            generate_lp_name_and_symbol(token_2, token_1)
         };
+
+        // Emit an event
+        event::emit(Swapped { pool_name: lp_name, token_in: fungible_asset::symbol(token_1), token_out: fungible_asset::symbol(token_2), amount_in: token_in, amount_out });
 
     }
 
@@ -491,12 +485,12 @@ module legato_addr::amm {
                 let coin_x_withdrawn = fungible_asset::withdraw(&config_object_signer, pool_config.token_1, coin_x_out);
                 let coin_y_withdrawn = fungible_asset::withdraw(&config_object_signer, pool_config.token_2, coin_y_out);
 
-                primary_fungible_store::ensure_primary_store_exists(signer::address_of(lp_provider), pool_config.token_1);
-                let store_x = primary_fungible_store::primary_store(signer::address_of(lp_provider), pool_config.token_1);
+                primary_fungible_store::ensure_primary_store_exists(signer::address_of(lp_provider), token_1);
+                let store_x = primary_fungible_store::primary_store(signer::address_of(lp_provider), token_1);
                 fungible_asset::deposit(store_x, coin_x_withdrawn);
 
-                primary_fungible_store::ensure_primary_store_exists(signer::address_of(lp_provider), pool_config.token_2);
-                let store_y = primary_fungible_store::primary_store(signer::address_of(lp_provider), pool_config.token_2);
+                primary_fungible_store::ensure_primary_store_exists(signer::address_of(lp_provider), token_2);
+                let store_y = primary_fungible_store::primary_store(signer::address_of(lp_provider), token_2);
                 fungible_asset::deposit(store_y, coin_y_withdrawn);
 
             } else {
@@ -509,12 +503,12 @@ module legato_addr::amm {
                 let coin_x_withdrawn = fungible_asset::withdraw(&config_object_signer, pool_config.token_1, coin_x_out);
                 let coin_y_withdrawn = fungible_asset::withdraw(&config_object_signer, pool_config.token_2, coin_y_out);
 
-                primary_fungible_store::ensure_primary_store_exists(signer::address_of(lp_provider), pool_config.token_1);
-                let store_x = primary_fungible_store::primary_store(signer::address_of(lp_provider), pool_config.token_1);
+                primary_fungible_store::ensure_primary_store_exists(signer::address_of(lp_provider), token_1);
+                let store_x = primary_fungible_store::primary_store(signer::address_of(lp_provider), token_1);
                 fungible_asset::deposit(store_x, coin_x_withdrawn);
 
-                primary_fungible_store::ensure_primary_store_exists(signer::address_of(lp_provider), pool_config.token_2);
-                let store_y = primary_fungible_store::primary_store(signer::address_of(lp_provider), pool_config.token_2);
+                primary_fungible_store::ensure_primary_store_exists(signer::address_of(lp_provider), token_2);
+                let store_y = primary_fungible_store::primary_store(signer::address_of(lp_provider), token_2);
                 fungible_asset::deposit(store_y, coin_y_withdrawn);
 
             };
@@ -697,14 +691,14 @@ module legato_addr::amm {
                 lbp::verify_and_adjust_amount(params, is_buy, token_in, token_2_out, false );
             };
 
-            let token_in_coin = fungible_asset::withdraw(sender, pool_config.token_1, token_in);
+            let token_in_coin = primary_fungible_store::withdraw(sender, token_1, token_in);
             let fee_in_coin = fungible_asset::extract(&mut token_in_coin, coin_x_fee);
 
             fungible_asset::deposit(pool_config.token_1, token_in_coin);
 
             // send fees to treasury
-            primary_fungible_store::ensure_primary_store_exists(config.treasury_address, pool_config.token_1);
-            let store = primary_fungible_store::primary_store(config.treasury_address, pool_config.token_1);
+            primary_fungible_store::ensure_primary_store_exists(config.treasury_address, token_1);
+            let store = primary_fungible_store::primary_store(config.treasury_address, token_1);
             fungible_asset::deposit(store, fee_in_coin);
 
             // send out token-2
@@ -721,7 +715,7 @@ module legato_addr::amm {
             // Obtain the current weights of the pool
             let (weight_out, weight_in) = pool_current_weight(pool_config);
 
-            let token_1_out = get_amount_out(
+            let token_2_out = get_amount_out(
                 pool_config.is_stable,
                 coin_y_after_fees,
                 reserve_in,
@@ -731,28 +725,28 @@ module legato_addr::amm {
             );
 
             assert!(
-                token_1_out >= token_out_min,
+                token_2_out >= token_out_min,
                 ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM
             );
 
             if (pool_config.is_lbp) {
                 let params = option::borrow_mut(&mut pool_config.lbp_params);
                 let is_buy = lbp::is_buy(params);   
-                lbp::verify_and_adjust_amount(params, !is_buy, token_in, token_1_out, false);
+                lbp::verify_and_adjust_amount(params, !is_buy, token_in, token_2_out, false);
             };
 
-            let token_in_coin = fungible_asset::withdraw(sender, pool_config.token_2, token_in);
+            let token_in_coin = primary_fungible_store::withdraw(sender, token_1, token_in);
             let fee_in_coin = fungible_asset::extract(&mut token_in_coin, coin_y_fee);
 
             fungible_asset::deposit(pool_config.token_2, token_in_coin);
 
             // send fees to treasury
-            primary_fungible_store::ensure_primary_store_exists(config.treasury_address, pool_config.token_2);
-            let store = primary_fungible_store::primary_store(config.treasury_address, pool_config.token_2);
+            primary_fungible_store::ensure_primary_store_exists(config.treasury_address, token_1);
+            let store = primary_fungible_store::primary_store(config.treasury_address, token_1);
             fungible_asset::deposit(store, fee_in_coin);
 
             // send out token-2
-            fungible_asset::withdraw(&config_object_signer, pool_config.token_1, token_1_out)
+            fungible_asset::withdraw(&config_object_signer, pool_config.token_1, token_2_out)
 
         }
     }
@@ -969,10 +963,13 @@ module legato_addr::amm {
                 weight_out, 
             )
         } else { 
-            stable_math::get_amount_out(
+            // FIXME: remove stable pool as the formula doesn't accurate
+            weighted_math::get_amount_out(
                 coin_in,
-                reserve_in, 
-                reserve_out
+                reserve_in,
+                5000, 
+                reserve_out,
+                5000, 
             )
         }
     }

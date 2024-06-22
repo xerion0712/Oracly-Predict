@@ -27,6 +27,87 @@ module legato_addr::amm_tests {
         register_pools(deployer, lp_provider, user);
     }
 
+    // Swapping tokens
+    #[test(deployer = @legato_addr, lp_provider = @0xdead, user = @0xbeef )]
+    fun test_swap_usdc_for_xyz(deployer: &signer, lp_provider: &signer, user: &signer) {
+        register_pools(deployer, lp_provider, user);
+
+        let user_address = signer::address_of(user);
+
+        mock_usdc_fa::mint( user_address, 100_000000 ); // 100 USDC
+        amm::swap(user, mock_usdc_fa::get_metadata(), mock_xyz_fa::get_metadata(), 100_000000, 1 );
+
+        assert!( primary_fungible_store::balance( user_address, mock_xyz_fa::get_metadata()) == 197_906 , 1 ); // 0.00197906 XBTC at a rate of 1 BTC = 52405 USDT
+    }
+
+    #[test(deployer = @legato_addr, lp_provider = @0xdead, user = @0xbeef )]
+    fun test_swap_xyz_for_usdc(deployer: &signer, lp_provider: &signer, user: &signer) {
+        register_pools(deployer, lp_provider, user);
+
+        let user_address = signer::address_of(user);
+
+        mock_xyz_fa::mint( user_address, 100000 ); // 0.001 XBTC
+        amm::swap(user, mock_xyz_fa::get_metadata(), mock_usdc_fa::get_metadata(), 100000, 1 );
+
+        assert!( primary_fungible_store::balance( user_address, mock_usdc_fa::get_metadata()) == 49_613272 , 1 ); // 49.613272 USDC at a rate of 1 BTC = 51465 USDT
+    }
+
+    #[test(deployer = @legato_addr, lp_provider = @0xdead, user = @0xbeef )]
+    fun test_swap_usdc_for_legato(deployer: &signer, lp_provider: &signer, user: &signer) {
+        register_pools(deployer, lp_provider, user);
+
+        let user_address = signer::address_of(user);
+
+        mock_usdc_fa::mint( user_address, 250_000000 ); // 250 USDC
+        amm::swap(user, mock_usdc_fa::get_metadata(), mock_legato_fa::get_metadata(), 250_000000, 1 );
+
+        assert!( primary_fungible_store::balance( user_address, mock_legato_fa::get_metadata()) == 248508_70003833 , 1 ); // 248,508 LEGATO at a rate of 0.001010028 LEGATO/USDC
+
+    }
+
+    #[test(deployer = @legato_addr, lp_provider = @0xdead, user = @0xbeef )]
+    fun test_swap_legato_for_usdc(deployer: &signer, lp_provider: &signer, user: &signer) {
+        register_pools(deployer, lp_provider, user);
+
+        let user_address = signer::address_of(user);
+ 
+        mock_legato_fa::mint( user_address,  100000_00000000); // 100,000 LEGATO 
+        amm::swap(user,  mock_legato_fa::get_metadata(), mock_usdc_fa::get_metadata(), 100000_00000000, 1 );
+
+        assert!( primary_fungible_store::balance( user_address, mock_usdc_fa::get_metadata()) == 99_700797 , 1 ); // 99.7 USDC at a rate of 0.00099302 LEGATO/USDC
+    }
+
+    #[test(deployer = @legato_addr, lp_provider = @0xdead, user = @0xbeef )]
+    fun test_remove_liquidity(deployer: &signer, lp_provider: &signer, user: &signer) {
+        register_pools(deployer, lp_provider, user);
+
+        let lp_provider_address = signer::address_of(lp_provider);
+
+        mock_usdc_fa::mint( lp_provider_address,  5000_000000); // 5000 USDC
+        mock_xyz_fa::mint( lp_provider_address,  15000000); // 0.15 XYZ
+
+        amm::add_liquidity(
+            lp_provider,
+            mock_usdc_fa::get_metadata(),
+            mock_xyz_fa::get_metadata(),
+            5000_000000,
+            1,
+            15000000,
+            1
+        );
+
+        let lp_metadata =  amm::get_lp_metadata( mock_usdc_fa::get_metadata(), mock_xyz_fa::get_metadata() );
+        let lp_balance =  primary_fungible_store::balance( lp_provider_address,lp_metadata );
+
+        amm::remove_liquidity(
+            lp_provider,
+            mock_usdc_fa::get_metadata(),
+            mock_xyz_fa::get_metadata(),
+            lp_balance
+        );
+        
+    }
+
     #[test_only]
     public fun register_pools(deployer: &signer, lp_provider: &signer, user: &signer) {
         
@@ -52,7 +133,7 @@ module legato_addr::amm_tests {
 
         // XYZ
         mock_xyz_fa::mint( lp_provider_address, XYZ_AMOUNT_90_10 );
-
+ 
         // Setup a 50/50 pool
 
         amm::register_stable_pool(
