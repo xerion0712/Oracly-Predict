@@ -6,6 +6,7 @@ authors = []
 [addresses]
 legato_addr = "f586bbdd187df4e3bd7cd5b8af8a7018d8b8b5f3ec24a95cd5ac79d94ebca981"
 aptos_framework = "0x1"
+aptos_fungible_asset = "0xA"
 
 [dev-addresses]
 

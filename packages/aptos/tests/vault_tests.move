@@ -156,7 +156,7 @@ module legato_addr::vault_tests {
         vault::request_exit<MAR_2024>( user_1, amount_before ); 
 
         // Perform admin tasks.
-        /// Unlock assets to prepare for amount_before
+        // Unlock assets to prepare for amount_before
         vault::admin_proceed_unlock(deployer, 101_37836771);
 
         // Fast forward one epoch.
