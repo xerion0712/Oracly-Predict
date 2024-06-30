@@ -29,7 +29,9 @@ module legato_addr::amm {
     use legato_addr::base_fungible_asset;
     use legato_addr::stable_math;
     use legato_addr::weighted_math;
-    use legato_addr::lbp::{Self, LBPParams};
+    use legato_addr::lbp::{Self, LBPParams, LBPStorage};
+    use legato_addr::vault::{Self};
+    
 
     // ======== Constants ========
 
@@ -51,6 +53,9 @@ module legato_addr::amm {
     /// a Pool. U64 MAX / WEIGHT_SCALE
     const MAX_POOL_VALUE : u64 = 18446744073709551615;
 
+    const MIN_APT_TO_UNSTAKE: u64 = 1_00000000; // 1 APT
+    
+
     // ======== Errors ========
 
     const ERR_UNAUTHORIZED: u64 = 101;
@@ -71,6 +76,8 @@ module legato_addr::amm {
     const ERR_RESERVES_EMPTY: u64 = 116;
     const ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM: u64 = 117;
     const ERR_MUST_BE_ORDER: u64 = 118;
+    const ERR_NO_YIELD: u64 = 119;
+    const ERR_NOT_ACCEPT_VAULT: u64 = 120;
 
     // ======== Structs =========
 
@@ -87,6 +94,7 @@ module legato_addr::amm {
         lp_transfer: TransferRef,
         lp_metadata: Object<Metadata>,
         lbp_params: Option<LBPParams>, // Params for a LBP pool
+        lbp_storage: Option<LBPStorage>,
         has_paused: bool,
         is_stable: bool, // Indicates if the pool is a stable pool
         is_lbp: bool, // Indicates if the pool is a LBP
@@ -122,6 +130,16 @@ module legato_addr::amm {
         token_1_in: u64,
         token_2_in: u64,
         lp_out: u64
+    }
+
+    #[event]
+    struct RemovedLiquidity has drop, store {
+        pool_name: String,
+        lp_in: u64,
+        token_1: String,
+        token_2: String,
+        token_1_out: u64,
+        token_2_out: u64
     }
 
     #[event]
@@ -194,6 +212,116 @@ module legato_addr::amm {
 
     }
 
+    // Allows swaps of future yield to token_out.
+    // When swapped, the vault tokens will be returned at a 1:1 ratio,
+    // while the yield is used to get token_out.
+    // 'X' refers to Legato vaults to be used.
+    public entry fun future_swap<X>(
+        sender: &signer,
+        input_amount: u64,
+        token_out: Object<Metadata>
+    )  acquires AMMManager {
+
+        let apt_metadata = object::address_to_object<Metadata>(@aptos_fungible_asset);
+        let is_order = is_order( apt_metadata, token_out);
+
+        let config = borrow_global_mut<AMMManager>(@legato_addr);
+        let config_object_signer = object::generate_signer_for_extending(&config.extend_ref);
+        let pool_config = get_mut_pool( &mut config.pool_list,  apt_metadata, token_out);
+
+        assert!(!pool_config.has_paused , ERR_PAUSED );
+
+        // stake and mint PT
+        vault::mint<X>(sender, input_amount);
+
+        // Get the metadata of the vault
+        let vault_metadata = vault::get_vault_metadata<X>();
+
+        let current_balance = primary_fungible_store::balance( signer::address_of(sender), vault_metadata  );
+
+        // Indicating yield generation
+        assert!( current_balance >  input_amount, ERR_NO_YIELD );
+
+        // The future yield tokens are immediately used to acquire token_out
+        // We're also waiving swap fees for future swaps.
+
+        let future_yield = current_balance-input_amount;
+
+        assert!( pool_config.is_lbp == true , ERR_NOT_LBP);
+
+        if (is_order) {
+            
+            let reserve_in = fungible_asset::balance(pool_config.token_1);
+            let reserve_out = fungible_asset::balance(pool_config.token_2);
+            assert!(reserve_in > 0 && reserve_out > 0, ERR_RESERVES_EMPTY);
+
+            // Obtain the current weights of the pool
+            let (weight_in, weight_out ) = pool_current_weight(pool_config);
+
+            let params = option::borrow_mut(&mut pool_config.lbp_params);
+
+            // Ensure the pool's parameters accept a vault.
+            assert!( lbp::is_vault( params ), ERR_NOT_ACCEPT_VAULT);
+
+            let token_2_out = get_amount_out(
+                pool_config.is_stable,
+                future_yield,
+                reserve_in,
+                weight_in, 
+                reserve_out,
+                weight_out
+            );
+
+            lbp::verify_and_adjust_amount(params, true, future_yield, token_2_out, true );
+            let coin_out = fungible_asset::withdraw(&config_object_signer, pool_config.token_2, token_2_out);
+            primary_fungible_store::ensure_primary_store_exists( signer::address_of(sender) , token_out);
+            let store = primary_fungible_store::primary_store(signer::address_of(sender)  , token_out);
+            fungible_asset::deposit( store , coin_out);
+
+        } else {
+
+            let reserve_in = fungible_asset::balance(pool_config.token_2);
+            let reserve_out = fungible_asset::balance(pool_config.token_1);
+            assert!(reserve_in > 0 && reserve_out > 0, ERR_RESERVES_EMPTY);
+
+            // Obtain the current weights of the pool
+            let (weight_out, weight_in ) = pool_current_weight(pool_config);
+
+            let params = option::borrow_mut(&mut pool_config.lbp_params);
+
+            // Ensure the pool's parameters accept a vault.
+            assert!( lbp::is_vault( params ), ERR_NOT_ACCEPT_VAULT);
+
+            let token_2_out = get_amount_out(
+                pool_config.is_stable,
+                future_yield,
+                reserve_in,
+                weight_in, 
+                reserve_out,
+                weight_out
+            );
+
+            lbp::verify_and_adjust_amount(params, true, future_yield, token_2_out, true );
+            let coin_out = fungible_asset::withdraw(&config_object_signer, pool_config.token_1, token_2_out);
+            primary_fungible_store::ensure_primary_store_exists( signer::address_of(sender) , token_out);
+            let store = primary_fungible_store::primary_store(signer::address_of(sender)  , token_out);
+            fungible_asset::deposit( store , coin_out);
+
+        };
+
+        // Store the PT tokens in the pool's pending storage.
+        let token_in_coin = primary_fungible_store::withdraw(sender, vault_metadata, future_yield);
+        primary_fungible_store::ensure_primary_store_exists( signer::address_of(&config_object_signer) , vault_metadata);
+        let store = primary_fungible_store::primary_store(signer::address_of(&config_object_signer)  , vault_metadata);
+        fungible_asset::deposit( store , token_in_coin);
+
+        let storage = option::borrow_mut(&mut pool_config.lbp_storage);
+        lbp::add_pending_in( storage, vault_metadata, future_yield );
+
+        // TODO: emit event
+
+    }
+
     // Register a new liquidity pool with custom weights
     public entry fun register_pool(
         sender: &signer, 
@@ -232,7 +360,7 @@ module legato_addr::amm {
                 utf8(b"https://legato.finance"), /* project */
             );
 
-            let pool = init_pool_params(constructor_ref, token_1, token_2, weight_1, weight_2, fixed_point64::create_from_raw_value( DEFAULT_FEE ), false, false, option::none() );
+            let pool = init_pool_params(constructor_ref, token_1, token_2, weight_1, weight_2, fixed_point64::create_from_raw_value( DEFAULT_FEE ), false, false, option::none(), option::none() );
 
             // Add to the table.
             table::add(
@@ -280,7 +408,7 @@ module legato_addr::amm {
                 utf8(b"https://legato.finance"), /* project */
             );
 
-            let pool = init_pool_params(constructor_ref, token_1, token_2, 5000, 5000, fixed_point64::create_from_raw_value( STABLE_FEE ), true, false, option::none() );
+            let pool = init_pool_params(constructor_ref, token_1, token_2, 5000, 5000, fixed_point64::create_from_raw_value( STABLE_FEE ), true, false, option::none(), option::none() );
 
             // Add to the table.
             table::add(
@@ -336,7 +464,7 @@ module legato_addr::amm {
 
         let params = lbp::construct_init_params( proj_on_x, start_weight, final_weight, is_vault, target_amount );
 
-        let pool = init_pool_params(constructor_ref, token_1, token_2, 0, 0, fixed_point64::create_from_raw_value( LBP_FEE ), false, true, option::some<LBPParams>(params)  );
+        let pool = init_pool_params(constructor_ref, token_1, token_2, 0, 0, fixed_point64::create_from_raw_value( LBP_FEE ), false, true, option::some<LBPParams>(params) , option::some<LBPStorage>( lbp::create_empty_storage() )  );
 
         // Add to the table.
         table::add(
@@ -483,11 +611,42 @@ module legato_addr::amm {
             fungible_asset::burn_from(&pool_config.lp_burn, lp_store, lp_amount);
 
             // Emit an event
-            // event::emit(RemovedLiquidity { pool_name: lp_name, coin_x : coin::symbol<X>(), coin_y : coin::symbol<Y>(), lp_in: lp_amount, coin_x_out, coin_y_out });
+            event::emit(RemovedLiquidity { pool_name: lp_name,  lp_in: lp_amount, token_1: fungible_asset::symbol(token_1), token_2: fungible_asset::symbol(token_2), token_1_out: coin_x_out , token_2_out: coin_y_out  });
         };
 
     }
 
+    // The process of redeeming PT tokens from the matured vault.
+    public entry fun lbp_replenish<X>(token_out: Object<Metadata>) acquires AMMManager {
+
+        let apt_metadata = object::address_to_object<Metadata>(@aptos_fungible_asset);
+        let is_order = is_order( apt_metadata, token_out);
+
+        let config = borrow_global_mut<AMMManager>(@legato_addr);
+        let config_object_signer = object::generate_signer_for_extending(&config.extend_ref);
+        let pool_config = get_mut_pool( &mut config.pool_list,  apt_metadata, token_out);
+
+        assert!(!pool_config.has_paused , ERR_PAUSED );
+        assert!( pool_config.is_lbp == true , ERR_NOT_LBP);
+
+         // Get the metadata of the vault
+        let vault_metadata = vault::get_vault_metadata<X>();
+
+        let storage = option::borrow_mut(&mut pool_config.lbp_storage);
+        
+        let pt_to_redeem = lbp::remove_pending_in( storage, vault_metadata );
+        assert!( pt_to_redeem > MIN_APT_TO_UNSTAKE, ERR_INSUFFICIENT_AMOUNT );
+
+        // Request Redeem
+        let apt_fa = vault::redeem_from_amm<X>( &config_object_signer, pt_to_redeem );
+
+        if (is_order) {
+            fungible_asset::deposit(pool_config.token_1, apt_fa);
+        } else {
+            fungible_asset::deposit(pool_config.token_2, apt_fa);
+        };
+
+    }
     
     // ======== Public Functions =========
 
@@ -831,7 +990,7 @@ module legato_addr::amm {
         (lp_name, lp_symbol)
     }
 
-    fun init_pool_params(constructor_ref: &ConstructorRef, token_1: Object<Metadata>, token_2: Object<Metadata>, weight_1: u64, weight_2: u64, swap_fee: FixedPoint64, is_stable: bool, is_lbp: bool, lbp_params: Option<LBPParams> ) : Pool {
+    fun init_pool_params(constructor_ref: &ConstructorRef, token_1: Object<Metadata>, token_2: Object<Metadata>, weight_1: u64, weight_2: u64, swap_fee: FixedPoint64, is_stable: bool, is_lbp: bool, lbp_params: Option<LBPParams>, lbp_storage: Option<LBPStorage> ) : Pool {
         // Ensure that the normalized weights sum up to 100%
         if (!is_lbp) {
             assert!( weight_1+weight_2 == 10000, ERR_WEIGHTS_SUM); 
@@ -856,6 +1015,7 @@ module legato_addr::amm {
             lp_transfer,
             lp_metadata,
             lbp_params,
+            lbp_storage,
             has_paused: false,
             is_stable,
             is_lbp
