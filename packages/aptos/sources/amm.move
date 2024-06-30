@@ -686,6 +686,19 @@ module legato_addr::amm {
     }
 
     #[view]
+    public fun get_reserves(token_1: Object<Metadata>, token_2: Object<Metadata>) : (u64, u64)  acquires AMMManager {
+        let config = borrow_global_mut<AMMManager>(@legato_addr);
+        let pool_config = get_mut_pool( &mut config.pool_list, token_1, token_2);
+        let is_order = is_order(token_1, token_2);
+
+        if (is_order) {
+            (fungible_asset::balance(pool_config.token_1), fungible_asset::balance(pool_config.token_2))
+        } else {
+            (fungible_asset::balance(pool_config.token_2), fungible_asset::balance(pool_config.token_1))
+        }
+    }
+
+    #[view]
     public fun get_lp_metadata(token_1: Object<Metadata>, token_2: Object<Metadata>): Object<Metadata> acquires AMMManager {
         let config = borrow_global_mut<AMMManager>(@legato_addr);
         let pool = get_mut_pool( &mut config.pool_list, token_1, token_2);
