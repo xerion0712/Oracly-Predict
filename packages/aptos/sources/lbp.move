@@ -6,9 +6,13 @@
 
 module legato_addr::lbp {
 
+    use std::vector;
     use aptos_std::fixed_point64::{Self, FixedPoint64}; 
-    use legato_addr::weighted_math::{power};
+    use aptos_framework::fungible_asset::{ Metadata };
+    use aptos_framework::object::{Self, Object};
+    use aptos_std::table::{Self, Table};
 
+    use legato_addr::weighted_math::{power};
 
     friend legato_addr::amm;
 
@@ -41,6 +45,12 @@ module legato_addr::lbp {
         enable_buy_with_vault: bool // Enable/Disable buy with vault tokens (PT).
     }
 
+    // Storage for vault-related coins when accepting vault tokens
+    struct LBPStorage has store {
+        pending_in: vector<Object<Metadata>>, // List of coins pending to be added to the pool
+        pending_in_amount: Table<Object<Metadata>, u64> //  Total amount of coins pending to be added to the pool
+    }
+
     // Constructs initialization parameters for an Lpending_amountBP
     public(friend) fun construct_init_params(
         proj_on_x: bool, // Indicates whether the project token is on the X or Y side
@@ -64,6 +74,13 @@ module legato_addr::lbp {
             total_amount_collected: 0,
             enable_buy_with_pair: true,
             enable_buy_with_vault: true
+        }
+    }
+
+    public(friend) fun create_empty_storage() : LBPStorage {
+        LBPStorage { 
+            pending_in: vector::empty<Object<Metadata>>(),
+            pending_in_amount: table::new<Object<Metadata>, u64>(),
         }
     }
 
@@ -156,6 +173,49 @@ module legato_addr::lbp {
             };
         };
     }
+
+    public(friend) fun add_pending_in(storage: &mut LBPStorage, coin_in: Object<Metadata>, amount_in: u64) {
+
+        if (!table::contains(&storage.pending_in_amount, coin_in)) { 
+            table::add(
+                &mut storage.pending_in_amount,
+                coin_in,
+                amount_in
+            );
+        } else {
+            *table::borrow_mut( &mut storage.pending_in_amount, coin_in ) = *table::borrow( &storage.pending_in_amount, coin_in )+amount_in;
+        };
+
+        if (!vector::contains(&storage.pending_in , &coin_in)) {
+            vector::push_back<Object<Metadata>>(&mut storage.pending_in, coin_in);
+        };
+
+    }
+
+    public(friend) fun remove_pending_in(storage: &mut LBPStorage, coin_in: Object<Metadata>) : u64 {
+        let output = *table::borrow( &storage.pending_in_amount, coin_in );
+        *table::borrow_mut( &mut storage.pending_in_amount, coin_in ) = 0;
+        output
+    }
+
+    // public(friend) fun withdraw_pending_in<X>(storage: &mut LBPStorage, ctx: &mut TxContext) : Coin<PT_TOKEN<X>> {
+        
+    //     let token_name = token_to_name<X>();
+        
+    //     assert!(bag::contains_with_type<String, Balance<PT_TOKEN<X>>>(&storage.coins, token_name), ERR_INVALID_POOL);
+
+    //     let current_balance = bag::borrow_mut<String, Balance<PT_TOKEN<X>>>(&mut storage.coins, token_name);
+
+    //     // Get the total locked amount of PT tokens.
+    //     let total_locked = balance::value(current_balance);
+
+    //     // Locked amount must greater than 0, otherwise return an error.
+    //     assert!(total_locked > 0 , ERR_EMPTY );
+        
+    //     storage.pending_in_amount = storage.pending_in_amount - total_locked;
+
+    //     coin::from_balance(balance::split(current_balance, total_locked ), ctx)
+    // }
 
     public fun is_vault(params: &LBPParams) : bool {
         params.is_vault

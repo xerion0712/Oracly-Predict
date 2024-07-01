@@ -13,7 +13,7 @@ module legato_addr::vault {
     use aptos_framework::event;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::object::{Self, Object, ExtendRef};
-    use aptos_framework::fungible_asset::{ Self, Metadata, MintRef, BurnRef };
+    use aptos_framework::fungible_asset::{ Self, FungibleAsset, Metadata, MintRef, BurnRef };
     use aptos_framework::primary_fungible_store::{Self};
     use aptos_framework::delegation_pool as dp;
     use aptos_framework::coin::{Self}; 
@@ -26,6 +26,8 @@ module legato_addr::vault {
 
     use legato_addr::base_fungible_asset;
     use legato_addr::legato_lib::{generate_vault_name_and_symbol, calculate_pt_debt_amount, calculate_exit_amount};
+
+    friend legato_addr::amm;
 
     // ======== Constants ========
 
@@ -264,6 +266,34 @@ module legato_addr::vault {
                 sender: signer::address_of(sender)
             }
         )
+    }
+
+    // Only AMM can call this
+    public(friend) fun redeem_from_amm<P>( sender: &signer, amount: u64 ): FungibleAsset acquires VaultManager {
+
+        let config = borrow_global_mut<VaultManager>(@legato_addr);
+        let config_object_signer = object::generate_signer_for_extending(&config.extend_ref);
+        assert!(vault_exist<P>(config), ERR_INVALID_VAULT);
+
+        let type_name = type_info::type_name<P>();
+        let vault_config = table::borrow_mut( &mut config.vault_config, type_name );
+
+        assert!( vault_config.enable_redeem == true, ERR_DISABLED);
+
+        assert!( primary_fungible_store::balance( signer::address_of(sender) , vault_config.metadata ) >= amount , ERR_INSUFFICIENT_AMOUNT );
+
+        // Check if the vault has matured
+        assert!(timestamp::now_seconds() > vault_config.maturity_time, ERR_VAULT_NOT_MATURED);
+
+        // Burn PT tokens on the sender's account
+        base_fungible_asset::burn_from_primary_stores(vault_config.metadata, vector[signer::address_of(sender)], vector[amount]);
+
+        let apt_coin = coin::withdraw<AptosCoin>(&config_object_signer, amount);
+
+        // Update
+        vault_config.pt_total_supply = vault_config.pt_total_supply-amount;
+
+        coin::coin_to_fungible_asset( apt_coin )
     }
 
     // request exit when the vault is not matured, the amount returned 
