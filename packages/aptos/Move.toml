@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = []
 
 [addresses]
-legato_addr = "07ea832095677f4cabe49e875d155d2ee3c36b9c7cfa66cad99c6e8e9f98c34b"
+legato_addr = "4ff2dae2ed7e9df56074c2e5f17ce407279dc308400b80dad069fa7eaa0612c5"
 aptos_framework = "0x1"
 aptos_fungible_asset = "0xA"
 
