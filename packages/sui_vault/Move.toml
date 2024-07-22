@@ -1,5 +1,5 @@
 [package]
-name = "legato"
+name = "LegatoVault"
 version = "0.2.1"
 
 [dependencies]
