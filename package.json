@@ -8,7 +8,7 @@
     "bootstrap": "npm install; lerna bootstrap;",
     "start": "run-p --print-label package:*",
     "build": "lerna run --parallel build",
-    "test": "lerna run test --concurrency 1 --stream --scope sui",
+    "test-sui-vault": "lerna run test --concurrency 1 --stream --scope sui-vault",
     "test-aptos": "lerna run test --concurrency 1 --stream --scope aptos"
   },
   "devDependencies": {
