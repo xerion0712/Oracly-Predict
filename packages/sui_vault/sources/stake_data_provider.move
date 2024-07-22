@@ -11,7 +11,6 @@ module legato::stake_data_provider {
 
     use sui::object::{ID};
     use sui::table::{Self,  Table};
-    use sui::random::{Self, Random};
     use sui::tx_context::{ TxContext};
     
     const EPOCH_TO_WEIGHT : u64 = 30;
@@ -19,27 +18,6 @@ module legato::stake_data_provider {
 
     const EInvalidRefEpoch: u64 = 1;
     const EInvalidEpoch: u64 = 2;
-
-
-    // Retrieve a random active validator address
-    #[allow(lint(public_random))]
-    public fun random_active_validator(wrapper: &mut SuiSystemState, r: &Random, whitelist: vector<address>, ctx: &mut TxContext) : address {
-
-        // Generate a random number
-        let generator = random::new_generator(r, ctx);
-        let random_num = random::generate_u64(&mut generator);
-
-        // Check if the whitelist is empty, if so, we load all validators
-        if (vector::length(&whitelist) == 0) { 
-            let active_list = sui_system::active_validator_addresses(wrapper);
-            // Return a random validator address from all in the system
-            *vector::borrow( &active_list, random_num % vector::length(&active_list) )
-        } else {
-             // Return a random validator address from the whitelist
-            *vector::borrow( &whitelist, random_num % vector::length(&whitelist) )
-        }
-
-    }
 
     // Fetch APY from the provided pool ID
     public fun pool_apy(wrapper: &mut SuiSystemState, pool_id: &ID, epoch: u64) : u64 {

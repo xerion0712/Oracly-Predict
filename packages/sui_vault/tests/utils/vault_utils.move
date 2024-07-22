@@ -110,28 +110,7 @@ module legato::vault_utils {
         let usdc_token = test::take_from_sender<Coin<USDC>>(test);  
         test::return_to_sender(test, usdc_token);
     }
-
-    // public fun set_up_random(test: &mut Scenario) {
-    //     // Setup randomness
-    //     next_tx(test, @0x0);
-    //     {
-    //         random::create_for_testing(ctx(test)); 
-    //     };
-
-    //     next_tx(test, @0x0);
-    //     {
-    //         let random_state = test::take_shared<Random>(test);  
-
-    //         update_randomness_state_for_testing(
-    //             &mut random_state,
-    //             0,
-    //             x"1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F1F",
-    //             ctx(test),
-    //         );
-
-    //         test::return_shared(random_state);
-    //     };
-    // }
+ 
 
     public fun mint_pt<P>(test: &mut Scenario, staker_address: address, amount: u64) {
         

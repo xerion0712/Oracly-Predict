@@ -309,20 +309,6 @@ module legato::vault {
         config.maturity_epoch
     }
 
-    // return accumulated rewards for the given vault config
-    // public fun vault_rewards(wrapper: &mut SuiSystemState, vault_config: &PoolConfig, epoch: u64): u64 {
-    //     let count = vector::length(&vault_config.deposit_items);
-    //     let i = 0;
-    //     let total_sum = 0;
-    //     while (i < count) {
-    //         let staked_sui = vector::borrow(&vault_config.deposit_items, i);
-    //         let activation_epoch = staking_pool::stake_activation_epoch(staked_sui);
-    //         if (epoch > activation_epoch) total_sum = total_sum+apy_reader::earnings_from_staked_sui(wrapper, staked_sui, epoch);
-    //         i = i + 1;
-    //     };
-    //     total_sum
-    // }
-
     public fun staking_pools(global: &Global) : vector<address> {
         global.staking_pools
     }
