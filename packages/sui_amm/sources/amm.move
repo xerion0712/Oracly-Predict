@@ -151,105 +151,8 @@ module legato_amm::amm {
         coin_out_min: u64,
         ctx: &mut TxContext
     ) {
-        let is_order = is_order<X, Y>();
-
-        assert!(!is_paused<X,Y>(global, is_order), ERR_PAUSED);
-
-        let lp_name = generate_lp_name<X, Y>();
-
-        assert!(coin::value<X>(&coin_in) > 0, ERR_ZERO_AMOUNT);
-
-        let treasury_address = get_treasury_address(global);
-
-        if (is_order) {
-
-            let pool = get_mut_pool<X, Y>(global, is_order);
-            let (coin_x_reserve, coin_y_reserve, _lp) = get_reserves_size(pool, is_order);
-            assert!(coin_x_reserve > 0 && coin_y_reserve > 0, ERR_RESERVES_EMPTY);
-            let coin_x_in = coin::value(&coin_in);
-
-            let (coin_x_after_fees, coin_x_fee) = weighted_math::get_fee_to_treasury( pool.swap_fee , coin_x_in);
-
-            // Obtain the current weights of the pool
-            let (weight_x, weight_y ) = pool_current_weight<X,Y>(pool);
-
-            let coin_y_out = get_amount_out(
-                coin_x_after_fees,
-                coin_x_reserve,
-                weight_x, 
-                coin_y_reserve,
-                weight_y
-            );
-
-            assert!(
-                coin_y_out >= coin_out_min,
-                ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM
-            );
-
-            let coin_x_balance = coin::into_balance(coin_in);
-            transfer::public_transfer(
-                coin::from_balance(balance::split(&mut coin_x_balance, coin_x_fee) , ctx),
-                treasury_address
-            );
-
-            balance::join(&mut pool.coin_x, coin_x_balance);
-            let coin_out = coin::take(&mut pool.coin_y, coin_y_out, ctx);
-            transfer::public_transfer(coin_out, tx_context::sender(ctx));
-
-            emit(
-                SwappedEvent {
-                    global: object::id(global),
-                    lp_name,
-                    coin_in_amount: coin_x_in,
-                    coin_out_amount: coin_y_out
-                }
-            )
-
-        } else {
-
-            let pool = get_mut_pool<Y, X>(global, !is_order);
-            let (coin_x_reserve, coin_y_reserve, _lp) = get_reserves_size(pool, is_order);
-            assert!(coin_x_reserve > 0 && coin_y_reserve > 0, ERR_RESERVES_EMPTY);
-            let coin_y_in = coin::value(&coin_in);
-
-            // Obtain the current weights of the pool
-            let (weight_x, weight_y ) = pool_current_weight(pool);
-
-            let (coin_y_after_fees, coin_y_fee) =  weighted_math::get_fee_to_treasury( pool.swap_fee , coin_y_in);
-
-            let coin_x_out = get_amount_out( 
-                coin_y_after_fees,
-                coin_y_reserve,
-                weight_y, 
-                coin_x_reserve,
-                weight_x
-            );
-
-            assert!(
-                coin_x_out >= coin_out_min,
-                ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM
-            );
-
-            let coin_y_balance = coin::into_balance(coin_in);
-            transfer::public_transfer(
-                coin::from_balance(balance::split(&mut coin_y_balance, coin_y_fee) , ctx),
-                treasury_address
-            );
-            balance::join(&mut pool.coin_y, coin_y_balance);
-            let coin_out = coin::take(&mut pool.coin_x, coin_x_out, ctx);
-            transfer::public_transfer(coin_out, tx_context::sender(ctx));
-
-            emit(
-                SwappedEvent {
-                    global: object::id(global),
-                    lp_name,
-                    coin_in_amount: coin_y_in,
-                    coin_out_amount: coin_x_out
-                }
-            )
-
-        };
-
+        let coin_out = swap_out_non_entry<X, Y>( global, coin_in, coin_out_min, ctx );
+        transfer::public_transfer(coin_out, tx_context::sender(ctx));
     }
 
     // Entrypoint for the add_liquidity function that returns LP<X,Y> back to the sender.
@@ -406,8 +309,114 @@ module legato_amm::amm {
     }
 
 
-
     // ======== Public Functions =========
+
+    // Exchange Coin<X> for Coin<Y> and return the Coin object.
+    public fun swap_out_non_entry<X, Y>(
+        global: &mut AMMGlobal,
+        coin_in: Coin<X>,
+        coin_out_min: u64,
+        ctx: &mut TxContext
+    ): Coin<Y> {
+        assert!(coin::value<X>(&coin_in) > 0, ERR_ZERO_AMOUNT);
+
+        let is_order = is_order<X, Y>();
+        let lp_name = generate_lp_name<X, Y>();
+        assert!(!is_paused<X,Y>(global, is_order), ERR_PAUSED);
+
+        let treasury_address = get_treasury_address(global);
+        let global_id =  object::id(global);
+        
+        if (is_order) {
+            
+            let pool = get_mut_pool<X, Y>(global, is_order);
+            let (coin_x_reserve, coin_y_reserve, _lp) = get_reserves_size(pool, is_order);
+            assert!(coin_x_reserve > 0 && coin_y_reserve > 0, ERR_RESERVES_EMPTY);
+            let coin_x_in = coin::value(&coin_in);
+
+            let (coin_x_after_fees, coin_x_fee) = weighted_math::get_fee_to_treasury( pool.swap_fee , coin_x_in);
+
+            // Obtain the current weights of the pool
+            let (weight_x, weight_y ) = pool_current_weight<X,Y>(pool);
+
+            let coin_y_out = get_amount_out(
+                coin_x_after_fees,
+                coin_x_reserve,
+                weight_x, 
+                coin_y_reserve,
+                weight_y
+            );
+
+            assert!(
+                coin_y_out >= coin_out_min,
+                ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM
+            );
+
+            let coin_x_balance = coin::into_balance(coin_in);
+            transfer::public_transfer(
+                coin::from_balance(balance::split(&mut coin_x_balance, coin_x_fee) , ctx),
+                treasury_address
+            );
+
+            balance::join(&mut pool.coin_x, coin_x_balance);
+
+            emit(
+                SwappedEvent {
+                    global: global_id, 
+                    lp_name,
+                    coin_in_amount: coin_x_in,
+                    coin_out_amount: coin_y_out
+                }
+            );
+
+            (coin::take(&mut pool.coin_y, coin_y_out, ctx))
+        } else {
+
+            let pool = get_mut_pool<Y, X>(global, !is_order);
+            let (coin_x_reserve, coin_y_reserve, _lp) = get_reserves_size(pool, is_order);
+            assert!(coin_x_reserve > 0 && coin_y_reserve > 0, ERR_RESERVES_EMPTY);
+            let coin_y_in = coin::value(&coin_in);
+
+            // Obtain the current weights of the pool
+            let (weight_x, weight_y ) = pool_current_weight(pool);
+
+            let (coin_y_after_fees, coin_y_fee) =  weighted_math::get_fee_to_treasury( pool.swap_fee , coin_y_in);
+
+            let coin_x_out = get_amount_out( 
+                coin_y_after_fees,
+                coin_y_reserve,
+                weight_y, 
+                coin_x_reserve,
+                weight_x
+            );
+
+            assert!(
+                coin_x_out >= coin_out_min,
+                ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM
+            );
+
+            let coin_y_balance = coin::into_balance(coin_in);
+            transfer::public_transfer(
+                coin::from_balance(balance::split(&mut coin_y_balance, coin_y_fee) , ctx),
+                treasury_address
+            );
+            balance::join(&mut pool.coin_y, coin_y_balance);
+
+            emit(
+                SwappedEvent {
+                    global: global_id, 
+                    lp_name,
+                    coin_in_amount: coin_y_in,
+                    coin_out_amount: coin_x_out
+                }
+            );
+
+            (coin::take(&mut pool.coin_x, coin_x_out, ctx))
+        }
+        
+
+    }
+
 
     /// Add liquidity to the `Pool`. Sender needs to provide both
     /// `Coin<X>` and `Coin<Y>`, and in exchange he gets `Coin<LP>` -
