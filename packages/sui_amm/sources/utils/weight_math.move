@@ -2,22 +2,15 @@
 // Module for weighted math operations, the formulas are borrowed from Balancer V2 Lite project.
 // https://github.com/icmoore/balancer-v2-lite
 
-module legato::weighted_math {
+module legato_amm::weighted_math {
   
     use legato_math::fixed_point64::{Self, FixedPoint64}; 
-    use legato_math::math_fixed64;
-    use legato_math::math128;
+    use legato_math::math_fixed64; 
     use legato_math::legato_math::{absolute, power};
 
     const WEIGHT_SCALE: u64 = 10000; 
 
-    // Maximum values for u64 and u128
-    const MAX_U64: u128 = 18446744073709551615;
-    const MAX_U128: u256 = 340282366920938463463374607431768211455;
-
     const LOG_2_E: u128 = 26613026195707766742;
-
-    const ERR_INCORRECT_SWAP: u64 = 1; 
 
     // Computes the optimal value for adding liquidity
     public fun compute_optimal_value(
