@@ -1,0 +1,14 @@
+[package]
+name = "legato-amm"
+version = "0.1.0"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/mainnet" }
+SuiSystem = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-system", rev = "framework/mainnet" }
+LegatoMath = {  git = "https://github.com/tamago-labs/legato-math.git", subdir = "packages/sui", rev = "main"  }
+LegatoVault = {  git = "https://github.com/tamago-labs/legato-finance.git", subdir = "packages/sui_vault", rev = "main"  }
+
+[addresses]
+legato_amm = "0x98d9d3e7b644182c87310ba8c6c7fdb4a2f2338cd0db58d7e6fa88e562129318" 
+sui="0x2"
+sui_system = "0x3"
