@@ -51,7 +51,6 @@ module legato_amm::amm {
     const ERR_RESERVES_EMPTY: u64 = 17;
     const ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM: u64 = 18;
 
-
     // ======== Structs =========
 
     /// The Pool token that will be used to mark the pool share
