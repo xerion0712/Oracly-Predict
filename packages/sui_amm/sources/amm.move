@@ -1,12 +1,15 @@
 // Copyright (c) Tamago Blockchain Labs, Inc.
 // SPDX-License-Identifier: MIT
 
-// AMM DEX with custom weights. It originated from the OmniBTC AMM and upgraded the weight function using the Balancer V2 Lite formula from Ethereum.
-// LBP in the current version is separated into another file.
+// AMM DEX with custom weights on Sui Move
+// The logic and mathematical calculations for managing pools are borrowed
+// from the established methodologies used in Balancer v.2 and OmniBTC.
+//
+// This implementation allows projects to set up a pool with less capital
+// compared to traditional 50/50 weight AMM DEXs.
 
 module legato_amm::amm {
 
-  
     use std::vector;
     use std::string::{ String};   
  
@@ -18,7 +21,6 @@ module legato_amm::amm {
     use sui::transfer; 
     use sui::event::emit;
 
-     
     use legato_amm::weighted_math;
     use legato_amm::lp_helpers::{ is_order, generate_lp_name };
     use legato_math::fixed_point64::{Self, FixedPoint64};
@@ -33,7 +35,7 @@ module legato_amm::amm {
     // ======== Errors ========
 
     const ERR_MUST_BE_ORDER: u64 = 1;
-    // const ERR_INCORRECT_SWAP: u64 = 2;
+    const ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM: u64 = 2;
     const ERR_UNAUTHORISED: u64 = 3;
     const ERR_NOT_FOUND: u64 = 4;
     const ERR_DUPLICATED_ENTRY: u64 = 5;
@@ -49,17 +51,17 @@ module legato_amm::amm {
     const ERR_NOT_REGISTERED: u64 = 15;
     const ERR_PAUSED: u64 = 16;
     const ERR_RESERVES_EMPTY: u64 = 17;
-    const ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM: u64 = 18;
+    
 
     // ======== Structs =========
 
     /// The Pool token that will be used to mark the pool share
     /// of a liquidity provider. The parameter `X` and `Y` is for the
     /// coin held in the pool.
-    struct LP<phantom X, phantom Y> has drop, store {}
+    public struct LP<phantom X, phantom Y> has drop, store {}
 
     // The liquidity pool with custom weighting
-    struct Pool<phantom X, phantom Y> has store {
+    public struct Pool<phantom X, phantom Y> has store {
         global: ID,
         coin_x: Balance<X>,
         coin_y: Balance<Y>,
@@ -72,35 +74,35 @@ module legato_amm::amm {
     }
     
     // The global state of the AMM
-    struct AMMGlobal has key {
+    public struct AMMGlobal has key {
         id: UID, 
-        pools: Bag, // Collection of all LP pools in the system
-        archives: Bag, // Storage for archived pools 
-        enable_whitelist: bool ,
-        whitelist: vector<address>, // Addresses that can set up a new pool
-        treasury: address // Address where all fees from all pools are collected for further LP staking
+        pools: Bag,  // Collection of all LP pools in the system
+        archives: Bag, // Storage for pools that are no longer in use
+        enable_whitelist: bool, // Indicates whether only whitelisted users can set up new pools
+        whitelist: vector<address>, // List of addresses that are authorized to set up new pools
+        treasury: address // Address where all fees from all pools are collected 
     }
 
     // Using ManagerCap for admin permission
-    struct ManagerCap has key {
+    public struct ManagerCap has key {
         id: UID
     }
 
-    struct RegisterPoolEvent has copy, drop {
+    public struct RegisterPoolEvent has copy, drop {
         global: ID,
         lp_name: String,
         weight_x: u64,
         weight_y: u64
     }
 
-    struct AddLiquidityEvent has copy, drop {
+    public struct AddLiquidityEvent has copy, drop {
         global: ID,
         lp_name: String,
         lp_amount: u64,
         is_pool_creator: bool
     }
 
-    struct RemoveLiquidityEvent has copy, drop {
+    public struct RemoveLiquidityEvent has copy, drop {
         global: ID,
         lp_name: String,
         lp_amount: u64,
@@ -108,7 +110,7 @@ module legato_amm::amm {
         coin_y_amount: u64
     }
 
-    struct SwappedEvent has copy, drop {
+    public struct SwappedEvent has copy, drop {
         global: ID,
         lp_name: String,
         coin_in_amount: u64,
@@ -124,9 +126,8 @@ module legato_amm::amm {
         );
 
         // Create a new list for adding to the global state
-        let whitelist_list = vector::empty<address>();
+        let mut whitelist_list = vector::empty<address>();
         vector::push_back<address>(&mut whitelist_list, tx_context::sender(ctx));
-        
         
         // Initialize the global state
         let global = AMMGlobal {
@@ -351,7 +352,7 @@ module legato_amm::amm {
                 ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM
             );
 
-            let coin_x_balance = coin::into_balance(coin_in);
+            let mut coin_x_balance = coin::into_balance(coin_in);
             transfer::public_transfer(
                 coin::from_balance(balance::split(&mut coin_x_balance, coin_x_fee) , ctx),
                 treasury_address
@@ -394,7 +395,7 @@ module legato_amm::amm {
                 ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM
             );
 
-            let coin_y_balance = coin::into_balance(coin_in);
+            let mut coin_y_balance = coin::into_balance(coin_in);
             transfer::public_transfer(
                 coin::from_balance(balance::split(&mut coin_y_balance, coin_y_fee) , ctx),
                 treasury_address
@@ -437,8 +438,8 @@ module legato_amm::amm {
 
         assert!(coin_x_value > 0 && coin_y_value > 0, ERR_ZERO_AMOUNT);
 
-        let coin_x_balance = coin::into_balance(coin_x);
-        let coin_y_balance = coin::into_balance(coin_y);
+        let mut coin_x_balance = coin::into_balance(coin_x);
+        let mut coin_y_balance = coin::into_balance(coin_y);
 
         let (coin_x_reserve, coin_y_reserve, lp_supply) = get_reserves_size(pool, is_order);
 
