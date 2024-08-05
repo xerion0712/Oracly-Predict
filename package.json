@@ -10,6 +10,7 @@
     "build": "lerna run --parallel build",
     "test-sui-vault": "lerna run test --concurrency 1 --stream --scope sui-vault",
     "test-sui-amm": "lerna run test --concurrency 1 --stream --scope sui-amm",
+    "test-sui-options": "lerna run test --concurrency 1 --stream --scope sui-options",
     "test-aptos": "lerna run test --concurrency 1 --stream --scope aptos"
   },
   "devDependencies": {
