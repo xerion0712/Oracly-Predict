@@ -23,7 +23,7 @@ module legato::vault {
     use legato_math::fixed_point64::{Self, FixedPoint64};
     use legato::stake_data_provider::{Self};
     use legato::vault_lib::{  find_combination, find_one_with_minimal_excess, get_amount_with_rewards, sort_items, sort_u64 };
-    // use legato::event::{new_vault_event, update_vault_apy_event, mint_event, migrate_event, redeem_event, exit_event};
+    use legato::event::{ mint_event, request_redeem_event, redeem_event };
 
     // ======== Constants ========
 
@@ -149,13 +149,14 @@ module legato::vault {
     // Mints VAULT tokens for the provided staked SUI.
     public entry fun mint(wrapper: &mut SuiSystemState, global: &mut VaultGlobal, staked_sui: StakedSui, ctx: &mut TxContext) {
 
+        let input_amount = staking_pool::staked_sui_amount(&staked_sui);
         let lp_token = mint_non_entry( wrapper, global, staked_sui, ctx );
+        let lp_amount = coin::value(&lp_token);
 
         // Transfer LP to the user
         transfer::public_transfer( lp_token , tx_context::sender(ctx));
 
-        // TODO: emit event
-
+        mint_event( object::id(global), input_amount, lp_amount, tx_context::sender(ctx), tx_context::epoch(ctx))
     }
 
     // Allows a user to request the redemption of their staked assets
@@ -190,9 +191,8 @@ module legato::vault {
         balance::decrease_supply(&mut global.reserve.lp_supply, coin::into_balance(vault_token));
 
         update_amounts(wrapper, global, ctx);
-
-        // TODO: emit event
-
+ 
+        request_redeem_event( object::id(global), lp_amount, withdrawal_amount, tx_context::sender(ctx), tx_context::epoch(ctx)  )
     }
 
     // Fulfil unstaking requests
@@ -218,9 +218,8 @@ module legato::vault {
 
             let withdrawn_balance = balance::split<SUI>(&mut global.pending_fulfil, this_request.amount);
             transfer::public_transfer(coin::from_balance(withdrawn_balance, ctx), this_request.sender);
-            
-            // TODO: emit event
 
+            redeem_event( object::id(global), this_request.amount, this_request.sender, tx_context::epoch(ctx)  )
         };
     
     }
