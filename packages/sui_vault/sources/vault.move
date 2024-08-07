@@ -141,7 +141,6 @@ module legato::vault {
     // Mints VAULT tokens for the provided SUI coins
     public entry fun mint_from_sui(wrapper: &mut SuiSystemState, global: &mut VaultGlobal, sui: Coin<SUI>, ctx: &mut TxContext) {
         assert!(coin::value(&sui) >= MIN_AMOUNT, ERR_MIN_THRESHOLD);
-        // let validator_address = random_validator_address( global.config.staking_pools, ctx );
         let validator_address = next_validator( global, coin::value(&sui), ctx);
         let staked_sui = sui_system::request_add_stake_non_entry(wrapper, sui, validator_address, ctx);
         mint(wrapper, global, staked_sui , ctx);
@@ -204,14 +203,14 @@ module legato::vault {
         let mut withdraw_ids = vector::empty<u64>();
 
         // Identify requests eligible for fulfilment
-        while ( count > vector::length(&global.request_list)) {  
+        while ( count < vector::length(&global.request_list)) {  
             let this_request = vector::borrow( &global.request_list, count);
             if ( tx_context::epoch(ctx) >= this_request.epoch+global.config.unstake_delay ) {
                 vector::push_back( &mut withdraw_ids, count );
             };
             count = count+1;
         };
-        
+
         // Fulfil each eligible request
         while (vector::length(&withdraw_ids) > 0) {
             let request_id = vector::pop_back(&mut withdraw_ids);
@@ -262,8 +261,6 @@ module legato::vault {
         let lp_supply = balance::supply_value(&global.reserve.lp_supply);
         let current_balance = current_balance_with_rewards(wrapper, &global.reserve.staked_sui, tx_context::epoch(ctx));
 
-        std::debug::print(&(current_balance));
-
         // Calculate the amount of LP tokens to mint
         let lp_amount_to_mint = if (lp_supply == 0) {
             // Check if initial liquidity is sufficient.
@@ -281,8 +278,6 @@ module legato::vault {
             let total_share = fixed_point64::multiply_u128( (lp_supply as u128) , ratio);
             (total_share as u64)
         };
-
-        std::debug::print(&(lp_amount_to_mint));
 
         // Lock Staked SUI
         vector::push_back<StakedSui>(&mut global.reserve.staked_sui, staked_sui); 
@@ -373,7 +368,6 @@ module legato::vault {
         assert!(restake_amount >= MIN_AMOUNT, ERR_MIN_THRESHOLD);
         assert!(balance::value( &global.pending_withdrawal ) >= restake_amount , ERR_INSUFFICIENT);
  
-        // let validator_address = random_validator_address( global.config.staking_pools, ctx );
         let validator_address = next_validator( global, restake_amount, ctx );
         let restake_balance = balance::split<SUI>(&mut global.pending_withdrawal, restake_amount);
 
@@ -423,7 +417,7 @@ module legato::vault {
 
             // Return the address of the staking pool from the priority list
             staking_pool_address
-        } else {
+        } else { 
             // If no priority list entries, select a random validator address
             random_validator_address( global.config.staking_pools, ctx )
         }
@@ -480,13 +474,12 @@ module legato::vault {
                 sort_u64(&mut asset_ids);
                 let sui_balance = unstake_staked_sui(wrapper, global, &mut asset_ids, ctx); 
                 balance::join<SUI>(&mut global.pending_withdrawal, sui_balance );
-            } else { 
+            } else {  
                 let mut asset_ids = vector::empty<u64>(); 
                 vector::push_back<u64>( &mut asset_ids, *option::borrow(&asset_id)); 
                 let sui_balance = unstake_staked_sui(wrapper, global, &mut asset_ids, ctx); 
                 balance::join<SUI>(&mut global.pending_withdrawal, sui_balance );
             };
-
 
         };
 

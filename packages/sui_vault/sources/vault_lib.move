@@ -86,9 +86,8 @@ module legato::vault_lib {
 
     // Find a combination of staked SUI assets that have sufficient value to cover the input amount.
     public fun find_combination(wrapper: &mut SuiSystemState, item_list: &vector<StakedSui>, input_amount: u64, epoch: u64 ): vector<u64> {
-        
         // Normalizing the value into the ratio
-        let ratio = normalize_into_ratio(wrapper, item_list, input_amount, epoch);
+        let (mut ratio, mut ratio_to_id) = normalize_into_ratio(wrapper, item_list, input_amount, epoch);
 
         // Initialize output variables
         let mut output_id = vector::empty<u64>();
@@ -99,33 +98,35 @@ module legato::vault_lib {
 
         // Iterate until ratio > 10000
         while ( ratio_count <= 10000 ) {
-            
             // Finds an asset with a ratio close to the target ratio
-            let (value, id) = matching_asset_to_ratio(ratio, target_ratio );
+            let (value, id) = matching_asset_to_ratio(&ratio, target_ratio );
 
             if (option::is_some( &id ) ) {
-
                 let current_value = *option::borrow(&value);
                 let current_id = *option::borrow(&id);
 
                 if (fixed_point64::greater_or_equal(  fixed_point64::create_from_u128(1), current_value )) {
                     // set new target
                     target_ratio = fixed_point64::sub( fixed_point64::create_from_u128(1), current_value );
-                    vector::push_back(&mut output_id, current_id);
+                    vector::swap_remove( &mut ratio, current_id );
+                    let asset_id = vector::swap_remove( &mut ratio_to_id, current_id );
+                    vector::push_back(&mut output_id, asset_id);
                     // increase ratio count 
                     ratio_count = ratio_count+fixed_point64::multiply_u128(10000, current_value);
                 };
-                
+
             } else {
                 break
             }
+
         };
 
         output_id
     }
 
-    fun normalize_into_ratio(wrapper: &mut SuiSystemState,  item_list: &vector<StakedSui>, input_amount: u64, epoch: u64 ): vector<FixedPoint64> {
+    fun normalize_into_ratio(wrapper: &mut SuiSystemState,  item_list: &vector<StakedSui>, input_amount: u64, epoch: u64 ): (vector<FixedPoint64>, vector<u64>) {
         let mut ratio = vector::empty<FixedPoint64>();
+        let mut ratio_to_id = vector::empty<u64>();
         let mut count = 0;
 
         while (count < vector::length(item_list)) {
@@ -136,16 +137,17 @@ module legato::vault_lib {
                 let amount_with_rewards = get_amount_with_rewards(wrapper,  staked_sui, epoch);
                 let this_ratio = fixed_point64::create_from_rational( (amount_with_rewards as u128) , (input_amount as u128));
                 vector::push_back(&mut ratio, this_ratio);
+                vector::push_back(&mut ratio_to_id, count);
             };
 
             count = count+1;
         };
 
-        ratio
+        (ratio, ratio_to_id)
     }
 
     // Finds an asset with a ratio close to the target ratio
-    fun matching_asset_to_ratio( ratio_list: vector<FixedPoint64>, target_ratio: FixedPoint64 ) : (Option<FixedPoint64>, Option<u64>) {
+    fun matching_asset_to_ratio( ratio_list: &vector<FixedPoint64>, target_ratio: FixedPoint64 ) : (Option<FixedPoint64>, Option<u64>) {
 
         let mut output_value = option::none<FixedPoint64>();
         let mut output_id = option::none<u64>();
@@ -160,9 +162,9 @@ module legato::vault_lib {
             let mut item_count = 0;
 
             // Iterate over each ratio in the ratio list
-            while (item_count < vector::length(&ratio_list)) {
+            while (item_count < vector::length(ratio_list)) {
 
-                let current_ratio = *vector::borrow( &ratio_list, item_count );
+                let current_ratio = *vector::borrow( ratio_list, item_count );
 
                 // Check if the current ratio is close to the target ratio within the given precision
                 if ( fixed_point64::almost_equal( current_ratio , target_ratio, p) ) {
