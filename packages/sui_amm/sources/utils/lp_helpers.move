@@ -14,10 +14,9 @@ module legato_amm::lp_helpers {
     // ======== Errors ========
 
     const ERR_THE_SAME_COIN: u64 = 600;
-     
-
+    
     public fun generate_lp_name<X, Y>(): String {
-        let lp_name = string::utf8(b"");
+        let mut lp_name = string::utf8(b"");
         string::append_utf8(&mut lp_name, b"LP-");
 
         if (is_order<X, Y>()) {

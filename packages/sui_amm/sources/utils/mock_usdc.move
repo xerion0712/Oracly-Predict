@@ -11,9 +11,9 @@ module legato_amm::mock_usdc {
     use sui::transfer;
     use sui::tx_context::{ TxContext};
 
-    struct MOCK_USDC has drop {}
+    public struct MOCK_USDC has drop {}
 
-    struct USDCGlobal has key {
+    public struct USDCGlobal has key {
         id: UID,
         supply: Supply<MOCK_USDC>
     }

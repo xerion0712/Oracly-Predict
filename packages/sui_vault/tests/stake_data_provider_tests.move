@@ -33,40 +33,34 @@ module legato::stake_data_provider_tests {
 
     #[test]
     public fun test_check_apy() {
-        let scenario = scenario();
+        let mut scenario = scenario();
         check_apy(&mut scenario);
         test::end(scenario);
     }
 
     fun check_apy(test: &mut Scenario) {
         set_up_sui_system_state(); 
-
-        let empty_list = vector::empty<address>();
-
+ 
         // Stake 100 SUI for Staker#1
         next_tx(test, STAKER_ADDR_1);
         { 
-            let system_state = test::take_shared<SuiSystemState>(test); 
-
-            sui_system::request_add_stake(&mut system_state, coin::mint_for_testing(100 * MIST_PER_SUI, ctx(test)), VALIDATOR_ADDR_1, ctx(test));
-
+            let mut system_state = test::take_shared<SuiSystemState>(test);  
+            sui_system::request_add_stake(&mut system_state, coin::mint_for_testing(100 * MIST_PER_SUI, ctx(test)), VALIDATOR_ADDR_1, ctx(test)); 
             test::return_shared(system_state);
         };
 
         // Stake 100 SUI for Staker#2
         next_tx(test, STAKER_ADDR_2);
         {
-            let system_state = test::take_shared<SuiSystemState>(test); 
- 
-            sui_system::request_add_stake(&mut system_state, coin::mint_for_testing(100 * MIST_PER_SUI, ctx(test)), VALIDATOR_ADDR_1, ctx(test));
-
+            let mut system_state = test::take_shared<SuiSystemState>(test);  
+            sui_system::request_add_stake(&mut system_state, coin::mint_for_testing(100 * MIST_PER_SUI, ctx(test)), VALIDATOR_ADDR_1, ctx(test)); 
             test::return_shared(system_state);
         };
 
         governance_test_utils::advance_epoch(test);
 
         // forwards 100 epoch
-        let i = 0;
+        let mut i = 0;
         while (i < 100) {
             advance_epoch_with_reward_amounts(0, 500, test);
             i = i + 1;
@@ -75,10 +69,10 @@ module legato::stake_data_provider_tests {
         // Checking APY
         next_tx(test, STAKER_ADDR_1);
         {
-            let system_state = test::take_shared<SuiSystemState>(test); 
+            let mut system_state = test::take_shared<SuiSystemState>(test); 
             let current_epoch = tx_context::epoch(ctx(test));
 
-            let pool_ids = vector::empty<ID>();
+            let mut pool_ids = vector::empty<ID>();
             vector::push_back<ID>(&mut pool_ids, validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_1));
             vector::push_back<ID>(&mut pool_ids, validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_2));
             vector::push_back<ID>(&mut pool_ids, validator_staking_pool_id(&mut system_state, VALIDATOR_ADDR_3));
@@ -88,7 +82,7 @@ module legato::stake_data_provider_tests {
                 let pool_id = vector::pop_back(&mut pool_ids);
                 let pool_apy = stake_data_provider::pool_apy(&mut system_state, &pool_id, current_epoch);
 
-                assert!( pool_apy/100000 == 451, 0 ); // ~4.51%
+                assert!( pool_apy/ 100000 == 451, 0 ); // ~4.51%
             };
 
             test::return_shared(system_state);
@@ -97,7 +91,7 @@ module legato::stake_data_provider_tests {
         // Estimate the rewards to be received
         next_tx(test, STAKER_ADDR_1);
         {
-            let system_state = test::take_shared<SuiSystemState>(test);
+            let mut system_state = test::take_shared<SuiSystemState>(test);
             let staked_sui = test::take_from_sender<StakedSui>(test);
 
             let current_epoch = tx_context::epoch(ctx(test));
@@ -112,7 +106,7 @@ module legato::stake_data_provider_tests {
     } 
 
     fun set_up_sui_system_state() {
-        let scenario_val = test::begin(@0x0);
+        let mut scenario_val = test::begin(@0x0);
         let scenario = &mut scenario_val;
         let ctx = test::ctx(scenario);
 

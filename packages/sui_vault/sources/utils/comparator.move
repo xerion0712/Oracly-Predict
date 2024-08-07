@@ -7,7 +7,7 @@ module legato::comparator {
     const SMALLER: u8 = 1;
     const GREATER: u8 = 2;
 
-    struct Result has drop {
+    public struct Result has drop {
         inner: u8,
     }
 
@@ -36,7 +36,7 @@ module legato::comparator {
         let left_length = vector::length(&left);
         let right_length = vector::length(&right);
 
-        let idx = 0;
+        let mut idx = 0;
 
         while (idx < left_length && idx < right_length) {
             let left_byte = *vector::borrow(&left, idx);

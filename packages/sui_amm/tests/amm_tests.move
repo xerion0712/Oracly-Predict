@@ -22,43 +22,43 @@ module legato_amm::amm_tests {
 
     // test coins
 
-    struct XBTC {}
+    public struct XBTC {}
 
-    struct USDT {}
+    public struct USDT {}
 
-    struct USDC {}
+    public struct USDC {}
 
     #[test]
     fun test_register_pools() {
-        let scenario = scenario();
+        let mut scenario = scenario();
         register_pools(&mut scenario);
         end(scenario);
     }
 
     #[test]
     fun test_swap_usdt_for_xbtc() {
-        let scenario = scenario();
+        let mut scenario = scenario();
         swap_usdt_for_xbtc(&mut scenario);
         end(scenario);
     }
 
     #[test]
     fun test_swap_xbtc_for_usdt() {
-        let scenario = scenario();
+        let mut scenario = scenario();
         swap_xbtc_for_usdt(&mut scenario);
         end(scenario);
     }
 
     #[test]
     fun test_swap_sui_for_usdc() {
-        let scenario = scenario();
+        let mut scenario = scenario();
         swap_sui_for_usdc(&mut scenario);
         end(scenario);
     }
 
     #[test]
     fun test_remove_liquidity() {
-        let scenario = scenario();
+        let mut scenario = scenario();
         remove_liquidity(&mut scenario);
         end(scenario);
     }
@@ -77,7 +77,7 @@ module legato_amm::amm_tests {
         // Setup a 10/90 pool first 
         next_tx(test, owner);
         {
-            let global = test_scenario::take_shared<AMMGlobal>(test);
+            let mut global = test_scenario::take_shared<AMMGlobal>(test);
             
             amm::register_pool<USDT, XBTC>(&mut global, 1000, 9000, ctx(test));
 
@@ -102,7 +102,7 @@ module legato_amm::amm_tests {
         // Add more liquidity to the pool and then remove it
         next_tx(test, owner);
         {
-            let global = test_scenario::take_shared<AMMGlobal>(test);
+            let mut global = test_scenario::take_shared<AMMGlobal>(test);
 
             let pool = amm::get_mut_pool_for_testing<USDT, XBTC>(&mut global);
 
@@ -134,8 +134,8 @@ module legato_amm::amm_tests {
         // test admin functions
         next_tx(test, owner);
         {
-            let global = test_scenario::take_shared<AMMGlobal>(test);
-            let managercap = test_scenario::take_from_sender<ManagerCap>(test);
+            let mut global = test_scenario::take_shared<AMMGlobal>(test);
+            let mut managercap = test_scenario::take_from_sender<ManagerCap>(test);
 
             amm::pause<USDT, XBTC>( &mut global, &mut managercap );
             amm::resume<USDT, XBTC>( &mut global, &mut managercap );
@@ -147,7 +147,7 @@ module legato_amm::amm_tests {
         // Setup a 50/50 pool 
         next_tx(test, owner);
         {
-            let global = test_scenario::take_shared<AMMGlobal>(test);
+            let mut global = test_scenario::take_shared<AMMGlobal>(test);
 
             amm::register_pool<SUI, USDC>(&mut global, 5000, 5000, ctx(test));
 
@@ -178,7 +178,7 @@ module legato_amm::amm_tests {
 
         next_tx(test, the_guy);
         {
-            let global = test_scenario::take_shared<AMMGlobal>(test);
+            let mut global = test_scenario::take_shared<AMMGlobal>(test);
             amm::swap<USDT, XBTC>(&mut global, mint<USDT>(100_000_000, ctx(test)), 1, ctx(test));
             test_scenario::return_shared(global);
         };
@@ -200,7 +200,7 @@ module legato_amm::amm_tests {
 
         next_tx(test, the_guy);
         {
-            let global = test_scenario::take_shared<AMMGlobal>(test);
+            let mut global = test_scenario::take_shared<AMMGlobal>(test);
             amm::swap<XBTC, USDT>(&mut global, mint<XBTC>(100000, ctx(test)), 1, ctx(test)); // 0.001 XBTC
             test_scenario::return_shared(global);
         };
@@ -221,7 +221,7 @@ module legato_amm::amm_tests {
 
         next_tx(test, user_2);
         {
-            let global = test_scenario::take_shared<AMMGlobal>(test);
+            let mut global = test_scenario::take_shared<AMMGlobal>(test);
             amm::swap<SUI, USDC>(&mut global, mint<SUI>(250_000_000_000, ctx(test)), 1, ctx(test)); // 250 SUI
             test_scenario::return_shared(global);
         };
@@ -236,7 +236,7 @@ module legato_amm::amm_tests {
 
         next_tx(test, user_1);
         {
-            let global = test_scenario::take_shared<AMMGlobal>(test);
+            let mut global = test_scenario::take_shared<AMMGlobal>(test);
             amm::swap<USDC, SUI>(&mut global, mint<USDC>(100_000_000, ctx(test)), 1, ctx(test)); // 100 USDC
             test_scenario::return_shared(global);
         };
@@ -260,7 +260,7 @@ module legato_amm::amm_tests {
         // Adding then removing liquidity from a 90/10 USDT/XBTC pool
         next_tx(test, lp_provider);
         {
-            let global = test_scenario::take_shared<AMMGlobal>(test);
+            let mut global = test_scenario::take_shared<AMMGlobal>(test);
             
             // Add liquidity to the pool using USDT and XBTC
             let pool = amm::get_mut_pool_for_testing<USDT, XBTC>(&mut global);
@@ -294,7 +294,7 @@ module legato_amm::amm_tests {
         // Adding then removing liquidity from a 50/50 pool
         next_tx(test, lp_provider);
         {
-            let global = test_scenario::take_shared<AMMGlobal>(test);
+            let mut global = test_scenario::take_shared<AMMGlobal>(test);
             
             // Add liquidity to the pool
             let pool = amm::get_mut_pool_for_testing<SUI, USDC>(&mut global);

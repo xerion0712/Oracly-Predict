@@ -6,12 +6,11 @@ module legato::stake_data_provider {
 
     use std::vector;
 
-    use sui_system::sui_system::{ Self, SuiSystemState, pool_exchange_rates};
+    use sui_system::sui_system::{  SuiSystemState, pool_exchange_rates};
     use sui_system::staking_pool::{ Self, PoolTokenExchangeRate, StakedSui}; 
 
     use sui::object::{ID};
-    use sui::table::{Self,  Table};
-    use sui::tx_context::{ TxContext};
+    use sui::table::{Self,  Table}; 
     
     const EPOCH_TO_WEIGHT : u64 = 30;
     const MIST_PER_SUI: u64 = 1_000_000_000;
@@ -24,14 +23,14 @@ module legato::stake_data_provider {
         let table_rates = pool_exchange_rates(wrapper, pool_id);
         assert!(table::contains(table_rates, epoch), EInvalidEpoch);
 
-        let sum = 0;
-        let i = 0;
-        let total_sum = 0;
+        let mut sum = 0;
+        let mut i = 0;
+        let mut total_sum = 0;
         while (i < EPOCH_TO_WEIGHT) {
 
             if (table::contains(table_rates, epoch-i)) {
                 // find the closest previous epoch
-                let count = 1;
+                let mut count = 1;
                 while (count < 10) {
                     if (table::contains(table_rates, epoch-i-count)) break;
                     count = count + 1
@@ -63,7 +62,7 @@ module legato::stake_data_provider {
     // Re-implement earnings calculation from staking_pool module
     public fun earnings_from_staked_sui(wrapper: &mut SuiSystemState, staked_sui: &StakedSui, to_epoch: u64): u64  {
 
-        let activation_epoch = staking_pool::stake_activation_epoch(staked_sui);
+        let mut activation_epoch = staking_pool::stake_activation_epoch(staked_sui);
         let principal_amount = staking_pool::staked_sui_amount(staked_sui);
         let pool_id = staking_pool::pool_id(staked_sui);
 
@@ -74,8 +73,8 @@ module legato::stake_data_provider {
         let at_staking_rate = table::borrow(table_rates, activation_epoch);        
         let pool_token_withdraw_amount = get_token_amount(at_staking_rate, principal_amount);
 
-        let epoch = to_epoch;
-        let target_epoch = activation_epoch;
+        let mut epoch = to_epoch;
+        let mut target_epoch = activation_epoch;
 
         while(epoch >= activation_epoch) {
             if (table::contains(table_rates, epoch)) {
