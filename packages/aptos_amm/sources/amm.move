@@ -55,6 +55,7 @@ module legato_amm_addr::amm {
     const ERR_INSUFFICIENT_AMOUNT: u64 = 11;
     const ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM: u64 = 12;
     const ERR_RESERVES_EMPTY: u64 = 13;
+    const ERR_INVALID_PATH_LENGTH: u64 = 14;
 
     // ======== Structs =========
 
@@ -82,6 +83,14 @@ module legato_amm_addr::amm {
         extend_ref: ExtendRef,
         enable_whitelist: bool,
         treasury_address: address // where all fees from all pools will be sent for further LP staking
+    }
+
+    // Used when swapping with a specified path
+    struct Route has drop, store {
+        token_1: Object<Metadata>,
+        token_2: Object<Metadata>,
+        pool_name: String,
+        is_order: bool
     }
 
     #[event]
@@ -117,6 +126,15 @@ module legato_amm_addr::amm {
     #[event]
     struct Swapped has drop, store {
         pool_name: String,
+        token_in: String,
+        token_out: String,
+        amount_in: u64,
+        amount_out: u64
+    }
+
+    #[event]
+    struct RouteSwapped has drop, store {
+        pool_name: vector<String>,
         token_in: String,
         token_out: String,
         amount_in: u64,
@@ -170,6 +188,100 @@ module legato_amm_addr::amm {
 
         // Emit an event
         event::emit(Swapped { pool_name: lp_name, token_in: fungible_asset::symbol(token_1), token_out: fungible_asset::symbol(token_2), amount_in: token_in, amount_out });
+    }
+
+    // Swaps tokens across multiple pools using the provided path.
+    // The path length must be between 2 and 4
+    public entry fun route_swap(sender: &signer, path: vector<Object<Metadata>>, token_in: u64, token_out_min: u64)  acquires AMMGlobal {
+        assert!( vector::length( &path ) >= 2 && vector::length( &path ) <= 4 , ERR_INVALID_PATH_LENGTH );
+
+        if ( vector::length( &path ) == 2 ) {
+            // Single-hop swap 
+
+            let token_1 = *vector::borrow(&path, 0);
+            let token_2 = *vector::borrow(&path, 1);
+            let is_order = is_order(token_1, token_2);
+
+            // Execute the swap
+            let token_out = swap_out_non_entry(sender, token_1, token_2, token_in, token_out_min, is_order);
+            let amount_out = fungible_asset::amount(&token_out);
+
+            primary_fungible_store::ensure_primary_store_exists(signer::address_of(sender), token_2);
+            let store = primary_fungible_store::primary_store(signer::address_of(sender), token_2);
+            fungible_asset::deposit(store, token_out);
+
+            let (lp_name, _) = if (is_order) {
+                generate_lp_name_and_symbol(token_1, token_2)
+            } else {
+                generate_lp_name_and_symbol(token_2, token_1)
+            };
+
+            let pool_name = vector::empty<String>();
+            vector::push_back( &mut pool_name, lp_name );
+
+            // Emit an event
+            event::emit(RouteSwapped { pool_name, token_in: fungible_asset::symbol(token_1), token_out: fungible_asset::symbol(token_2), amount_in: token_in, amount_out });
+        } else {
+
+            // Multi-hop swaps for paths with more than 2 pools
+            let routes = extract_routes(path);
+
+            // Check if any pool in the route is paused
+            check_routes(&routes);
+
+            let config = borrow_global_mut<AMMGlobal>(@legato_amm_addr);
+            let config_object_signer = object::generate_signer_for_extending(&config.extend_ref);
+
+            let input_token = *vector::borrow(&path, 0);
+            let fungible_asset_in = primary_fungible_store::withdraw(sender, input_token, token_in);
+            let amount_in = fungible_asset::amount(&fungible_asset_in);
+
+            primary_fungible_store::ensure_primary_store_exists( signer::address_of(&config_object_signer) , input_token);
+            let store = primary_fungible_store::primary_store(signer::address_of(&config_object_signer)  , input_token);
+            fungible_asset::deposit( store , fungible_asset_in);
+
+            let token_amounts = vector::empty<u64>();
+            vector::push_back( &mut token_amounts, amount_in);
+
+            let pool_count = 0;
+            let pool_name = vector::empty<String>();
+
+            // Perform swaps across each pool in the route
+            while (pool_count < vector::length( &routes )) {
+                let route = vector::borrow( &routes, pool_count); 
+
+                let token_in = vector::pop_back(&mut token_amounts); 
+                let token_out = swap_out_non_entry(&config_object_signer, route.token_1, route.token_2, token_in, 0, route.is_order);
+                let token_out_amount = fungible_asset::amount(&token_out);
+
+                primary_fungible_store::ensure_primary_store_exists( signer::address_of(&config_object_signer), route.token_2);
+                let store = primary_fungible_store::primary_store(signer::address_of(&config_object_signer), route.token_2);
+                fungible_asset::deposit( store , token_out);
+
+                vector::push_back( &mut token_amounts, token_out_amount);
+                vector::push_back( &mut pool_name, route.pool_name);
+
+                pool_count = pool_count+1;
+            };
+
+            // Send the final output tokens to the sender
+            let output_amount = vector::pop_back(&mut token_amounts); 
+            let output_token = *vector::borrow(&path, vector::length(&routes)-1);
+            
+            let fungible_asset_out = primary_fungible_store::withdraw(&config_object_signer, output_token, output_amount);
+
+            primary_fungible_store::ensure_primary_store_exists( signer::address_of(sender) , output_token);
+            let store = primary_fungible_store::primary_store(signer::address_of(sender)  , output_token);
+            fungible_asset::deposit( store , fungible_asset_out);
+
+            assert!(
+                output_amount >= token_out_min,
+                ERR_COIN_OUT_NUM_LESS_THAN_EXPECTED_MINIMUM
+            );
+
+            // Emit event
+            event::emit(RouteSwapped { pool_name, token_in: fungible_asset::symbol(input_token), token_out: fungible_asset::symbol(output_token), amount_in, amount_out: output_amount });
+        };
     }
     
     // Register a new liquidity pool with custom weights
@@ -488,6 +600,8 @@ module legato_amm_addr::amm {
 
     }
 
+
+
     #[view]
     public fun is_order(token_1: Object<Metadata>, token_2: Object<Metadata>): bool {
         let token_1_addr = object::object_address(&token_1);
@@ -615,6 +729,22 @@ module legato_amm_addr::amm {
         (lp_name, lp_symbol)
     }
 
+    fun check_routes( routes: &vector<Route> ) acquires AMMGlobal  {
+
+        let config = borrow_global<AMMGlobal>(@legato_amm_addr);
+
+        let pool_count = 0;
+
+        while (pool_count < vector::length( routes )) {
+            let route = vector::borrow( routes, pool_count );
+            assert!( table::contains( &config.pools, route.pool_name ) , ERR_POOL_NOT_REGISTER);
+            let pool_config = table::borrow( &config.pools, route.pool_name );
+            assert!(!pool_config.has_paused , ERR_PAUSED );
+            pool_count = pool_count+1;
+        };
+        
+    }
+
     fun init_pool_params(constructor_ref: &ConstructorRef, token_1: Object<Metadata>, token_2: Object<Metadata>, weight_1: u64, weight_2: u64, swap_fee: FixedPoint64) : Pool {
         
         // Ensure that the normalized weights sum up to 100%
@@ -710,6 +840,36 @@ module legato_amm_addr::amm {
     inline fun create_token_store(pool_signer: &signer, token: Object<Metadata>): Object<FungibleStore> {
         let constructor_ref = &object::create_object_from_object(pool_signer);
         fungible_asset::create_store(constructor_ref, token)
+    }
+
+    fun extract_routes(path: vector<Object<Metadata>>): vector<Route> {
+
+        let output = vector::empty<Route>();
+        let pool_count = 0;
+
+        while ( pool_count < (vector::length( &path )-1) ) {
+            
+            let token_1 = *vector::borrow( &path, pool_count );
+            let token_2 = *vector::borrow( &path, pool_count+1);
+            let is_order = is_order(token_1, token_2);
+
+            let (lp_name, _) = if (is_order) {
+                generate_lp_name_and_symbol(token_1, token_2)
+            } else {
+                generate_lp_name_and_symbol(token_2, token_1)
+            };
+
+            vector::push_back( &mut output, Route {
+                token_1,
+                token_2,
+                pool_name: lp_name,
+                is_order
+            });
+
+            pool_count = pool_count+1;
+        };
+
+        output
     }
 
     // ======== Test-related Functions =========
