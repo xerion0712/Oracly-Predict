@@ -502,6 +502,32 @@ module legato_amm_addr::amm {
         signer::address_of(&config_object_signer)
     }
 
+    #[view]
+    public fun get_lp_metadata(token_1: Object<Metadata>, token_2: Object<Metadata>): Object<Metadata> acquires AMMGlobal {
+        let config = borrow_global_mut<AMMGlobal>(@legato_amm_addr);
+        let pool = get_mut_pool( &mut config.pools, token_1, token_2);
+        pool.lp_metadata
+    }
+
+    #[view]
+    public fun get_treasury_address(): address acquires AMMGlobal {
+        let config = borrow_global<AMMGlobal>(@legato_amm_addr);
+        config.treasury_address
+    }
+
+    #[view]
+    public fun get_reserves(token_1: Object<Metadata>, token_2: Object<Metadata>) : (u64, u64)  acquires AMMGlobal {
+        let config = borrow_global_mut<AMMGlobal>(@legato_amm_addr);
+        let pool_config = get_mut_pool( &mut config.pools, token_1, token_2);
+        let is_order = is_order(token_1, token_2);
+
+        if (is_order) {
+            (fungible_asset::balance(pool_config.token_1), fungible_asset::balance(pool_config.token_2))
+        } else {
+            (fungible_asset::balance(pool_config.token_2), fungible_asset::balance(pool_config.token_1))
+        }
+    }
+
     // ======== Only Governance =========
 
     // Adds a user to the whitelist
