@@ -1,0 +1,18 @@
+[package]
+name = "legato-amm"
+version = "0.1.0"
+authors = []
+
+[addresses]
+legato_amm_addr = "4ff2dae2ed7e9df56074c2e5f17ce407279dc308400b80dad069fa7eaa0612c5"
+aptos_framework = "0x1"
+aptos_fungible_asset = "0xA"
+
+[dev-addresses]
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "mainnet"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dev-dependencies]

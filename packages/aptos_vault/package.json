@@ -1,0 +1,14 @@
+{
+  "name": "aptos-vault",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "aptos move test"
+  },
+  "author": "",
+  "license": "MIT"
+}
