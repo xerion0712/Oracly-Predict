@@ -266,7 +266,7 @@ module legato_amm_addr::amm {
 
             // Send the final output tokens to the sender
             let output_amount = vector::pop_back(&mut token_amounts); 
-            let output_token = *vector::borrow(&path, vector::length(&routes)-1);
+            let output_token = *vector::borrow(&path, vector::length(&path)-1);
             
             let fungible_asset_out = primary_fungible_store::withdraw(&config_object_signer, output_token, output_amount);
 
