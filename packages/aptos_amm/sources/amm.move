@@ -30,7 +30,6 @@ module legato_amm_addr::amm {
     use aptos_framework::object::{Self, ConstructorRef, Object, ExtendRef};
     use aptos_framework::primary_fungible_store;
 
-    use legato_amm_addr::base_fungible_asset;
     use legato_amm_addr::weighted_math;
 
     // ======== Constants ========
@@ -312,7 +311,7 @@ module legato_amm_addr::amm {
 
             let constructor_ref = &object::create_named_object(&config_object_signer, *bytes(&lp_symbol) );
 
-            base_fungible_asset::initialize(
+            lp_initialize(
                 constructor_ref,
                 0, /* maximum_supply. 0 means no maximum */
                 lp_name, /* name */
@@ -770,6 +769,31 @@ module legato_amm_addr::amm {
             lp_metadata, 
             has_paused: false
         }
+    }
+
+    fun lp_initialize(
+        constructor_ref: &ConstructorRef,
+        maximum_supply: u128,
+        name: String,
+        symbol: String,
+        decimals: u8,
+        icon_uri: String,
+        project_uri: String
+    ) {
+        let supply = if (maximum_supply != 0) {
+            option::some(maximum_supply)
+        } else {
+            option::none()
+        };
+        primary_fungible_store::create_primary_store_enabled_fungible_asset(
+            constructor_ref,
+            supply,
+            name,
+            symbol,
+            decimals,
+            icon_uri,
+            project_uri,
+        );
     }
 
     // Mint LP tokens
