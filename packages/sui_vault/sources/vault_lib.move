@@ -113,6 +113,11 @@ module legato::vault_lib {
                     vector::push_back(&mut output_id, asset_id);
                     // increase ratio count 
                     ratio_count = ratio_count+fixed_point64::multiply_u128(10000, current_value);
+                } else {
+                    vector::swap_remove( &mut ratio, current_id );
+                    let asset_id = vector::swap_remove( &mut ratio_to_id, current_id );
+                    vector::push_back(&mut output_id, asset_id);
+                    ratio_count = 10001;
                 };
 
             } else {

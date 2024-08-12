@@ -8,7 +8,7 @@
 module legato_vault_addr::vault {
 
     use std::signer;  
-    use std::string::{Self, String, utf8, bytes};
+    use std::string::{ String, utf8};
     use std::option::{  Self, Option};
     use std::vector;
 
@@ -16,15 +16,12 @@ module legato_vault_addr::vault {
     use aptos_framework::event;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::object::{Self, Object, ExtendRef, ConstructorRef};
-    use aptos_framework::fungible_asset::{ Self, FungibleAsset, FungibleStore, Metadata, MintRef, BurnRef, TransferRef };
+    use aptos_framework::fungible_asset::{ Self, FungibleStore, Metadata, MintRef, BurnRef, TransferRef };
     use aptos_framework::primary_fungible_store::{Self};
     use aptos_framework::delegation_pool as dp;
     use aptos_framework::coin::{Self}; 
- 
-    use aptos_std::type_info::{Self};   
-    use aptos_std::fixed_point64::{Self, FixedPoint64};
-    use aptos_std::math_fixed64::{Self};
-    use aptos_std::table::{Self, Table};
+  
+    use aptos_std::fixed_point64::{Self, FixedPoint64}; 
 
     // ======== Constants ========
 
@@ -215,11 +212,10 @@ module legato_vault_addr::vault {
             assert!(input_amount > MINIMAL_LIQUIDITY, ERR_LIQUID_NOT_ENOUGH);
 
             let min_lp_tokens = fungible_asset::mint(&global.reserve.mint_ref, MINIMAL_LIQUIDITY);
-
             fungible_asset::deposit(global.reserve.min_liquidity, min_lp_tokens);
 
             input_amount - MINIMAL_LIQUIDITY
-        } else {
+        } else { 
             let ratio = fixed_point64::create_from_rational((input_amount as u128) , (current_balance as u128));
             let total_share = fixed_point64::multiply_u128( (lp_supply as u128) , ratio);
             (total_share as u64)
@@ -256,17 +252,13 @@ module legato_vault_addr::vault {
         assert!(global.config.enable_redeem == true, ERR_DISABLED);
         assert!( primary_fungible_store::balance( signer::address_of(sender) , global.reserve.lp_metadata ) >= lp_amount , ERR_INSUFFICIENT_AMOUNT );
 
-        // Burn vault tokens on the sender's account 
-        let lp_store = ensure_lp_token_store( &global.reserve, signer::address_of(sender));
-        fungible_asset::burn_from(&global.reserve.burn_ref, lp_store, lp_amount);
-
         let lp_supply = option::destroy_some(fungible_asset::supply(global.reserve.lp_metadata));
         let current_balance = current_balance_with_rewards(signer::address_of(&config_object_signer) , global.config.delegator_pools );
 
-        // Calculate the withdrawal amount from the given vault token
+        // Calculate the withdrawal amount from the given vault token 
         let multiplier = fixed_point64::create_from_rational( (current_balance as u128), ( lp_supply as u128));
         let withdrawal_amount = (fixed_point64::multiply_u128( (lp_amount as u128), multiplier) as u64);
-    
+
         // Initiate withdrawal by unlocking staked assets from 
         // one or more delegator pools to cover the withdrawal amount
         prepare_withdrawal( &config_object_signer, &global.config, withdrawal_amount );
@@ -278,6 +270,10 @@ module legato_vault_addr::vault {
             amount: withdrawal_amount,
             timestamp: timestamp::now_seconds()
         });
+
+        // Burn vault tokens on the sender's account 
+        let lp_store = ensure_lp_token_store( &global.reserve, signer::address_of(sender));
+        fungible_asset::burn_from(&global.reserve.burn_ref, lp_store, lp_amount);
 
         // Update amounts
         update_amounts();
@@ -327,14 +323,21 @@ module legato_vault_addr::vault {
         while (vector::length(&withdraw_ids) > 0) {
             let request_id = vector::pop_back(&mut withdraw_ids);
             let this_request = vector::swap_remove(&mut global.request_list, request_id);
+            let current_balance = coin::balance<AptosCoin>(signer::address_of(&config_object_signer));
 
-            let apt_coin = coin::withdraw<AptosCoin>(&config_object_signer, this_request.amount);
+            let withdraw_amount = if (current_balance >= this_request.amount) {
+                this_request.amount
+            } else {
+                current_balance
+            };
+
+            let apt_coin = coin::withdraw<AptosCoin>(&config_object_signer, withdraw_amount);
             coin::deposit(this_request.sender, apt_coin);
         
             // Emit an event
             event::emit(
                 Redeem { 
-                    withdraw_amount: this_request.amount, 
+                    withdraw_amount, 
                     timestamp: timestamp::now_seconds(),  
                     sender: this_request.sender
                 }
@@ -607,10 +610,12 @@ module legato_vault_addr::vault {
         let count = 0;
         let total_amount = 0;
 
-        while ( count < vector::length(&pool_list) ) {
-            let pool_address = *vector::borrow( &pool_list, count );
+        while ( count < vector::length(&pool_list) ) { 
+            let validator_address = *vector::borrow( &pool_list, count ); 
+            let pool_address = dp::get_owned_pool_address(validator_address);  
             let (active, _, pending) = dp::get_stake( pool_address, vault_address);
             total_amount = total_amount+active+pending;
+            count = count+1;
         };
 
         total_amount
@@ -622,9 +627,11 @@ module legato_vault_addr::vault {
         let total_amount = 0;
 
         while ( count < vector::length(pool_list) ) {
-            let pool_address = *vector::borrow( pool_list, count );
+            let validator_address = *vector::borrow( pool_list, count );
+            let pool_address = dp::get_owned_pool_address(validator_address); 
             let (_, inactive, _) = dp::get_stake( pool_address, vault_address);
             total_amount = total_amount+inactive;
+            count = count+1;
         };
 
         total_amount
@@ -666,19 +673,19 @@ module legato_vault_addr::vault {
         let unlocked_amount = current_unlocked_balance( signer::address_of(pool_signer), &config.delegator_pools );
 
         // Ignore if there is a sufficient amount of APT staked in an inactive state
-        if (unlocked_amount > withdraw_amount) {
+        if (withdraw_amount > unlocked_amount) {
 
-            let remaining_amount = unlocked_amount-withdraw_amount;
+            let remaining_amount = withdraw_amount-unlocked_amount;
 
             // Look for unlocking staked assets from a single pool first
             let pool_address = find_one_with_minimal_excess(pool_signer, config, remaining_amount);
 
-            if (option::is_none<address>(&pool_address)) {
+            if (option::is_none<address>(&pool_address)) { 
                 // If no single pool fits, then look for unlocking from multiple pools.
                 let pool_ids = find_combination(pool_signer, config, remaining_amount);
                 assert!( vector::length( &pool_ids ) > 0 , ERR_NONE_POOL_WITHDRAWN  );
                 unlock_stake( pool_signer, pool_ids, remaining_amount );
-            } else {
+            } else { 
                 let pool_ids = vector::empty<address>();
                 vector::push_back( &mut pool_ids, *option::borrow( &pool_address ) );
                 unlock_stake( pool_signer, pool_ids, remaining_amount );
@@ -705,7 +712,7 @@ module legato_vault_addr::vault {
                 } else {
                     inactive_amount
                 };
-                remaining_withdraw = remaining_withdraw-amount_to_withdraw;
+                remaining_withdraw = remaining_withdraw-amount_to_withdraw;  
                 dp::withdraw(pool_signer, pool_address, amount_to_withdraw);
             };
             
@@ -785,7 +792,7 @@ module legato_vault_addr::vault {
         while ( ratio_count <= 10000 ) {
             // Finds a pool with a ratio close to the target ratio
             let (value, id) = find_closest_ratio_pool(&ratio, target_ratio );
-            
+
             if (option::is_some( &id )) {
                 let current_value = *option::borrow(&value);
                 let current_id = *option::borrow(&id);
@@ -799,7 +806,12 @@ module legato_vault_addr::vault {
 
                     // increase ratio count 
                     ratio_count = ratio_count+fixed_point64::multiply_u128(10000, current_value);
-                };
+                } else {
+                    vector::swap_remove( &mut ratio, current_id );
+                    let pool_address = vector::swap_remove( &mut ratio_to_address, current_id );
+                    vector::push_back(&mut ouput_pools, pool_address);
+                    ratio_count = 10001;
+                };  
 
             } else {
                 break
