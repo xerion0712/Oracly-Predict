@@ -4,7 +4,7 @@
 // https://github.com/icmoore/balancer-v2-lite
 
 
-module legato_addr::weighted_math {
+module legato_amm_addr::weighted_math {
   
     use aptos_std::fixed_point64::{Self, FixedPoint64}; 
     use aptos_std::math_fixed64; 

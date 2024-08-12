@@ -1,10 +1,11 @@
 // A base fungible asset module that allows anyone to mint and burn coins
 
-module legato_addr::base_fungible_asset {
+module legato_amm_addr::base_fungible_asset {
 
     use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleStore};
     use aptos_framework::object::{Self, Object, ConstructorRef};
     use aptos_framework::primary_fungible_store;
+
     use std::error;
     use std::signer;
     use std::string::{String, utf8};
@@ -159,7 +160,22 @@ module legato_addr::base_fungible_asset {
         object_from_constructor_ref<Metadata>(constructor_ref)
     }
 
-    #[test(creator = @legato_addr, alice = @0xface)]
+    #[test_only]
+    public fun create_custom_token(creator: &signer, seed: vector<u8>): Object<Metadata> {
+        let constructor_ref = &object::create_named_object(creator, seed);
+        initialize(
+            constructor_ref,
+            0,
+            utf8(b"Custom Token"), /* name */
+            utf8(seed), /* symbol */
+            8, /* decimals */
+            utf8(b"http://example.com/favicon.ico"), /* icon */
+            utf8(b"http://example.com"), /* project */
+        );
+        object_from_constructor_ref<Metadata>(constructor_ref)
+    }
+
+    #[test(creator = @legato_amm_addr, alice = @0xface)]
     fun test_basic_flow(
         creator: &signer,
         alice: &signer

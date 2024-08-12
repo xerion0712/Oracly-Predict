@@ -2,12 +2,14 @@
 
 // Mock USDC coins in fungible asset
 
-module legato_addr::mock_usdc_fa {
+module legato_amm_addr::mock_usdc_fa {
 
     use aptos_framework::object;
     use aptos_framework::fungible_asset::{ Metadata};
     use aptos_framework::object::Object;
-    use legato_addr::base_fungible_asset;
+
+    use legato_amm_addr::base_fungible_asset;
+
     use std::string::utf8;
 
     const ASSET_SYMBOL: vector<u8> = b"USDC";
@@ -29,7 +31,7 @@ module legato_addr::mock_usdc_fa {
     #[view]
     /// Return the address of the metadata that's created when this module is deployed.
     public fun get_metadata(): Object<Metadata> {
-        let metadata_address = object::create_object_address(&@legato_addr, ASSET_SYMBOL);
+        let metadata_address = object::create_object_address(&@legato_amm_addr, ASSET_SYMBOL);
         object::address_to_object<Metadata>(metadata_address)
     }
 
@@ -37,7 +39,6 @@ module legato_addr::mock_usdc_fa {
     public entry fun mint(   to: address, amount: u64) {
         base_fungible_asset::mint_to_primary_stores( get_metadata(), vector[to], vector[amount]);
     }
-
 
     /// Burn fungible assets as the owner of metadata object.
     public entry fun burn( from: address, amount: u64) {
