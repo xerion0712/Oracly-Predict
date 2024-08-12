@@ -1,6 +1,6 @@
 // A base fungible asset module that allows anyone to mint and burn coins
 
-module legato_addr::base_fungible_asset {
+module legato_vault_addr::base_fungible_asset {
 
     use aptos_framework::fungible_asset::{Self, MintRef, TransferRef, BurnRef, Metadata, FungibleStore};
     use aptos_framework::object::{Self, Object, ConstructorRef};
@@ -159,7 +159,7 @@ module legato_addr::base_fungible_asset {
         object_from_constructor_ref<Metadata>(constructor_ref)
     }
 
-    #[test(creator = @legato_addr, alice = @0xface)]
+    #[test(creator = @legato_vault_addr, alice = @0xface)]
     fun test_basic_flow(
         creator: &signer,
         alice: &signer
