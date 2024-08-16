@@ -168,24 +168,57 @@ module legato::vault_tests {
             test::return_shared(global);
         };
 
-        mint( test, STAKER_ADDR_1, 100 * MIST_PER_SUI); 
-        mint( test, STAKER_ADDR_2, 200 * MIST_PER_SUI); 
+        mint( test, STAKER_ADDR_1, 50 * MIST_PER_SUI); 
+        mint( test, STAKER_ADDR_2, 100 * MIST_PER_SUI); 
+        mint( test, STAKER_ADDR_3, 150 * MIST_PER_SUI); 
         
         advance_epoch(test, 1);
 
         // Checking validator staking amount
-        next_tx(test, STAKER_ADDR_2);
+        next_tx(test, STAKER_ADDR_1);
         {
             let mut system_state = test::take_shared<SuiSystemState>(test);
             
             let pool_1_amount = validator_stake_amount(&mut system_state, @0x1);
             let pool_2_amount = validator_stake_amount(&mut system_state, @0x2); 
             
-            assert!( pool_1_amount == 1005225000000000, 7 );
-            assert!( pool_2_amount == 1505325000000000, 8 );
+            assert!( pool_1_amount == 1005275000000000, 7 );
+            assert!( pool_2_amount == 1505275000000000, 8 );
 
             test::return_shared(system_state); 
         };
+
+        // Forward 20 epochs
+        advance_epoch(test, 20);
+
+        // Requests to redeem VAULT tokens that requires unstaking only a single locked asset.
+        next_tx(test, STAKER_ADDR_1);
+        {
+            let mut system_state = test::take_shared<SuiSystemState>(test);
+            let mut global = test::take_shared<VaultGlobal>(test); 
+            let vault_token = test::take_from_sender<Coin<VAULT>>(test);  
+            vault::request_redeem(&mut system_state, &mut global, vault_token , ctx(test)); 
+            test::return_shared(global);
+            test::return_shared(system_state); 
+        };
+
+        advance_epoch(test, 1);
+
+        // Fulfill pending redemption requests to distribute SUI to users
+        next_tx(test, STAKER_ADDR_1);
+        { 
+            let mut global = test::take_shared<VaultGlobal>(test); 
+            vault::fulfil_request( &mut global , ctx(test)); 
+            test::return_shared(global); 
+        };
+
+        next_tx(test, STAKER_ADDR_1);
+        { 
+            let sui_token = test::take_from_sender<Coin<SUI>>(test);   
+            assert!( coin::value( &sui_token ) ==  50_103691692, 2 ); // Stake 100 SUI and redeem at 50.1036 SUI
+            test::return_to_sender( test, sui_token );
+        };
+
     }
 
 }

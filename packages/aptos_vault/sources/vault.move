@@ -580,15 +580,17 @@ module legato_vault_addr::vault {
     fun next_validator(config: &mut VaultConfig, stake_amount: u64) : address {
         // Check if there are any entries in the priority list
         if (vector::length( &config.priority_list ) > 0 ) {
-            let first_entry = vector::borrow( &config.priority_list, 0);
+            let first_entry = vector::borrow_mut( &mut config.priority_list, 0);
             let staking_pool_address = first_entry.delegator_pool;
-            let deducted_amount = if ( first_entry.quota_amount > stake_amount) {
+            let new_amount = if ( first_entry.quota_amount > stake_amount) {
                 first_entry.quota_amount - stake_amount
             } else {
                 0
             };
 
-            if (deducted_amount == 0) {
+            first_entry.quota_amount = new_amount;
+
+            if (new_amount == 0) {
                 vector::swap_remove( &mut config.priority_list, 0);
             };
 

@@ -28,9 +28,8 @@ module legato::vault {
     // ======== Constants ========
 
     const MIN_AMOUNT: u64 = 1_000_000_000; // Minimum amount required to stake and unstake
-    const UNSTAKE_DELAY: u64 = 1; // Default delay for unstaking, set to 1 epoch
-    // Minimal liquidity.
-    const MINIMAL_LIQUIDITY: u64 = 1000; 
+    const UNSTAKE_DELAY: u64 = 1; // Default delay for unstaking, set to 1 epoch 
+    const MINIMAL_LIQUIDITY: u64 = 1000; // Minimal liquidity.
 
     // ======== Errors ========
 
@@ -402,15 +401,17 @@ module legato::vault {
     fun next_validator(global: &mut VaultGlobal, stake_amount: u64, ctx: &TxContext) : address {
         // Check if there are any entries in the priority list
         if (vector::length( &global.config.priority_list ) > 0 ) {
-            let first_entry = vector::borrow( &global.config.priority_list, 0);
+            let first_entry = vector::borrow_mut( &mut global.config.priority_list, 0);
             let staking_pool_address = first_entry.staking_pool;
-            let deducted_amount = if ( first_entry.quota_amount > stake_amount) {
+            let new_amount = if ( first_entry.quota_amount > stake_amount) {
                 first_entry.quota_amount - stake_amount
             } else {
                 0
             };
+            
+            first_entry.quota_amount = new_amount;
 
-            if (deducted_amount == 0) {
+            if (new_amount == 0) {
                 vector::swap_remove( &mut global.config.priority_list, 0);
             };
 
