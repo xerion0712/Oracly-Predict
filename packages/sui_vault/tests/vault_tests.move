@@ -45,6 +45,14 @@ module legato::vault_tests {
         test::end(scenario);
     }
 
+    // Test at high volumes
+    #[test]
+    public fun test_high_volumes() {
+        let mut scenario = scenario();
+        high_volumes(&mut scenario);
+        test::end(scenario);
+    }
+
     fun mint_redeem_flow( test: &mut Scenario ) {
         set_up_sui_system_state();
         advance_epoch(test, 40); // <-- overflow when less than 40
@@ -219,6 +227,93 @@ module legato::vault_tests {
             test::return_to_sender( test, sui_token );
         };
 
+    }
+
+    // Simulates high-volume transactions 
+    fun high_volumes(test: &mut Scenario) {
+        set_up_sui_system_state();
+        advance_epoch(test, 20); 
+
+        // Initialize and configure the vaults
+        setup_vault(test, ADMIN_ADDR );
+
+        next_tx(test, ADMIN_ADDR);
+        {
+            let mut managercap = test::take_from_sender<ManagerCap>(test);
+            let mut global = test::take_shared<VaultGlobal>(test); 
+
+            // Add priority pools with specified quotas
+            vault::add_priority( &mut global, &mut managercap,  @0x1, 2500_000000000);
+            vault::add_priority( &mut global, &mut managercap,  @0x2, 2500_000000000);
+
+            test::return_to_sender(test, managercap);
+            test::return_shared(global);
+        };
+
+        let mut count = 0; 
+
+        // Mint and stake tokens for different stakers
+        while ( count < 100) {
+            let amount_to_stake = count+1; 
+            let staker_address = get_random_staker(count);
+            mint( test, staker_address, amount_to_stake * MIST_PER_SUI); 
+            count = count +1;
+        };
+
+        // Fast forward 20 epochs
+        advance_epoch(test, 20);
+
+        next_tx(test, STAKER_ADDR_1);
+        {   
+            let mut system_state = test::take_shared<SuiSystemState>(test);
+            let mut global = test::take_shared<VaultGlobal>(test); 
+            vault::request_redeem(&mut system_state, &mut global, coin::mint_for_testing<VAULT>( 5_000000000 , ctx(test)) , ctx(test)); 
+            test::return_shared(global);
+            test::return_shared(system_state); 
+        };
+
+        next_tx(test, STAKER_ADDR_2);
+        {   
+            let mut system_state = test::take_shared<SuiSystemState>(test);
+            let mut global = test::take_shared<VaultGlobal>(test); 
+            vault::request_redeem(&mut system_state, &mut global, coin::mint_for_testing<VAULT>( 5_000000000 , ctx(test)) , ctx(test)); 
+            test::return_shared(global);
+            test::return_shared(system_state); 
+        };
+
+        advance_epoch(test, 1);
+
+        // Fulfill pending redemption requests to distribute SUI to users
+        next_tx(test, STAKER_ADDR_1);
+        { 
+            let mut global = test::take_shared<VaultGlobal>(test); 
+            vault::fulfil_request( &mut global, ctx(test)); 
+            test::return_shared(global); 
+        };
+
+        // Verify the SUI balance
+        next_tx(test, STAKER_ADDR_1);
+        { 
+            let sui_token = test::take_from_sender<Coin<SUI>>(test);    
+            assert!( coin::value( &sui_token ) ==  5_009875856, 3 );  
+            test::return_to_sender( test, sui_token );
+        };
+
+    }
+
+    fun get_random_staker(seed: u64) : address {
+        let id = seed % 5;
+        if (id == 0) 
+            STAKER_ADDR_1
+        else if (id == 1) 
+            STAKER_ADDR_2
+        else if (id == 2)
+            STAKER_ADDR_3
+        else if (id == 3)
+            STAKER_ADDR_4
+        else if (id == 3)
+            STAKER_ADDR_5
+        else STAKER_ADDR_6 
     }
 
 }

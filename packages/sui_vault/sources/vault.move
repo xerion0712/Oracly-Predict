@@ -188,8 +188,6 @@ module legato::vault {
 
         // Burn the VAULT tokens
         balance::decrease_supply(&mut global.reserve.lp_supply, coin::into_balance(vault_token));
-
-        update_amounts(wrapper, global, ctx);
  
         request_redeem_event( object::id(global), lp_amount, withdrawal_amount, tx_context::sender(ctx), tx_context::epoch(ctx)  )
     }
@@ -408,7 +406,7 @@ module legato::vault {
             } else {
                 0
             };
-            
+
             first_entry.quota_amount = new_amount;
 
             if (new_amount == 0) {
@@ -474,7 +472,7 @@ module legato::vault {
                 sort_u64(&mut asset_ids);
                 let sui_balance = unstake_staked_sui(wrapper, global, &mut asset_ids, ctx); 
                 balance::join<SUI>(&mut global.pending_withdrawal, sui_balance );
-            } else {  
+            } else {
                 let mut asset_ids = vector::empty<u64>(); 
                 vector::push_back<u64>( &mut asset_ids, *option::borrow(&asset_id)); 
                 let sui_balance = unstake_staked_sui(wrapper, global, &mut asset_ids, ctx); 
@@ -488,7 +486,7 @@ module legato::vault {
     // Unstake Staked SUI from the validator node
     fun unstake_staked_sui(wrapper: &mut SuiSystemState, global: &mut VaultGlobal, asset_ids: &mut vector<u64>, ctx: &mut TxContext): Balance<SUI> {
         let mut balance_sui = balance::zero();  
-        
+
         while (vector::length<u64>(asset_ids) > 0) {
             let asset_id = vector::pop_back(asset_ids);
             let staked_sui = vector::swap_remove(&mut global.reserve.staked_sui, asset_id);
