@@ -107,7 +107,7 @@ module legato::vault {
             tx_context::sender(ctx)
         );
 
-        let (treasury_cap, metadata) = coin::create_currency<VAULT>(witness, 9, b"VAULT", b"Legato Vault Token", b"", option::some(url::new_unsafe_from_bytes(b"https://img.tamago.finance/legato-logo-icon.png")), ctx);
+        let (treasury_cap, metadata) = coin::create_currency<VAULT>(witness, 9, b"LV-SUI", b"Legato Vault Token", b"", option::some(url::new_unsafe_from_bytes(b"https://img.tamago.finance/legato-logo-icon.png")), ctx);
         transfer::public_freeze_object(metadata);
         
         transfer::share_object(VaultGlobal {

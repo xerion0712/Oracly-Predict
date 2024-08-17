@@ -1,6 +1,6 @@
 [package]
 name = "LegatoVault"
-version = "0.2.5"
+version = "0.1.5"
 edition = "2024.beta"
 
 [dependencies]
@@ -9,6 +9,6 @@ SuiSystem = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/su
 LegatoMath = {  git = "https://github.com/tamago-labs/legato-math.git", subdir = "packages/sui", rev = "main"  }
 
 [addresses]
-legato = "0x98d9d3e7b644182c87310ba8c6c7fdb4a2f2338cd0db58d7e6fa88e562129318" 
+legato = "0x0"
 sui="0x2"
 sui_system = "0x3"
