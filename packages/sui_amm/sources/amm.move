@@ -656,6 +656,17 @@ module legato_amm::amm {
         pool.swap_fee = fixed_point64::create_from_rational( fee_numerator, fee_denominator )
     }
 
+    // Updates the pool weights for the specified pool
+    // Note that this will affect the price. Simulate off-chain before proceeding
+    public entry fun update_pool_weights<X, Y>(global: &mut AMMGlobal, _manager_cap: &mut ManagerCap, weight_x: u64, weight_y: u64 ) {
+        // Ensure that the normalized weights sum up to 100%
+        assert!( weight_x+weight_y == 10000, ERR_WEIGHTS_SUM);
+        let is_order = is_order<X, Y>();
+        let pool = get_mut_pool<X, Y>(global, is_order);
+        pool.weight_x = weight_x;
+        pool.weight_y = weight_y;
+    }
+
     // Adds a user to the whitelist
     public entry fun add_whitelist(global: &mut AMMGlobal,  _manager_cap: &mut ManagerCap, user: address) {
         assert!(!vector::contains(&global.whitelist, &user),ERR_DUPLICATED_ENTRY);
