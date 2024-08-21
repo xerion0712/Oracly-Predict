@@ -683,6 +683,21 @@ module legato_amm_addr::amm {
         pool_config.swap_fee = fixed_point64::create_from_rational( fee_numerator, fee_denominator );
     }
 
+    // Updates the pool weights for the specified pool
+    // Note that this will affect the price. Simulate off-chain before proceeding
+    public entry fun update_pool_weights(sender: &signer, token_1: Object<Metadata>, token_2: Object<Metadata>, weight_1: u64, weight_2: u64) acquires AMMGlobal {
+        assert!( signer::address_of(sender) == @legato_amm_addr , ERR_UNAUTHORIZED);
+
+        // Ensure that the normalized weights sum up to 100%
+        assert!( weight_1+weight_2 == 10000, ERR_WEIGHTS_SUM); 
+    
+        let config = borrow_global_mut<AMMGlobal>(@legato_amm_addr);
+        let pool_config = get_mut_pool( &mut config.pools,  token_1, token_2 );
+
+        pool_config.weight_1 = weight_1;
+        pool_config.weight_2 = weight_2;
+    }
+
     // Pause/Unpause the LP pool
     public entry fun pause(sender: &signer, token_1: Object<Metadata>, token_2: Object<Metadata>, is_pause: bool) acquires AMMGlobal {
         assert!( signer::address_of(sender) == @legato_amm_addr , ERR_UNAUTHORIZED);
