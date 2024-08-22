@@ -1,14 +1,18 @@
 # Legato
 
-Legato is a DeFi liquidity bootstrap protocol utilizing native staking available on Sui and currently experimenting on Aptos. It allows stakers to sacrifice staking rewards for the next 6 or 12 months in exchange for early project tokens launched on Legato LBP. Early projects will benefit from a stable price curve and mitigated selling pressure. Stakers receive new tokens while all principal assets remains the same. Existing projects can also list tokens with significantly less initial capital, around 3x to 5x less compared to other DEX platforms.
+Legato is a comprehensive DeFi solution on Aptos and Sui featuring liquid staking, a dynamic weight DEX, liquidity bootstrapping and options protocols, all of which utilize AI to optimize critical system constants in real-time using external public internet data through LLM RAG fine-tuning, creating a smarter, more resilient DeFi ecosystem for users.
 
-The Legato system is made up of core modules outlined as follows:
+**Please be aware that the project is still in its very early stages of development with each service deployed across different network environments between Testnet and Mainnet.**
 
-- Fixed APY Vaults - Allows locking in a fixed staking rate for a fixed period by converting staked assets into derivative tokens representing the future value at the vault's maturity date.
+The available services are outlined below:
+
+- Liquid Staking Vaults - Allows staking of native tokens and receiving liquid-form assets on Move-based PoS chains. AI is used to select validators for staking by analyzing factors like credibility and trading volumes.
 - Dynamic Weight AMM - An AMM that allows customization of pool weights, ranging from 50/50, 80/20 to 90/10, benefiting projects that want to set up a new pool with much less initial capital paired with their tokens.
 - LBP (Liquidity Bootstrap Pool) - An AMM pool where the weight can automatically shift when more liquidity comes in, ideally for projects to launch tokens with a stable price curve.
 
 ## Fixed APY Vaults
+
+**This section will be replaced with Legato Vault v.1.5**
 
 The fixed yield vault is generally a timelock vault with a specific maturity date controlled by VaultManager or `vault.move`. The system employs a quarterly expiration scheme. At any given time, there will be 4 vaults available to stake, allowing conversion of staked assets into their future value at the end of each quarter Q1, Q2, Q3 and Q4.
 
