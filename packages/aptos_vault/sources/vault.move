@@ -57,10 +57,10 @@ module legato_vault_addr::vault {
         quota_amount: u64 // Quota amount allocated for staking in this pool
     }
 
-    // Represents a request to unstake SUI from the vault
+    // Represents a request to unstake APT from the vault
     struct Request has store, drop {
         sender: address, // Address of the user making the request
-        amount: u64, // SUI amount to be sent out when available 
+        amount: u64, // APT amount to be sent out when available 
         timestamp: u64 // Timestamp at which the request was made
     }
 

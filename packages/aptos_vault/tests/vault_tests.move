@@ -186,9 +186,7 @@ module legato_vault_addr::vault_tests {
         // Check the APT balance after redemption 
         assert!(coin::balance<AptosCoin>(signer::address_of(user_4)) == 32_46037972, 4 );  // User 4 received 32.46 APT
     }
-
-    // test_priority_list
-
+ 
     #[test_only]
     public fun initialize_for_test(
         aptos_framework: &signer,
