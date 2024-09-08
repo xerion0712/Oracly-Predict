@@ -16,10 +16,11 @@ module legato::vault {
     use sui::object::{ Self, ID, UID };
     use sui_system::staking_pool::{ Self, StakedSui};
     use sui_system::sui_system::{ Self, SuiSystemState }; 
- 
+    use sui::table_vec::{Self, TableVec};
+
     use std::option::{  Self, Option};
     use std::vector; 
-
+    
     use legato_math::fixed_point64::{Self, FixedPoint64};
     use legato::stake_data_provider::{Self};
     use legato::vault_lib::{  find_combination, find_one_with_minimal_excess, get_amount_with_rewards, sort_items, sort_u64 };
@@ -72,7 +73,7 @@ module legato::vault {
     // Representing the reserve
     public struct VaultReserve has store {
         lp_supply: Supply<VAULT>, // Supply of vault tokens (LP)
-        staked_sui: vector<StakedSui>, // Storage for staked SUI objects
+        staked_sui: TableVec<StakedSui>, // Storage for staked SUI objects
         min_liquidity: Balance<VAULT>
     }
 
@@ -124,7 +125,7 @@ module legato::vault {
             },
             reserve: VaultReserve {
                 lp_supply: coin::treasury_into_supply<VAULT>(treasury_cap),
-                staked_sui: vector::empty<StakedSui>(), 
+                staked_sui: table_vec::empty<StakedSui>(ctx), 
                 min_liquidity: balance::zero<VAULT>()
             },
             pending_withdrawal: balance::zero<SUI>(),
@@ -276,8 +277,8 @@ module legato::vault {
         };
 
         // Lock Staked SUI
-        vector::push_back<StakedSui>(&mut global.reserve.staked_sui, staked_sui); 
-        if (vector::length(&global.reserve.staked_sui) > 1) sort_items(&mut global.reserve.staked_sui);
+        table_vec::push_back<StakedSui>(&mut global.reserve.staked_sui, staked_sui); 
+        if (table_vec::length(&global.reserve.staked_sui) > 1) sort_items(&mut global.reserve.staked_sui);
 
         // Update balances for the frontend to fetch
         global.current_balance_with_rewards = current_balance+input_value;
@@ -369,7 +370,7 @@ module legato::vault {
 
         // Request to add stake
         let staked_sui = sui_system::request_add_stake_non_entry(wrapper, coin::from_balance(restake_balance, ctx), validator_address, ctx);
-        vector::push_back<StakedSui>(&mut global.reserve.staked_sui, staked_sui); 
+        table_vec::push_back<StakedSui>(&mut global.reserve.staked_sui, staked_sui); 
     }
 
     // Adds a new prioritized staking pool
@@ -435,13 +436,13 @@ module legato::vault {
         coin::from_balance(balance::split(&mut global.pending_withdrawal, amount), ctx) 
     }
 
-    fun current_balance_with_rewards(wrapper: &mut SuiSystemState, staked_sui_list: &vector<StakedSui>, epoch: u64) : u64 {
-        let count = vector::length(staked_sui_list);
+    fun current_balance_with_rewards(wrapper: &mut SuiSystemState, staked_sui_list: &TableVec<StakedSui>, epoch: u64) : u64 {
+        let count = table_vec::length(staked_sui_list);
         let mut i = 0;
         let mut total_sum = 0;
 
         while (i < count) {
-            let staked_sui = vector::borrow(staked_sui_list, i);
+            let staked_sui = table_vec::borrow(staked_sui_list, i);
             let activation_epoch = staking_pool::stake_activation_epoch(staked_sui);
             if (epoch > activation_epoch) {
                 total_sum = total_sum+staking_pool::staked_sui_amount(staked_sui)+stake_data_provider::earnings_from_staked_sui(wrapper, staked_sui, epoch);
@@ -489,7 +490,7 @@ module legato::vault {
 
         while (vector::length<u64>(asset_ids) > 0) {
             let asset_id = vector::pop_back(asset_ids);
-            let staked_sui = vector::swap_remove(&mut global.reserve.staked_sui, asset_id);
+            let staked_sui = table_vec::swap_remove(&mut global.reserve.staked_sui, asset_id);
             let principal_amount = staking_pool::staked_sui_amount(&staked_sui);
 
             // Request to withdraw 

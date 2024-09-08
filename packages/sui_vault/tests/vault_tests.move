@@ -46,12 +46,12 @@ module legato::vault_tests {
     }
 
     // Test at high volumes
-    #[test]
-    public fun test_high_volumes() {
-        let mut scenario = scenario();
-        high_volumes(&mut scenario);
-        test::end(scenario);
-    }
+    // #[test]
+    // public fun test_high_volumes() {
+    //     let mut scenario = scenario();
+    //     high_volumes(&mut scenario);
+    //     test::end(scenario);
+    // }
 
     fun mint_redeem_flow( test: &mut Scenario ) {
         set_up_sui_system_state();

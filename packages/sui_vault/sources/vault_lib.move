@@ -6,6 +6,7 @@
 module legato::vault_lib {
 
     use std::vector;
+    use sui::table_vec::{Self, TableVec};
 
     use sui_system::sui_system::{ Self, SuiSystemState }; 
     use sui_system::staking_pool::{ Self, StakedSui};
@@ -20,19 +21,19 @@ module legato::vault_lib {
     }
 
     // Sorts the items in ascending order based on the amount of Staked SUI they contain.
-    public fun sort_items(items: &mut vector<StakedSui>) {
-        let length = vector::length(items);
+    public fun sort_items(items: &mut TableVec<StakedSui>) {
+        let length = table_vec::length(items);
         let mut i = 1;
         while (i < length) {
-            let cur = vector::borrow(items, i);
+            let cur = table_vec::borrow(items, i);
             let cur_amount =  staking_pool::staked_sui_amount(cur);
             let mut j = i;
             while (j > 0) {
                 j = j - 1;
-                let item = vector::borrow(items, j);
+                let item = table_vec::borrow(items, j);
                 let item_amount = staking_pool::staked_sui_amount(item);
                 if (item_amount > cur_amount) {
-                    vector::swap(items, j, j + 1);
+                    table_vec::swap(items, j, j + 1);
                 } else {
                     break
                 };
@@ -61,14 +62,14 @@ module legato::vault_lib {
     }
 
     //  Find one Staked SUI asset with sufficient value that cover the input amount and minimal excess
-    public fun find_one_with_minimal_excess(wrapper: &mut SuiSystemState, item_list: &vector<StakedSui>, input_amount: u64, epoch: u64 ) : (Option<u64>) {
-        let length = vector::length(item_list); 
+    public fun find_one_with_minimal_excess(wrapper: &mut SuiSystemState, item_list: &TableVec<StakedSui>, input_amount: u64, epoch: u64 ) : (Option<u64>) {
+        let length = table_vec::length(item_list); 
 
         let mut count = 0;
         let mut output_id = option::none<u64>();
 
         while ( count < length ) {
-            let staked_sui = vector::borrow(item_list, count);
+            let staked_sui = table_vec::borrow(item_list, count);
             if (epoch > staking_pool::stake_activation_epoch(staked_sui)) {
                 let amount_with_rewards = get_amount_with_rewards(wrapper,  staked_sui, epoch);
                 // If the amount with rewards is greater than the input amount, update output variables and break
@@ -85,7 +86,7 @@ module legato::vault_lib {
     }
 
     // Find a combination of staked SUI assets that have sufficient value to cover the input amount.
-    public fun find_combination(wrapper: &mut SuiSystemState, item_list: &vector<StakedSui>, input_amount: u64, epoch: u64 ): vector<u64> {
+    public fun find_combination(wrapper: &mut SuiSystemState, item_list: &TableVec<StakedSui>, input_amount: u64, epoch: u64 ): vector<u64> {
         // Normalizing the value into the ratio
         let (mut ratio, mut ratio_to_id) = normalize_into_ratio(wrapper, item_list, input_amount, epoch);
 
@@ -129,13 +130,13 @@ module legato::vault_lib {
         output_id
     }
 
-    fun normalize_into_ratio(wrapper: &mut SuiSystemState,  item_list: &vector<StakedSui>, input_amount: u64, epoch: u64 ): (vector<FixedPoint64>, vector<u64>) {
+    fun normalize_into_ratio(wrapper: &mut SuiSystemState,  item_list: &TableVec<StakedSui>, input_amount: u64, epoch: u64 ): (vector<FixedPoint64>, vector<u64>) {
         let mut ratio = vector::empty<FixedPoint64>();
         let mut ratio_to_id = vector::empty<u64>();
         let mut count = 0;
 
-        while (count < vector::length(item_list)) {
-            let staked_sui = vector::borrow(item_list, count);
+        while (count < table_vec::length(item_list)) {
+            let staked_sui = table_vec::borrow(item_list, count);
             let activation_epoch = staking_pool::stake_activation_epoch(staked_sui);
 
             if (epoch > activation_epoch) {
