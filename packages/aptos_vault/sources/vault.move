@@ -784,7 +784,7 @@ module legato_vault_addr::vault {
         // Normalizing the value into the ratio
         let (ratio, ratio_to_address) = normalize_into_ratio(pool_signer, config, withdraw_amount);
 
-        let ouput_pools = vector::empty<address>();
+        let output_pools = vector::empty<address>();
         let ratio_count = 0; // Tracks the total ratio
 
         // Looking for the pool that has 0.5 ratio first
@@ -804,14 +804,14 @@ module legato_vault_addr::vault {
                     target_ratio = fixed_point64::sub( fixed_point64::create_from_u128(1), current_value );
                     vector::swap_remove( &mut ratio, current_id );
                     let pool_address = vector::swap_remove( &mut ratio_to_address, current_id );
-                    vector::push_back(&mut ouput_pools, pool_address);
+                    vector::push_back(&mut output_pools, pool_address);
 
                     // increase ratio count 
                     ratio_count = ratio_count+fixed_point64::multiply_u128(10000, current_value);
                 } else {
                     vector::swap_remove( &mut ratio, current_id );
                     let pool_address = vector::swap_remove( &mut ratio_to_address, current_id );
-                    vector::push_back(&mut ouput_pools, pool_address);
+                    vector::push_back(&mut output_pools, pool_address);
                     ratio_count = 10001;
                 };  
 
@@ -821,7 +821,7 @@ module legato_vault_addr::vault {
 
         };
 
-        ouput_pools
+        output_pools
     }
 
     fun normalize_into_ratio(pool_signer: &signer, config: &VaultConfig, withdraw_amount: u64) : (vector<FixedPoint64>, vector<address>) {
