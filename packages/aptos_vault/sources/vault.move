@@ -79,7 +79,7 @@ module legato_vault_addr::vault {
         priority_list: vector<Priority>, // List of prioritized delegator pools and quotas to be staked
         deposit_cap: Option<u64>, // Optional cap on the total deposits allowed in the vault
         min_amount: u64, // Minimum amount required to stake/unstake
-        unstake_delay: u64, // Delay period for unstaking, specified in epochs
+        unstake_delay: u64, // Delay period for unstaking, specified in seconds
         batch_amount: u64, // Amount required to trigger a batch processing
         enable_mint: bool, 
         enable_redeem: bool,
@@ -438,7 +438,7 @@ module legato_vault_addr::vault {
     // Updates the delay period for unstaking in the vault
     public entry fun update_unstake_delay(sender: &signer, new_value: u64) acquires VaultGlobal {
         assert!( signer::address_of(sender) == @legato_vault_addr , ERR_UNAUTHORIZED);
-        assert!( 30 >= new_value, ERR_INVALID_VALUE );
+        assert!( 2592000 >= new_value, ERR_INVALID_VALUE ); // 30 days
         let global = borrow_global_mut<VaultGlobal>(@legato_vault_addr);
         global.config.unstake_delay = new_value;
     }
