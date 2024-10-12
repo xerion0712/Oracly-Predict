@@ -310,6 +310,10 @@ module legato::vault {
         global.config.staking_pools
     }
 
+    public fun get_amounts(global: &VaultGlobal): (u64, u64) {
+        ( global.current_balance_with_rewards, global.total_lp_amount )
+    }
+
     // ======== Only Governance =========
 
     // Updates the minimum amount required to stake and unstake
