@@ -1,6 +1,6 @@
 {
     "name": "sui-vault",
-    "version": "0.1.5",
+    "version": "0.2",
     "description": "",
     "main": "index.js",
     "directories": {

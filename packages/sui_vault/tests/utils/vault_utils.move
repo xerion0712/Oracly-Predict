@@ -66,6 +66,8 @@ module legato::vault_utils {
             vault::attach_pool( &mut global, &mut managercap, VALIDATOR_ADDR_3, pool_id_3 );
             vault::attach_pool( &mut global, &mut managercap, VALIDATOR_ADDR_4, pool_id_4 );
  
+            vault::enable_auto_stake( &mut global, &mut managercap, true );
+
             test::return_shared(global);
             test::return_shared(system_state);
             test::return_to_sender(test, managercap);
