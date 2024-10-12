@@ -1,9 +1,10 @@
 [package]
-name = "legato-vault"
-version = "0.2"
+name = "legato-polymarket"
+version = "0.1.0"
 authors = []
 
 [addresses]
+market_addr = "3de3ff1f80b7fce6dff30ebddedf09977328a0b4f958a6d942731a696816cb31"
 legato_vault_addr = "45fa42f6840a7032a97d4d66a45a776be0b8d73bb54182cee82cc41cc7d9a962"
 aptos_framework = "0x1"
 aptos_fungible_asset = "0xA"
@@ -14,5 +15,11 @@ aptos_fungible_asset = "0xA"
 git = "https://github.com/aptos-labs/aptos-core.git"
 rev = "mainnet"
 subdir = "aptos-move/framework/aptos-framework"
+
+[dependencies.legato-vault]
+git = "https://github.com/tamago-labs/legato-finance.git"
+rev = "main"
+subdir = "packages/aptos_vault"
+
 
 [dev-dependencies]
