@@ -155,7 +155,7 @@ module legato_vault_addr::vault {
                 batch_amount: BATCH_AMOUNT,
                 enable_mint: true,
                 enable_redeem: true,
-                enable_auto_stake: true
+                enable_auto_stake: false
             },
             reserve: VaultReserve {
                 lp_metadata,

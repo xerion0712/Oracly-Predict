@@ -12,7 +12,8 @@
     "test-sui-amm": "lerna run test --concurrency 1 --stream --scope sui-amm",
     "test-sui-options": "lerna run test --concurrency 1 --stream --scope sui-options",
     "test-aptos-vault": "lerna run test --concurrency 1 --stream --scope aptos-vault",
-    "test-aptos-amm": "lerna run test --concurrency 1 --stream --scope aptos-amm"
+    "test-aptos-amm": "lerna run test --concurrency 1 --stream --scope aptos-amm",
+    "test-aptos-market": "lerna run test --concurrency 1 --stream --scope aptos-market"
   },
   "devDependencies": {
     "lerna": "^6.6.2",
