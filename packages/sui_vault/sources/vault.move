@@ -1,9 +1,10 @@
 // Copyright (c) Tamago Blockchain Labs, Inc.
 // SPDX-License-Identifier: MIT
 
-// New Legato's Vault allows liquid staking on a supported random validator
-// and removes the complexity of a quarterly expiration schedule,
-// making its behavior similar to other liquid staking protocols.
+// New Legato's Vault allows liquid staking on a supported random validator or 
+// one assigned by the AI-engine, which selects based on performance and other criteria.
+// When staking, SUI is initially locked into an internal pool and
+// once it reaches a threshold will be staked to the validator.
 
 module legato::vault {
 
@@ -28,9 +29,10 @@ module legato::vault {
 
     // ======== Constants ========
 
-    const MIN_AMOUNT: u64 = 1_000_000_000; // Minimum amount required to stake and unstake
-    const UNSTAKE_DELAY: u64 = 1; // Default delay for unstaking, set to 1 epoch 
-    const MINIMAL_LIQUIDITY: u64 = 1000; // Minimal liquidity.
+    const MIN_AMOUNT: u64 = 100000000; // 0.1 SUI
+    const BATCH_AMOUNT: u64 = 10_000000000; // 10 SUI 
+    const UNSTAKE_DELAY: u64 = 1; // Default for unstaking - 1 epoch
+    const MINIMAL_LIQUIDITY: u64 = 1000; // Minimal liquidity
 
     // ======== Errors ========
 
@@ -85,8 +87,10 @@ module legato::vault {
         deposit_cap: Option<u64>, // Optional cap on the total deposits allowed in the vault
         min_amount: u64, // Minimum amount required to unstake
         unstake_delay: u64, // Delay period for unstaking, specified in epochs
+        batch_amount: u64, // Amount required to trigger a batch processing
         enable_mint: bool,
-        enable_redeem: bool
+        enable_redeem: bool,
+        enable_auto_stake: bool // Stake SUI from the pool when batch amount is reached
     }
 
     // Global state
@@ -94,6 +98,7 @@ module legato::vault {
         id: UID,
         config: VaultConfig,
         reserve: VaultReserve,
+        pending_stake: Balance<SUI>, // Balance of SUI pending to stake
         pending_withdrawal: Balance<SUI>, // Balance of SUI pending withdrawal
         pending_fulfil: Balance<SUI>,  // Balance of SUI pending to be sent out
         request_list: vector<Request>, // List of unstaking requests
@@ -120,14 +125,17 @@ module legato::vault {
                 deposit_cap: option::none<u64>(),
                 min_amount: MIN_AMOUNT,
                 unstake_delay: UNSTAKE_DELAY, 
+                batch_amount: BATCH_AMOUNT,
                 enable_mint: true,
-                enable_redeem: true
+                enable_redeem: true,
+                enable_auto_stake: false
             },
             reserve: VaultReserve {
                 lp_supply: coin::treasury_into_supply<VAULT>(treasury_cap),
                 staked_sui: table_vec::empty<StakedSui>(ctx), 
                 min_liquidity: balance::zero<VAULT>()
             },
+            pending_stake: balance::zero<SUI>(),
             pending_withdrawal: balance::zero<SUI>(),
             pending_fulfil: balance::zero<SUI>(),
             request_list:  vector::empty<Request>(),
@@ -139,18 +147,11 @@ module legato::vault {
     // ======== Entry Functions =========
 
     // Mints VAULT tokens for the provided SUI coins
-    public entry fun mint_from_sui(wrapper: &mut SuiSystemState, global: &mut VaultGlobal, sui: Coin<SUI>, ctx: &mut TxContext) {
-        assert!(coin::value(&sui) >= MIN_AMOUNT, ERR_MIN_THRESHOLD);
-        let validator_address = next_validator( global, coin::value(&sui), ctx);
-        let staked_sui = sui_system::request_add_stake_non_entry(wrapper, sui, validator_address, ctx);
-        mint(wrapper, global, staked_sui , ctx);
-    }
+    public entry fun mint_from_sui(wrapper: &mut SuiSystemState, global: &mut VaultGlobal, sui: Coin<SUI>, ctx: &mut TxContext ) {
 
-    // Mints VAULT tokens for the provided staked SUI.
-    public entry fun mint(wrapper: &mut SuiSystemState, global: &mut VaultGlobal, staked_sui: StakedSui, ctx: &mut TxContext) {
+        let input_amount = coin::value(&sui);
 
-        let input_amount = staking_pool::staked_sui_amount(&staked_sui);
-        let lp_token = mint_non_entry( wrapper, global, staked_sui, ctx );
+        let lp_token = mint_non_entry( wrapper, global, sui, ctx );
         let lp_amount = coin::value(&lp_token);
 
         // Transfer LP to the user
@@ -226,42 +227,55 @@ module legato::vault {
         global.current_balance_with_rewards = current_balance_with_rewards(wrapper, &global.reserve.staked_sui, tx_context::epoch(ctx));
         global.total_lp_amount = balance::supply_value(&global.reserve.lp_supply);
     }
- 
+
+    // Check if the SUI in pending_stake meets the BATCH_AMOUNT, then use it to stake.
+    public entry fun transfer_stake(wrapper: &mut SuiSystemState, global: &mut VaultGlobal, ctx: &mut TxContext) {
+
+        let total_locked = balance::value(&global.pending_stake);
+
+        if (total_locked >= global.config.batch_amount) {
+            
+            let stake_balance = balance::split<SUI>(&mut global.pending_stake, total_locked);
+            let validator_address = next_validator( global, total_locked, ctx );
+
+            // Request to add stake
+            let staked_sui = sui_system::request_add_stake_non_entry(wrapper, coin::from_balance(stake_balance, ctx), validator_address, ctx);
+
+            // Lock Staked SUI
+            table_vec::push_back<StakedSui>(&mut global.reserve.staked_sui, staked_sui); 
+            if (table_vec::length(&global.reserve.staked_sui) > 1) sort_items(&mut global.reserve.staked_sui);
+
+            global.config.batch_amount = 0;
+        };
+
+    }
+
     // ======== Public Functions =========
 
-    public fun mint_non_entry(wrapper: &mut SuiSystemState, global: &mut VaultGlobal, staked_sui: StakedSui, ctx: &mut TxContext) : Coin<VAULT> {
+    public fun mint_non_entry(wrapper: &mut SuiSystemState, global: &mut VaultGlobal, sui: Coin<SUI>, ctx: &mut TxContext) : Coin<VAULT> {
         // Ensure minting is enabled for the vault
         assert!(global.config.enable_mint == true, ERR_NOT_ENABLED);
-        // Ensure staked SUI amount is above the minimum threshold
-        assert!(staking_pool::staked_sui_amount(&staked_sui) >= MIN_AMOUNT, ERR_MIN_THRESHOLD);
+        // Ensure SUI amount is above the minimum threshold
+        assert!(coin::value(&sui) >= global.config.min_amount, ERR_MIN_THRESHOLD);
 
-        // Check if the staked SUI is staked on a valid staking pool
-        let pool_id = staking_pool::pool_id(&staked_sui);
-        assert!(vector::contains(&global.config.staking_pool_ids, &pool_id), ERR_UNAUTHORIZED_POOL);
+        let input_amount = coin::value(&sui);
 
-        // Extract principal amount of staked SUI
-        let principal_amount = staking_pool::staked_sui_amount(&staked_sui);
+        // Deposit SUI into the object
+        balance::join<SUI>(&mut global.pending_stake, coin::into_balance(sui));
 
         // Apply deposit cap if defined
         if (option::is_some(&global.config.deposit_cap)) {
-            assert!( *option::borrow(&global.config.deposit_cap) >= principal_amount, ERR_DEPOSIT_CAP);
-            *option::borrow_mut(&mut global.config.deposit_cap) = *option::borrow(&global.config.deposit_cap)-principal_amount;
+            assert!( *option::borrow(&global.config.deposit_cap) >= input_amount, ERR_DEPOSIT_CAP);
+            *option::borrow_mut(&mut global.config.deposit_cap) = *option::borrow(&global.config.deposit_cap)-input_amount;
         };
-
-        // Calculate total earned amount until current epoch
-        let total_earned = 
-            if (tx_context::epoch(ctx) > staking_pool::stake_activation_epoch(&staked_sui))
-                stake_data_provider::earnings_from_staked_sui(wrapper, &staked_sui, tx_context::epoch(ctx))
-            else 0;
-
-        let input_value = principal_amount+total_earned;
+        
         let lp_supply = balance::supply_value(&global.reserve.lp_supply);
         let current_balance = current_balance_with_rewards(wrapper, &global.reserve.staked_sui, tx_context::epoch(ctx));
 
         // Calculate the amount of LP tokens to mint
         let lp_amount_to_mint = if (lp_supply == 0) {
             // Check if initial liquidity is sufficient.
-            assert!(input_value > MINIMAL_LIQUIDITY, ERR_LIQUID_NOT_ENOUGH);
+            assert!(input_amount > MINIMAL_LIQUIDITY, ERR_LIQUID_NOT_ENOUGH);
 
             let minimal_liquidity = balance::increase_supply(
                 &mut global.reserve.lp_supply,
@@ -269,20 +283,20 @@ module legato::vault {
             );
             balance::join(&mut global.reserve.min_liquidity, minimal_liquidity);
             // Calculate the initial LP amount
-            input_value - MINIMAL_LIQUIDITY
+            input_amount - MINIMAL_LIQUIDITY
         } else {
-            let ratio = fixed_point64::create_from_rational((input_value as u128) , (current_balance as u128));
+            let ratio = fixed_point64::create_from_rational((input_amount as u128) , (current_balance as u128));
             let total_share = fixed_point64::multiply_u128( (lp_supply as u128) , ratio);
             (total_share as u64)
         };
 
-        // Lock Staked SUI
-        table_vec::push_back<StakedSui>(&mut global.reserve.staked_sui, staked_sui); 
-        if (table_vec::length(&global.reserve.staked_sui) > 1) sort_items(&mut global.reserve.staked_sui);
-
         // Update balances for the frontend to fetch
-        global.current_balance_with_rewards = current_balance+input_value;
+        global.current_balance_with_rewards = current_balance+input_amount;
         global.total_lp_amount = lp_supply+lp_amount_to_mint;
+
+        if (global.config.enable_auto_stake == true) {
+            transfer_stake(wrapper, global, ctx);
+        };
 
         (mint_lp( &mut global.reserve, lp_amount_to_mint, ctx))
     }
@@ -298,7 +312,7 @@ module legato::vault {
 
     // ======== Only Governance =========
 
-    // Updates the minimum amount required to stake and unstake 
+    // Updates the minimum amount required to stake and unstake
     public entry fun update_min_amount(global: &mut VaultGlobal, _manager_cap: &mut ManagerCap, new_value: u64 ) {
         assert!( new_value > 0, ERR_ZERO_VALUE );
         global.config.min_amount = new_value;
@@ -330,6 +344,17 @@ module legato::vault {
         global.config.enable_redeem = is_enable;
     }
 
+    // Enable of Disable Auto-Staking
+    public entry fun enable_auto_stake(global: &mut VaultGlobal, _manager_cap: &mut ManagerCap, is_enable: bool) {
+        global.config.enable_auto_stake = is_enable;
+    }
+
+    // Update the batch amount for staking.
+    public entry fun update_batch_amount(global: &mut VaultGlobal, _manager_cap: &mut ManagerCap, new_amount: u64) {
+        assert!( new_amount > 0, ERR_ZERO_VALUE );
+        global.config.batch_amount = new_amount;
+    }
+
     // To add a supported staking pool
     public entry fun attach_pool(global: &mut VaultGlobal, _manager_cap: &mut ManagerCap, pool_address: address, pool_id: ID) {
         // Ensure that the pool address is not already in the list
@@ -359,10 +384,9 @@ module legato::vault {
         transfer::public_transfer(coin::from_balance(withdrawn_balance, ctx), tx_context::sender(ctx));
     }
 
-
     // Restake SUI from the redemption pool to the staking pool 
     public entry fun restake(wrapper: &mut SuiSystemState, global: &mut VaultGlobal, _manager_cap: &mut ManagerCap,  restake_amount: u64, ctx: &mut TxContext ) {
-        assert!(restake_amount >= MIN_AMOUNT, ERR_MIN_THRESHOLD);
+        assert!(restake_amount >= global.config.min_amount, ERR_MIN_THRESHOLD);
         assert!(balance::value( &global.pending_withdrawal ) >= restake_amount , ERR_INSUFFICIENT);
  
         let validator_address = next_validator( global, restake_amount, ctx );
@@ -377,7 +401,7 @@ module legato::vault {
     public entry fun add_priority(global: &mut VaultGlobal, _manager_cap: &mut ManagerCap, pool_address: address, quota_amount: u64) {
         // Ensure that the pool address is in the list
         assert!(vector::contains(&global.config.staking_pools, &pool_address), ERR_UNAUTHORIZED_POOL);
-        assert!( quota_amount >= MIN_AMOUNT, ERR_MIN_THRESHOLD );
+        assert!( quota_amount >= global.config.min_amount, ERR_MIN_THRESHOLD );
 
         vector::push_back( 
             &mut global.config.priority_list,
