@@ -9,6 +9,7 @@
     "start": "run-p --print-label package:*",
     "build": "lerna run --parallel build",
     "test-sui-vault": "lerna run test --concurrency 1 --stream --scope sui-vault",
+    "test-sui-market": "lerna run test --concurrency 1 --stream --scope sui-market",
     "test-sui-amm": "lerna run test --concurrency 1 --stream --scope sui-amm",
     "test-sui-options": "lerna run test --concurrency 1 --stream --scope sui-options",
     "test-aptos-vault": "lerna run test --concurrency 1 --stream --scope aptos-vault",
