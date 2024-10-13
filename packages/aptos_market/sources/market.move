@@ -143,6 +143,7 @@ module market_addr::market {
         bet_outcome: u8,
         bet_amount: u64,
         placing_odds: u64,
+        position_id: u64,
         timestamp: u64,
         sender: address
     }
@@ -347,6 +348,7 @@ module market_addr::market {
                 bet_outcome,
                 bet_amount,
                 placing_odds,
+                position_id: new_position_id,
                 timestamp: timestamp::now_seconds(),  
                 sender: signer::address_of(sender)
             }
@@ -414,6 +416,7 @@ module market_addr::market {
         let global = borrow_global_mut<MarketManager>(@market_addr);
         let config_object_signer = object::generate_signer_for_extending(&global.extend_ref);
         assert!(global.is_paused == false, ERR_PAUSED);
+        assert!(lp_amount >= global.liquidity_pool.min_amount, ERR_TOO_LOW);
         assert!( primary_fungible_store::balance( signer::address_of(sender), global.liquidity_pool.lp_metadata ) >= lp_amount , ERR_INSUFFICIENT_AMOUNT );
 
         let lp_supply = option::destroy_some(fungible_asset::supply(global.liquidity_pool.lp_metadata));
