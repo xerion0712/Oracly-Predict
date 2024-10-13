@@ -534,6 +534,90 @@ module legato_market::market {
 
     }
 
+     public entry fun get_total_vault_locked(global: &MarketGlobal) : u64 {
+        balance::value( &global.liquidity_pool.vault_balance)
+    }
+
+    public entry fun get_total_vault_balance(global: &MarketGlobal, vault_global: &VaultGlobal) : u64 {
+        let total_vault_locked = balance::value( &global.liquidity_pool.vault_balance);
+        let current_staking_amount = get_current_staking_amount( vault_global, total_vault_locked );
+        let current_balance = current_staking_amount+balance::value( &global.pending_fulfil );
+        (current_balance)
+    }
+
+    public entry fun check_betting_capacity(global: &MarketGlobal): u64 {
+        (global.max_capacity)
+    }
+
+    public entry fun get_current_round(global: &MarketGlobal) : u64 {
+        (global.current_round)
+    }
+
+    public entry fun get_market_info(global: &MarketGlobal, round: u64, market_type: u8): (vector<u64>, vector<u64>, bool, u8, u64, u64, u64) {
+        (get_market_info_internal(global, round, market_type))
+    }
+
+    public entry fun get_market_adjusted_probabilities(global: &MarketGlobal, round: u64, market_type: u8) : (vector<u64>) {
+        let (liquidity_outcome_list, p_outcome_list, _, _, _, ratio, total_liquidity ) = get_market_info_internal(global, round, market_type);
+        let global_weight = global.weight;
+
+        let mut output = vector::empty<u64>();
+        let mut count = 0;
+
+        while (count < 4) {
+            let l_outcome = *vector::borrow( &liquidity_outcome_list, count );
+            let p_outcome = *vector::borrow( &p_outcome_list, count );
+            let p_adjusted = calculate_p_adjusted(p_outcome, global_weight, l_outcome, total_liquidity, ratio );
+            vector::push_back(&mut output, p_adjusted);
+            count = count+1;
+        };
+
+        (output)
+    }
+
+    public entry fun get_bet_position_ids(global: &MarketGlobal, market_type: u8, user_address: address): (vector<u64>) {
+        assert!( market_type == 0 || market_type == 1 || market_type == 2, ERR_INVALID_VALUE);
+
+        let mut count = 0;
+        let mut result = vector::empty<u64>();
+
+        while ( count < table::length( &global.positions) ) {
+            let this_position = table::borrow( &global.positions, count );
+            if ( market_type == this_position.market_type && user_address == this_position.holder ) {
+                vector::push_back( &mut result, count );
+            };
+            count = count+1;
+        };
+
+        result
+    }
+
+    public entry fun get_bet_position(global: &MarketGlobal, position_id: u64): (u8, u64, u64, u8, u64, u64, bool ) {
+        let entry = table::borrow( &global.positions, position_id );
+        ( entry.market_type, entry.placing_odds, entry.amount, entry.predicted_outcome, entry.round, entry.epoch, entry.is_open )
+    }
+
+    public entry fun check_payout_amount( global: &MarketGlobal, round: u64, market_type: u8, from_id: u64, until_id: u64, ctx: &mut TxContext  )  : (u64, u64) {
+        let (_, amount_list , _) = list_winners_and_payouts( global, round, market_type, from_id, until_id, ctx );
+        let mut total_amount = 0;
+        let mut count = 0;
+        let length = vector::length(&amount_list);
+
+        while (count < length) {
+            total_amount = total_amount+*vector::borrow( &amount_list, count );
+            count = count+1;
+        };
+
+        (length, total_amount)
+    }
+
+    public entry fun total_bet_positions(global: &MarketGlobal) : u64 {
+        (table::length(&global.positions))
+    }
+
+    public entry fun available_for_immediate_payout(global: &MarketGlobal): u64 {
+        (balance::value( &global.pending_fulfil ))
+    }
 
     // ======== Public Functions =========
 
@@ -557,6 +641,8 @@ module legato_market::market {
         global.current_staking_amount = current_staking_amount;
         global.current_fulfil_amount = balance::value( &global.pending_fulfil );
     }
+
+   
 
     // ======== Only Governance =========
 
@@ -585,7 +671,7 @@ module legato_market::market {
     }
 
     // To top-up SUI into the fulfilment pool
-    public entry fun topup_fulfilment_pool(global: &mut MarketGlobal, _manager_cap: &mut ManagerCap, coin: Coin<SUI>, _ctx: &mut TxContext) {
+    public entry fun topup_fulfilment_pool(global: &mut MarketGlobal, coin: Coin<SUI>) {
         let balance = coin::into_balance(coin);
         balance::join<SUI>(&mut global.pending_fulfil, balance);
     }
