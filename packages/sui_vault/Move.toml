@@ -11,3 +11,6 @@ LegatoMath = {  git = "https://github.com/tamago-labs/legato-math.git", subdir =
 
 [addresses]
 legato = "0x0"
+legato_math = "0x98d9d3e7b644182c87310ba8c6c7fdb4a2f2338cd0db58d7e6fa88e562129318"
+sui="0x2"
+sui_system = "0x3"
