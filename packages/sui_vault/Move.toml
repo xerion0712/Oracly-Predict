@@ -9,6 +9,6 @@ SuiSystem = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/su
 LegatoMath = {  git = "https://github.com/tamago-labs/legato-math.git", subdir = "packages/sui", rev = "main"  }
 
 [addresses]
-legato = "0x0"
+legato = "0x6af6e028c1bb66e821c532b6832665f369fb33d517763b441fe061d71fc25c78"
 sui="0x2"
 sui_system = "0x3"
