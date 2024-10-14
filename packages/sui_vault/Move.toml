@@ -1,6 +1,7 @@
 [package]
 name = "LegatoVault"
 version = "0.2"
+published-at = "0x6af6e028c1bb66e821c532b6832665f369fb33d517763b441fe061d71fc25c78"
 edition = "2024.beta"
 
 [dependencies]
