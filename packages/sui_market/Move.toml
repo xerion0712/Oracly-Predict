@@ -2,6 +2,7 @@
 name = "legato-market"
 version = "0.1.0"
 edition = "2024.beta"
+published-at = "0x7e4b84ff3beaf25bfc66a85380d23a659dc12be49739954651b2caed67829698"
 
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/mainnet" }
@@ -10,6 +11,4 @@ LegatoMath = {  git = "https://github.com/tamago-labs/legato-math.git", subdir =
 LegatoVault = {  git = "https://github.com/tamago-labs/legato-finance.git", subdir = "packages/sui_vault", rev = "main"  }
 
 [addresses]
-legato_market = "0x98d9d3e7b644182c87310ba8c6c7fdb4a2f2338cd0db58d7e6fa88e562129318" 
-sui="0x2"
-sui_system = "0x3"
+legato_market = "0x0" 
