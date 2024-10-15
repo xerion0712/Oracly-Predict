@@ -979,6 +979,7 @@ module legato_market::market {
 
             (result as u64)
         } else {
+            // TODO: Checks whether we need to apply normalization
             p_outcome
         }
 
