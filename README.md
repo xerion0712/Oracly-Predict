@@ -1,7 +1,0 @@
-# Legato
-
-（REWORK IN PROGRESS）
-
-
-
-
