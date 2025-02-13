@@ -89,17 +89,7 @@ const MarketDetailsModal = ({ visible, close, currentMarket }: IMarketModal) => 
 
 
     const [description, setDescription] = useState("");
-
-    // const [state, generateRecipe] =
-    //     useAIGeneration("GenerateRecipe");
-
-    // const { data, isLoading, hasError } = state
-
-    // const handleClick = useCallback(async () => {
-    //     generateRecipe({ description });
-    // }, [description])
-
-    // console.log("data : ", state)
+ 
 
     return (
         <BaseModal
@@ -160,43 +150,8 @@ const MarketDetailsModal = ({ visible, close, currentMarket }: IMarketModal) => 
                                                     </div>
                                                 )
                                             })}
-                                        </div>
-
-                                    </div>
-
-
-                                    <div className="flex flex-grow">
-                                        <div className="m-auto bg-white">
-                                            {/* Analytics will be available soon */}
-                                            {/* <Flex direction="column ">
-                                                <Flex direction="row">
-                                                    <TextAreaField
-                                                        autoResize
-                                                        value={description}
-                                                        onChange={(e) => setDescription(e.target.value)}
-                                                        label="Description"
-                                                    />
-                                                    <Button onClick={handleClick}>Generate recipe</Button>
-                                                </Flex>
-                                                {isLoading ? (
-                                                    <Loader variation="linear" />
-                                                ) : (
-                                                    <>
-                                                        <Text fontWeight="bold">{data?.name}</Text>
-                                                        <View as="ul">
-                                                            {data?.ingredients?.map((ingredient) => (
-                                                                <View as="li" key={ingredient}>
-                                                                    {ingredient}
-                                                                </View>
-                                                            ))}
-                                                        </View>
-                                                        <Text>{data?.instructions}</Text>
-                                                    </>
-                                                )}
-                                            </Flex> */}
-                                        </div>
-                                    </div>
-
+                                        </div> 
+                                    </div> 
                                 </div>
 
                                 <div className="col-span-2">

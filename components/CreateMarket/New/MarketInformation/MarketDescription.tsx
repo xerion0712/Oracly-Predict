@@ -1,66 +1,66 @@
 
-import useDatabase from "@/hooks/useDatabase"
-import { generateClient } from "aws-amplify/api";
-import { Schema } from "@/amplify/data/resource";
-import { createAIHooks } from "@aws-amplify/ui-react-ai";
-import { useCallback, useEffect, useState } from "react";
+// import useDatabase from "@/hooks/useDatabase"
+// import { generateClient } from "aws-amplify/api";
+// import { Schema } from "@/amplify/data/resource";
+// import { createAIHooks } from "@aws-amplify/ui-react-ai";
+// import { useCallback, useEffect, useState } from "react";
 
-import { Puff } from 'react-loading-icons'
+// import { Puff } from 'react-loading-icons'
 
-const client = generateClient<Schema>({ authMode: "apiKey" });
-const { useAIConversation, useAIGeneration } = createAIHooks(client);
+// const client = generateClient<Schema>({ authMode: "apiKey" });
+// const { useAIConversation, useAIGeneration } = createAIHooks(client);
 
 
 const MarketDescription = ({ marketDescription, resource, dispatch }: any) => {
 
-    const [state, suggestTitle] = useAIGeneration("MarketCreationAI")
+    // const [state, suggestTitle] = useAIGeneration("MarketCreationAI")
 
-    const { data, isLoading, hasError } = state
+    // const { data, isLoading, hasError } = state
 
-    const [errorMessage, setErrorMessage] = useState<any>()
-    const [loading, setLoading] = useState<boolean>(false) 
+    // const [errorMessage, setErrorMessage] = useState<any>()
+    // const [loading, setLoading] = useState<boolean>(false) 
 
-    const { crawl } = useDatabase()
+    // const { crawl } = useDatabase()
 
-    const onSuggest = useCallback(async () => {
+    // const onSuggest = useCallback(async () => {
 
-        setErrorMessage(undefined)
+    //     setErrorMessage(undefined)
 
-        if (!resource) {
-            setErrorMessage("Please select a resource")
-            return
-        }
+    //     if (!resource) {
+    //         setErrorMessage("Please select a resource")
+    //         return
+    //     }
 
-        setLoading(true)
+    //     setLoading(true)
 
-        try {
+    //     try {
 
-            const context = await crawl(resource)
+    //         const context = await crawl(resource)
 
-            const prompt = [
-                "Suggest a DeFi prediction market title that will be resolved in 7 days",
-                "similar to 'What will the price of BTC be on Feb 1, 2025?'. The current date is ",
-                `${(new Date().toDateString())}.`,
-                "Use the following context:",
-                context
-            ].join("")
+    //         const prompt = [
+    //             "Suggest a DeFi prediction market title that will be resolved in 7 days",
+    //             "similar to 'What will the price of BTC be on Feb 1, 2025?'. The current date is ",
+    //             `${(new Date().toDateString())}.`,
+    //             "Use the following context:",
+    //             context
+    //         ].join("")
 
-            suggestTitle({ description: prompt })
+    //         suggestTitle({ description: prompt })
 
-        } catch (e: any) {
-            console.log(e)
-            setErrorMessage(`${e.message}`)
-        }
+    //     } catch (e: any) {
+    //         console.log(e)
+    //         setErrorMessage(`${e.message}`)
+    //     }
 
-        setLoading(false)
+    //     setLoading(false)
 
-    }, [resource])
+    // }, [resource])
 
-    useEffect(() => {
-        if (data && data.result) {
-            dispatch({ marketDescription: `${data.result}` })
-        }
-    }, [data])
+    // useEffect(() => {
+    //     if (data && data.result) {
+    //         dispatch({ marketDescription: `${data.result}` })
+    //     }
+    // }, [data])
 
     return (
         <div className="grid grid-cols-7 mt-4">
@@ -69,7 +69,7 @@ const MarketDescription = ({ marketDescription, resource, dispatch }: any) => {
                     Description:
                 </div>
             </div>
-            <div className="col-span-3">
+            {/* <div className="col-span-3">
                 <textarea
                     rows={3}
                     value={marketDescription}
@@ -103,7 +103,7 @@ const MarketDescription = ({ marketDescription, resource, dispatch }: any) => {
             </div>
             <div className="col-span-2 flex px-4">
                 {errorMessage && <p className="text-sm py-2 pb-0 text-center text-secondary">{errorMessage}</p>}
-            </div>
+            </div> */}
 
         </div>
     )
