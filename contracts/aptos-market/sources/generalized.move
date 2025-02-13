@@ -599,9 +599,31 @@ module legato_market::generalized {
         global.treasury_address = new_address;
     }
 
-    // TODO: emergency withdraw
+    // Emergency withdraw funds from the given market
+    public entry fun emergency_withdraw(sender: &signer,  market_id: u64, withdraw_amount: u64) acquires MarketManager {
+        assert!( signer::address_of(sender) == @legato_market , ERR_UNAUTHORIZED);
+        let global = borrow_global_mut<MarketManager>(@legato_market); 
+        assert!( table_with_length::contains( &global.markets, market_id ), ERR_NOT_FOUND);
+        let market_store = table_with_length::borrow_mut(&mut global.markets, market_id); 
+        let bet_token_metadata = fungible_asset::store_metadata(market_store.bet_pool);
+        let pool_signer = object::generate_signer_for_extending(&global.extend_ref);
 
-    // TODO: emerygency topup
+        let token_out = fungible_asset::withdraw(&pool_signer, market_store.bet_pool, withdraw_amount);
+        primary_fungible_store::ensure_primary_store_exists(signer::address_of(sender), bet_token_metadata);
+        let store = primary_fungible_store::primary_store(signer::address_of(sender), bet_token_metadata);
+        fungible_asset::deposit(store, token_out);
+    }
+
+    // Emergency deposit funds to the given market
+    public entry fun emergency_deposit(sender: &signer, market_id: u64, deposit_amount: u64) acquires MarketManager {
+        assert!( signer::address_of(sender) == @legato_market , ERR_UNAUTHORIZED);
+        let global = borrow_global_mut<MarketManager>(@legato_market); 
+        assert!( table_with_length::contains( &global.markets, market_id ), ERR_NOT_FOUND);
+        let market_store = table_with_length::borrow_mut(&mut global.markets, market_id); 
+        let bet_token_metadata = fungible_asset::store_metadata(market_store.bet_pool);
+        let input_token = primary_fungible_store::withdraw(sender, bet_token_metadata, deposit_amount);
+        fungible_asset::deposit(market_store.bet_pool, input_token);
+    }
 
     // Updates the winning fee.
     public entry fun update_winning_fee(sender: &signer, new_value: u64) acquires MarketManager {
