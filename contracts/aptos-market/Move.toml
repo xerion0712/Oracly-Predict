@@ -1,0 +1,19 @@
+[package]
+name = "legato-market"
+version = "1.0.0"
+authors = []
+
+[addresses]
+legato_market="3de3ff1f80b7fce6dff30ebddedf09977328a0b4f958a6d942731a696816cb31"
+aptos_framework = "0x1"
+aptos_fungible_asset = "0xA"
+
+
+[dev-addresses]
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "mainnet"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dev-dependencies]
