@@ -23,7 +23,8 @@ const schema = a.schema({
       resource: a.hasOne('Resource', "marketId"),
       category: a.string(),
       tags: a.string().array(),
-      currency: a.string()
+      currency: a.string(),
+      comments: a.hasMany('Comment', "marketId"),
     })
     .authorization((allow) => [allow.publicApiKey()]),
   Comment: a.model({
