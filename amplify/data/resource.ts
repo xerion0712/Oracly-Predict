@@ -25,7 +25,8 @@ const schema = a.schema({
       tags: a.string().array(),
       currency: a.string(),
       comments: a.hasMany('Comment', "marketId"),
-      positions: a.hasMany('Position', "marketId")
+      positions: a.hasMany('Position', "marketId"),
+      outcomes: a.hasMany('Outcome', "marketId")
     })
     .authorization((allow) => [allow.publicApiKey()]),
   Comment: a.model({
