@@ -17,7 +17,7 @@ enum Menu {
 }
 
 const ProfileContainer = () => {
-    
+
     const [tab, setTab] = useState<Menu>(Menu.PROFILE)
 
     const router = useRouter()
@@ -35,9 +35,16 @@ const ProfileContainer = () => {
 
     return (
         <div>
-            <div className="w-full px-1.5 grid grid-cols-1 lg:grid-cols-3">
+            <div className="  mx-auto w-full max-w-lg pt-2">
 
-                <div className='col-span-1 grid grid-cols-5 '>
+                <Overview profile={currentProfile} />
+                <div className="py-2 pt-2.5 px-1">
+                    <button onClick={handleSignOut} type="button" className="btn mx-auto bg-white py-3.5 w-full rounded-lg my-2">
+                        Sign out
+                    </button>
+                </div>
+
+                {/* <div className='col-span-1 grid grid-cols-5 '>
                     <div className='col-span-4 flex flex-col'>
                         <div onClick={() => setTab(Menu.PROFILE)} className={`py-2.5 px-2 cursor-pointer border-0 border-b-2 border-gray/20 ${tab === Menu.PROFILE && "font-semibold  text-secondary"}`}>
                             Overview
@@ -70,16 +77,14 @@ const ProfileContainer = () => {
                     {tab === Menu.WALLET && (
                         <div className="bg-black/90 rounded-lg p-6">
                             <h2 className="text-xl font-semibold text-white mb-4">Connected Wallets</h2>
-                            {/* Wallet content will be implemented later */}
                         </div>
                     )}
                     {tab === Menu.POSITION && (
                         <div className="bg-black/90 rounded-lg p-6">
                             <h2 className="text-xl font-semibold text-white mb-4">Your Positions</h2>
-                            {/* Positions content will be implemented later */}
                         </div>
                     )}
-                </div>
+                </div> */}
 
             </div>
 

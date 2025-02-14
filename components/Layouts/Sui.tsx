@@ -9,9 +9,7 @@ const SuiLayout = ({ children }: PropsWithChildren) => {
 
     return (
         <WalletProvider>
-            <MainLayout>
-                {children}
-            </MainLayout>
+            {children}
         </WalletProvider>
     )
 }

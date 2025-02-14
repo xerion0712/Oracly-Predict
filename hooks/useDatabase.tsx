@@ -11,29 +11,26 @@ const app = new FirecrawlApp({ apiKey: FIRECRAWL_API_KEY });
 
 const useDatabase = () => {
 
-    const getProfile = async (userId: string) => {
+    const getProfile = async (userId: string) => { 
+        const user = await client.models.User.list({
+            filter: {
+                username: {
+                    eq: userId
+                }
+            }
+        })
 
-        // const user = await client.models.User.list({
-        //     filter: {
-        //         username: {
-        //             eq: userId
-        //         }
-        //     }
-        // })
-
-        // if (user.data.length === 0) {
-        //     const newUser = {
-        //         username: userId,
-        //         credits: 100
-        //     }
-        //     await client.models.User.create({
-        //         ...newUser
-        //     })
-        //     return newUser
-        // } else {
-        //     return user.data[0]
-        // }
-        return undefined
+        if (user.data.length === 0) {
+            const newUser = {
+                username: userId
+            }
+            await client.models.User.create({
+                ...newUser
+            })
+            return newUser
+        } else {
+            return user.data[0]
+        } 
     }
 
     const getMarkets = async (chainId: string) => {

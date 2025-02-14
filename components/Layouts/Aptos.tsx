@@ -31,9 +31,7 @@ const AptosLayout = ({ children }: PropsWithChildren) => {
             plugins={wallets}
             autoConnect={true}
         >
-            <MainLayout>
-                {children}
-            </MainLayout>
+            {children}
         </AptosWalletAdapterProvider>
     )
 }

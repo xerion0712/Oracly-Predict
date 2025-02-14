@@ -20,7 +20,7 @@ const Overview = ({ profile }: any) => {
                 </div>
                 <div className="col-span-5">
                     <BadgePurple>
-                        {profile && profile.role}
+                        {profile && profile.role || "USER"}
                     </BadgePurple>
                 </div>
             </div>
