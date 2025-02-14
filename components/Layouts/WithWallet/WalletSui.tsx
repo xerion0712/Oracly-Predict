@@ -34,7 +34,7 @@ const WalletSui = ({ showWallet }: IWalletSui) => {
     return (
         <>
 
-            {connected && (
+            {/* {connected && (
                 <BaseModal
                     visible={!isMainnet}
                     close={() => { }}
@@ -51,7 +51,7 @@ const WalletSui = ({ showWallet }: IWalletSui) => {
 
                     </div>
                 </BaseModal>
-            )}
+            )} */}
 
             <div className="grid grid-cols-1 lg:grid-cols-5">
                 <div className={` ${showWallet ? "col-span-4" : "col-span-5"} `}>

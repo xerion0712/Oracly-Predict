@@ -95,14 +95,14 @@ const BaseOverview = ({ network }: any) => {
                             <span className="font-bold mr-2">Total Liquidity:</span>
                             <div className={`flex flex-row  text-white text-sm `}>
                                 {/* ${(balance).toLocaleString()} */}
-                                $10,000
+                                -
                             </div>
                         </div>
                         <div className=" py-0.5 text-sm  flex flex-row">
                             <span className="font-bold mr-2">Base/Boost APR:</span>
                             <div className={` flex flex-row  text-white text-sm `}>
                                 {/* {capacity.toLocaleString()} {(symbol)} */}
-                                3%/5%
+                                -%
                             </div>
                         </div>
                         {/* <div className=" py-0.5 text-sm  flex flex-row">
@@ -124,14 +124,14 @@ const BaseOverview = ({ network }: any) => {
             <div className="mt-2 flex flex-row  ">
                 <div className="relative mt-auto mb-auto">
                     <div className="w-3 h-3 bg-secondary rounded-full"></div>
-                    <div className="w-3 h-3 bg-secondary rounded-full absolute top-0 left-0 animate-ping"></div>
-                    <div className="w-3 h-3 bg-secondary rounded-full absolute top-0 left-0 animate-pulse"></div>
+                    {/* <div className="w-3 h-3 bg-secondary rounded-full absolute top-0 left-0 animate-ping"></div>
+                    <div className="w-3 h-3 bg-secondary rounded-full absolute top-0 left-0 animate-pulse"></div> */}
                 </div>
                 <div className="font-semibold my-auto mx-2.5 ">
                     Status
                 </div>
                 <div className=" text-white my-auto flex flex-row">
-                    Active
+                    Inactive
                 </div>
                 <div className="ml-auto text-white  my-auto flex flex-row  pt-[2px] pr-2  text-sm sm:text-lg">
                     <img className="h-5 w-5 mt-auto mb-auto ml-2 rounded-full" src={network === "sui" ? "/assets/images/sui-sui-logo.svg" : "/assets/images/aptos-logo.png"} alt="" />

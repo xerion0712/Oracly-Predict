@@ -61,7 +61,7 @@ const WalletAptos = ({ showWallet }: IWalletAptos) => {
     return (
         <>
 
-            <BaseModal
+            {/* <BaseModal
                 visible={network ? network.name !== "mainnet" : false}
                 close={() => { }}
                 title="Wrong Network"
@@ -76,7 +76,7 @@ const WalletAptos = ({ showWallet }: IWalletAptos) => {
                     </div>
 
                 </div>
-            </BaseModal>
+            </BaseModal> */}
 
             <div className="grid grid-cols-1 lg:grid-cols-5">
                 <div className={` ${showWallet ? "col-span-4" : "col-span-5"} `}>

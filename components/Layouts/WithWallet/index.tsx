@@ -5,6 +5,7 @@ import Link from 'next/link';
 import WalletSui from './WalletSui';
 import WalletAptos from './WalletAptos';
 import SelectNetwork from "@/modals/selectNetwork";
+import BaseModal from "@/modals/base"
 
 interface IWithWalletPanel {
     children: ReactNode
@@ -17,6 +18,8 @@ interface IWithWalletPanel {
 }
 
 const WithWalletPanel = ({ children, pageName, title1, title2, info, href, showWallet = true }: IWithWalletPanel) => {
+
+    const [disclaimer, setDisclaimer] = useState(true)
 
     const [modal, setModal] = useState(false)
 
@@ -32,6 +35,23 @@ const WithWalletPanel = ({ children, pageName, title1, title2, info, href, showW
 
     return (
         <>
+
+            <BaseModal
+                visible={disclaimer}
+                close={() => setDisclaimer(false)}
+                title="On Maintenance"
+                maxWidth="max-w-lg"
+            >
+                <div className="p-2 px-0 text-center">
+                    <p>Legato Vault is currently undergoing maintenance. Please check back later or follow our updates.</p>
+                    <div className="px-2  pt-3">
+                        <li className="text-sm text-secondary font-semibold">
+                        Temporarily unavailable
+                        </li>
+                    </div>
+
+                </div>
+            </BaseModal>
 
             <SelectNetwork
                 visible={modal}

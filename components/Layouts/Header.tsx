@@ -44,7 +44,7 @@ const Header = (props: any) => {
         })()
     }, [])
 
-    useEffect(() => {
+    useEffect(() => { 
         if (user && user.loginId) {
             loadProfile(user.loginId)
         }
@@ -74,7 +74,7 @@ const Header = (props: any) => {
                                     </svg>
                                 </button>
                             </div>
-                            <ul onClick={() => toggleMenu()} className=' flex justify-between max-w-sm w-full mx-0 lg:mx-8 '>
+                            <ul onClick={() => toggleMenu()} className=' flex justify-between max-w-[300px] w-full mx-auto '>
                                 <li className=' '>
                                     <Link href="/" className={router.pathname === '/' ? 'active' : ''}>
                                         Home
@@ -89,17 +89,7 @@ const Header = (props: any) => {
                                     <Link href={`/vault/${currentNetwork}`} className={router.pathname === '/vault' || router.pathname.includes('vault') ? 'active' : ''}>
                                         Vault
                                     </Link>
-                                </li>
-                                <li>
-                                    <Link href={`/leaderboard`} className={router.pathname === '/leaderboard' || router.pathname.includes('leaderboard') ? 'active' : ''}>
-                                        Leaderboard
-                                    </Link>
-                                </li>
-                                {/* <li>
-                                    <Link href={`/tools`} className={router.pathname === '/tools' || router.pathname.includes('tools') ? 'active' : ''}>
-                                        My Markets
-                                    </Link>
-                                </li> */}
+                                </li> 
                             </ul>
                             <div className='flex flex-row ml-auto'>
 
