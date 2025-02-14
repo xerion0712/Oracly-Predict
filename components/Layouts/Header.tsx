@@ -81,7 +81,7 @@ const Header = (props: any) => {
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href={`/markets/${currentNetwork}`} className={router.pathname === '/markets' || router.pathname.includes('/markets') ? 'active' : ''}>
+                                    <Link href={`/markets`} className={router.pathname === '/markets' || router.pathname.includes('/markets') ? 'active' : ''}>
                                         Explore
                                     </Link>
                                 </li>
