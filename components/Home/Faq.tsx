@@ -8,7 +8,7 @@ const DATA = [
     {
         id: 1,
         question: 'What is the status of the project?',
-        answer: 'We are at the early stage and while our liquidity may be limited, your support by using even a small amount of tokens is crucial to our growth journey.',
+        answer: 'We are at the early stage and continuously improving the platform, your support by using even a small amount of tokens is crucial to our growth journey.',
     },
     {
         id: 2,
@@ -20,16 +20,16 @@ const DATA = [
         question: 'How does AI work in DeFi?',
         answer: 'AI is used to produce constant variables that matter for each DeFi service. For instance, in liquid staking, the engine collects unstructured data like news feeds combines with structured data like current staked amounts and trading volume and uses AI to determine the best validator to stake with.',
     },
-    {
-        id: 6,
-        question: "How Legato DEX works?",
-        answer: "Legato decentralized exchange is based on custom weight AMM, which allows anyone wanting to list tokens to set custom weights. This can help reduce initial capital on settlement assets like USDC or SUI by around 3x to 5x."
-    },
-    {
-        id: 7,
-        question: 'Has your smart contract been audited?',
-        answer: "The smart contract is currently being audited by the audit team at Tamago Labs. We will post the report on the website once it's completed.",
-    },
+    // {
+    //     id: 6,
+    //     question: "How Legato DEX works?",
+    //     answer: "Legato decentralized exchange is based on custom weight AMM, which allows anyone wanting to list tokens to set custom weights. This can help reduce initial capital on settlement assets like USDC or SUI by around 3x to 5x."
+    // },
+    // {
+    //     id: 7,
+    //     question: 'Has your smart contract been audited?',
+    //     answer: "The smart contract is currently being audited by the audit team at Tamago Labs. We will post the report on the website once it's completed.",
+    // },
     {
         id: 9,
         question: 'How can I contact your team?',
