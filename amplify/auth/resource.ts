@@ -14,9 +14,9 @@ export const auth = defineAuth({
       },
       callbackUrls: [
         'http://localhost:3000/auth/profile',
-        'https://legato.finance/auth/profile',
+        'https://www.legato.finance/auth/profile',
       ],
-      logoutUrls: ['http://localhost:3000/', 'https://legato.finance'],
+      logoutUrls: ['http://localhost:3000/', 'https://www.legato.finance'],
     }
   },
 });
