@@ -60,6 +60,7 @@ const schema = a.schema({
     title: a.string(),
     resolutionDate: a.datetime(),
     status: a.enum(["PENDING", "WIN", "LOSE", "CANCELLED"]),
+    crawledDataAtCreated: a.string(),
     result: a.string()
   }).authorization((allow) => [allow.publicApiKey()]),
   Resource: a.model({
