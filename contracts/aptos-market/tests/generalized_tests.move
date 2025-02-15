@@ -4,11 +4,8 @@
 module legato_market::generalized_tests {
 
     use std::signer;
-    use std::vector;
-    use std::features;
 
     use aptos_framework::account;
-    use aptos_framework::coin;
     use aptos_framework::timestamp;
     use aptos_framework::primary_fungible_store;
  

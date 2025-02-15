@@ -31,9 +31,9 @@ module legato_market::generalized {
     use aptos_std::fixed_point64::{Self }; 
     use aptos_std::table_with_length::{Self, TableWithLength};
     use aptos_framework::fungible_asset::{
-        Self, FungibleAsset, FungibleStore, Metadata, BurnRef, MintRef, TransferRef,
+        Self, FungibleStore, Metadata,
     };
-    use aptos_framework::object::{Self, ConstructorRef, Object, ExtendRef};
+    use aptos_framework::object::{Self, Object, ExtendRef};
     use aptos_framework::primary_fungible_store;
     use aptos_framework::timestamp;
     use aptos_framework::event;

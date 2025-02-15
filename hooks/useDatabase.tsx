@@ -62,30 +62,68 @@ const useDatabase = () => {
         return resources.data
     }
 
+    const getOutcomes = async (marketId: string) => {
+        const resources = await client.models.Outcome.list({
+            filter: {
+                marketId: {
+                    eq: marketId
+                }
+            }
+        })
+        return resources.data
+    }
+
+    const addOutcome = async ({ marketId, roundId, title, dataCrawled }: any) => {
+
+        const { data } = await client.models.Outcome.list()
+
+        const maxTeamId = data.reduce((result: number, item: any) => {
+            if (item.onchainId > result) {
+                result = item.onchainId
+            }
+            return result
+        }, 0)
+
+        const onchainId = maxTeamId + 1
+
+        await client.models.Outcome.create({
+            marketId,
+            onchainId,
+            roundId,
+            title,
+            crawledDataAtCreated: dataCrawled 
+        })
+
+    }
+
+
+
+
     const crawl = async (resource: any) => {
 
-        // let need_update = false
+        let need_update = false
 
-        // if (resource.last_crawled_at === undefined) {
-        //     need_update = true
-        // } else if ((new Date().valueOf() / 1000) - resource.last_crawled_at > 86400) {
-        //     need_update = true
-        // }
+        if (resource.lastCrawledAt === undefined) {
+            need_update = true
+        } else if ((new Date().valueOf() / 1000) - resource.lastCrawledAt > 86400) {
+            need_update = true
+        }
 
-        // if (need_update) {
+        if (need_update) {
 
-        //     const result: any = (await app.scrapeUrl(resource.url, { formats: ['markdown', 'html'] }))
+            const result: any = (await app.scrapeUrl(resource.url, { formats: ['markdown', 'html'] }))
 
-        //     await client.models.Resource.update({
-        //         id: resource.id,
-        //         last_crawled_at: Math.floor((new Date().valueOf()) / 1000),
-        //         crawled_data: result.markdown
-        //     })
+            await client.models.Resource.update({
+                id: resource.id,
+                lastCrawledAt: Math.floor((new Date().valueOf()) / 1000),
+                crawledData: result.markdown
+            })
 
-        // } else {
-        //     return resource.crawled_data
-        // }
-        return undefined
+            return result.markdown
+
+        } else {
+            return resource.crawledData
+        }
     }
 
     return {
@@ -93,7 +131,9 @@ const useDatabase = () => {
         getProfile,
         getMarkets,
         getResources,
-        getMarketsByCreator
+        getMarketsByCreator,
+        addOutcome,
+        getOutcomes
     }
 }
 

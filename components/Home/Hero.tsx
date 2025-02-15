@@ -138,6 +138,16 @@ const Hero = () => {
                                 Legato's AI tracks major trusted sources, letting you propose future outcomes and earn rewards when you're right
                             </p>
                         </div>
+                        <div className='mx-2 sm:mx-4 flex w-full mb-6'>
+                                    <Link href={`/markets`} className='mx-auto'>
+                                        <button type="button" className="btn bg-white text-xs sm:text-base flex rounded-lg px-6 py-3 sm:py-4 sm:px-12 flex-row hover:text-black hover:bg-white ">
+                                            <div className='my-auto'>
+                                                Explore{` `}
+                                            </div>
+                                            <ArrowRight size={18} className='mt-[3px] ml-1' />
+                                        </button>
+                                    </Link>
+                                </div>
                     </div>
                     <div className="px-6 sm:px-1">
 
@@ -192,7 +202,7 @@ const Hero = () => {
 
                         <div className='mx-2 sm:mx-6 flex mt-[20px] sm:mt-[40px]'>
                             <div className='flex flex-row  container'>
-                                <div className='mx-2 sm:mx-4'>
+                                {/* <div className='mx-2 sm:mx-4'>
                                     <Link href={`/markets`}>
                                         <button type="button" className="btn bg-white text-xs sm:text-base flex rounded-lg px-6 py-3 sm:py-4 sm:px-12 flex-row hover:text-black hover:bg-white ">
                                             <div className='my-auto'>
@@ -201,7 +211,7 @@ const Hero = () => {
                                             <ArrowRight size={18} className='mt-[3px] ml-1' />
                                         </button>
                                     </Link>
-                                </div>
+                                </div> */}
                                 {/* <div className=' '>
                                     <button type="button" className="btn bg-secondary  text-white text-xs sm:text-base flex rounded-lg px-6 py-3 sm:py-4 sm:px-12 flex-row hover:text-black hover:bg-white ">
                                         <div className='my-auto'>
