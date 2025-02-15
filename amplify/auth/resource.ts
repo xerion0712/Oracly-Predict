@@ -13,9 +13,10 @@ export const auth = defineAuth({
         clientSecret: secret('GOOGLE_CLIENT_SECRET')
       },
       callbackUrls: [
-        'http://localhost:3000/auth/profile'
+        'http://localhost:3000/auth/profile',
+        'http://legato.finance/auth/profile',
       ],
-      logoutUrls: ['http://localhost:3000/'],
+      logoutUrls: ['http://localhost:3000/, http://legato.finance'],
     }
   },
 });
