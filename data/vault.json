@@ -1,0 +1,58 @@
+[
+    {
+        "name": "sui",
+        "network": "sui",
+        "modules": {
+            "testnet": {
+                "packageId": "0xa2bddfde336d1e7c2f385d3009c815e18a204c127777f7c29f0c228db1e2b90f",
+                "managerCap": "0x37c151bebe75acbb266cc644e666ec7b3b2a721d5974b72436175f11c3c3154b",
+                "vaultGlobal": "0xe68fddd94a9532ce7edfe0f26105f19704e692cbad0cce6e030ef23a70461ff3"
+            },
+            "mainnet": {
+                "packageId": "0xd3b4dc330793d2297e1136b75ec457666d2ca436743e7fdffa6fa1c81bf63c74",
+                "managerCap": "0x38a2d47caf2a36995877a9c37be5339920ca0e5b0c525c9eec6ccb48684adf44",
+                "vaultGlobal": "0x8dbaeaad921ec2d164e0a6f11b42b7522668d633ae011dc471dc6462e96ea6b9"
+            }
+        },
+        "vaults": [
+            {
+                "icon": "/assets/images/legato-icon.png",
+                "name": "Legato Staked LP",
+                "description": "provide liquidity to counter bets and earn staking rewards from the network's validators with no fees",
+                "unstaking_delay": 4,
+                "available_asset": "SUI"
+            }
+        ]
+    },
+    {
+        "name": "aptos",
+        "network": "aptos",
+        "modules": {
+            "testnet": {
+                "packageId": "0x45fa42f6840a7032a97d4d66a45a776be0b8d73bb54182cee82cc41cc7d9a962",
+                "validators": [
+                    "0xa562415be88d9f08ba98fa3f6af9be0e36580c0f8fff5100a50b519e8f4a15c9",
+                    "0xfd47a2fb988c959839ea2fe4d7169b48536a42bf5e4933790701a08252ba2039"
+                ],
+                "lp_metadata": "0xb644db897dced9c8a462fe40b200617fcea49aaa3681bd7f6cb45554808c1fd4"
+            },
+            "mainnet": {
+                "packageId": "0x45fa42f6840a7032a97d4d66a45a776be0b8d73bb54182cee82cc41cc7d9a962",
+                "validators": [
+                    "0xa562415be88d9f08ba98fa3f6af9be0e36580c0f8fff5100a50b519e8f4a15c9",
+                    "0xfd47a2fb988c959839ea2fe4d7169b48536a42bf5e4933790701a08252ba2039"
+                ],
+                "lp_metadata": "0xb644db897dced9c8a462fe40b200617fcea49aaa3681bd7f6cb45554808c1fd4"
+            }
+        },
+        "vaults": [
+            {
+                "icon": "/assets/images/legato-icon.png",
+                "name": "Legato Staked LP",
+                "description": "provide liquidity to counter bets and earn staking rewards from the network's validators with no fees",
+                "unstaking_delay": 12,
+                "available_asset": "APT"
+            }
+        ]
+    }
+]

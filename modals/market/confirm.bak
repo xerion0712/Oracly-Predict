@@ -1,0 +1,113 @@
+import { useRouter } from 'next/router';
+import { useReducer } from 'react';
+
+const Confirm = () => {
+
+    const [values, dispatch] = useReducer(
+        (curVal: any, newVal: any) => ({ ...curVal, ...newVal }),
+        {
+            amount: 0,
+            errorMessage: undefined,
+            loading: false
+        }
+    )
+
+    const { amount, errorMessage, loading } = values
+
+    const onAmountChange = (amount: number) => {
+        dispatch({
+            amount
+        })
+    }
+
+    const router = useRouter()
+
+    // const isSui = router.pathname.includes("sui")
+    const isAptos = router.pathname.includes("aptos")
+
+    const icon = isAptos ? "/assets/images/aptos-logo.png" : "/assets/images/sui-sui-logo.png"
+
+    return (
+        <div>
+            <div className='p-2 border-gray/20   mt-[15px] border-[1px] rounded-md bg-[url(/assets/images/consulting/business-img.png)] bg-cover bg-center bg-no-repeat '>
+                <div className="grid grid-cols-2 p-2 text-gray">
+                    <div className=" py-0.5 text-sm  flex flex-row">
+                        <span className="font-bold mr-2">Outcome:</span>
+                        <div className={`   flex flex-row  text-white text-sm `}>
+                            {/* {`${marketName}`} */}
+                        </div>
+                    </div>
+                    <div className=" py-0.5 text-sm  flex flex-row">
+                        <span className="font-bold mr-2">Outcome Liquidity:</span>
+                        <div className={`   flex flex-row  text-white text-sm `}>
+                            {/* {liquidity}{` APT`} */}
+                        </div>
+                    </div>
+                    <div className=" py-0.5 text-sm  flex flex-row">
+                        <span className="font-bold mr-2">Current Odds:</span>
+                        <div className={`   flex flex-row  text-white text-sm `}>
+                            {/* {odds.toLocaleString()} */}
+                        </div>
+                    </div>
+                    <div className=" py-0.5 text-sm  flex flex-row">
+                        <span className="font-bold mr-2">Deadline:</span>
+                        <div className={`   flex flex-row  text-white text-sm `}>
+                            {/* {(new Date(Number(expiration) * 1000)).toLocaleDateString()} */}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div className='p-4 border-gray mt-[15px] border-[1px] rounded-md '>
+                <div className='py-3'>
+                    <div className="block leading-6 mb-2">Enter bet amount</div>
+                    <div className="grid grid-cols-7">
+                        <div className="col-span-5">
+                            <input value={amount} onChange={(e) => {
+                                onAmountChange(Number(e.target.value))
+                            }} type="number" id="input-asset" className={`block w-full p-4  rounded-l-lg text-base bg-[#141F32] border border-gray/30 placeholder-gray text-white focus:outline-none`} />
+                        </div> 
+                        
+                        <div className="col-span-2">
+                            <div className="cursor-default flex border border-l-0 border-gray/30 bg-gray/30  rounded-r-lg h-full">
+                                <div className="m-auto flex flex-row text-white font-normal">
+                                    <img className="h-5 w-5 mt-0.5 rounded-full" src={icon} alt="" />
+                                    <div className="mt-auto mb-auto ml-1.5">
+                                        { isAptos ? "APT" : "SUI"}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="text-xs flex flex-row my-2">
+                        {/* <div className="font-medium ">
+                            Available: {Number(aptAvailable).toFixed(3)}{` APT`}
+                        </div>
+                        <div className="ml-auto flex flex-row ">
+                            <OptionBadge onClick={() => onAmountChange(1)} className="cursor-pointer hover:bg-gray hover:text-black">
+                                1{` APT`}
+                            </OptionBadge>
+                            <OptionBadge onClick={() => onAmountChange((Math.floor(Number(aptAvailable) * 500) / 1000))} className="cursor-pointer hover:bg-gray hover:text-black">
+                                50%
+                            </OptionBadge>
+                            <OptionBadge onClick={() => onAmountChange((aptAvailable > 3 ? 3 : Math.floor(Number(aptAvailable) * 1000) / 1000))} className="cursor-pointer hover:bg-gray hover:text-black">
+                                Max
+                            </OptionBadge>
+                        </div> */}
+                    </div>
+                    <div className="px-1 mt-4">
+                        {/* <ListGroup
+                            items={[
+                                ["Potential payout", `${(odds * amount).toLocaleString()} APT`],
+                                ["Estimate payout date", `${(new Date((Number(expiration) + (86400)) * 1000)).toLocaleDateString()}`],
+                                ["Winning fee", "10%"],
+                            ]}
+                        /> */}
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    )
+}
+
+export default Confirm

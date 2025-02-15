@@ -1,0 +1,375 @@
+import { useState, useCallback, useEffect, useReducer } from "react"
+import BaseModal from "@/modals/base"
+import { Puff } from 'react-loading-icons'
+import useDatabase from "@/hooks/useDatabase"
+
+import { generateClient } from "aws-amplify/api";
+import { Schema } from "@/amplify/data/resource";
+import { createAIHooks } from "@aws-amplify/ui-react-ai";
+import Categories from "../../../data/categories.json"
+
+
+const client = generateClient<Schema>({ authMode: "apiKey" });
+const { useAIConversation, useAIGeneration } = createAIHooks(client);
+
+
+const MarketInformation = ({ dispatch, markets, marketTitle, resource, marketDescription, marketCategory, marketClosingDate, marketResolutionDate }: any) => {
+
+    const [state, suggestTitle] = useAIGeneration("MarketCreationAI")
+    const { data, isLoading, hasError } = state
+
+    const { crawl } = useDatabase()
+
+    const [text, setText] = useState<any>()
+    const [loading, setLoading] = useState<boolean>(false)
+    const [totalOutcomes, setTotalOutcomes] = useState<number>(2)
+
+    const [modal, setModal] = useState<boolean>(false)
+
+    const [errors, setErrors] = useReducer(
+        (curVal: any, newVal: any) => ({ ...curVal, ...newVal }), {}
+    )
+
+
+    const titles = markets.reduce((output: any, item: any) => {
+        if (output.indexOf(item.title) === -1) {
+            output.push(item.title)
+        }
+        return output
+    }, [])
+
+    const total = markets.reduce((output: number, item: any) => {
+        if (item.title === marketTitle) {
+            output += 1
+        }
+        return output
+    }, 0)
+
+    const onSuggest = useCallback(async () => {
+
+        if (!resource) {
+            alert("Please select a resource")
+            return
+        }
+
+        setLoading(true)
+
+        try {
+
+            const context = await crawl(resource)
+
+            const prompt = [
+                "Suggest a DeFi prediction market title that will be resolved in 7 days",
+                "similar to 'What will the price of BTC be on Feb 1, 2025?'. The current date is ",
+                `${(new Date().toDateString())}.`,
+                "Use the following context:",
+                context
+            ].join("")
+
+            suggestTitle({ description: prompt })
+
+        } catch (e) {
+            console.log(e)
+        }
+
+        setLoading(false)
+
+    }, [resource])
+
+    useEffect(() => {
+        if (data && data.result) {
+            dispatch({ marketDescription: `${data.result}` })
+        }
+    }, [data])
+
+    return (
+        <>
+
+            <BaseModal
+                visible={modal}
+                title="Add New Title"
+                maxWidth="max-w-lg" close={() => {
+                    setModal(false)
+                }}>
+
+                <div className="py-2 pt-4">
+                    <input type="text" value={text} onChange={(e) => setText(e.target.value)} id="market-title-new" placeholder="Ex. BTC Price Prediction" className={`block w-full p-2  rounded-lg text-base bg-[#141F32] border border-gray/30 placeholder-gray text-white focus:outline-none`} />
+                    <p className="text-gray mt-2 px-0.5 text-base">Please use a unique, short and descriptive title. We reserve the right to make changes. </p>
+                </div>
+
+                <div className="mt-4 flex   flex-row">
+                    <button onClick={() => {
+                        dispatch({ marketTitle: text })
+                        setModal(false)
+                    }} type="button" className="btn ml-auto mr-1 rounded-lg  bg-white py-2.5 px-8  hover:text-black hover:bg-white flex flex-row">
+                        Save
+                    </button>
+                    <button onClick={() => {
+                        setText(undefined)
+                        setModal(false)
+                    }} type="button" className="btn mr-auto ml-1 rounded-lg  bg-white py-2.5 px-8  hover:text-black hover:bg-white flex flex-row">
+                        Cancel
+                    </button>
+                </div>
+
+            </BaseModal>
+
+            <h2 className='text-xl tracking-tight font-semibold text-white'>Market Settings</h2>
+            <p className="py-0.5">General information about your market</p>
+
+            <div className='py-4 '>
+
+                <div className="grid grid-cols-7">
+                    <div className="col-span-2 text-white text-lg font-semibold flex">
+                        <div className="m-auto mr-4">
+                            Market Title:
+                        </div>
+                    </div>
+                    <div className="col-span-3">
+                        <select value={marketTitle} onChange={(e: any) => {
+
+                            if (e.target.value === "clear") {
+                                dispatch({ marketTitle: undefined })
+                            } else {
+                                const market = markets.sort((a: any, b: any) => {
+                                    return new Date(b.closingDate).getTime() - new Date(a.closingDate).getTime()
+                                }).find((m: any) => m.title === e.target.value)
+                                dispatch({ marketTitle: e.target.value, marketDescription: market ? market.description : undefined })
+                            }
+
+                        }} className="block w-full p-2 cursor-pointer  rounded-lg text-base bg-[#141F32] border border-gray/30 placeholder-gray text-white focus:outline-none">
+                            {text === undefined
+                                ?
+                                <option value={"clear"}>Use existing title</option>
+                                :
+                                <option value={text}>{text}</option>
+                            }
+                            {titles.map((t: any, index: number) => (
+                                <option key={index} value={t}>{t}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="col-span-2 px-2">
+                        <button onClick={() => {
+                            setModal(true)
+                        }} type="button" className="btn ml-2  rounded-lg  bg-white py-2.5 px-8  hover:text-black hover:bg-white flex flex-row">
+                            Add New Title
+                        </button>
+                    </div>
+                    <div className="col-span-2 ">
+
+                    </div>
+                    <div className="col-span-3">
+                        {marketTitle ? (
+                            <>
+                                <p className="text-sm py-2 pb-0 ">{total} markets grouped under the same title.</p>
+                            </>
+                        ) : <p className="text-sm py-2 pb-0 ">Use an existing title to group related markets together.</p>}
+
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-7 mt-4">
+                    <div className="col-span-2 text-white text-lg font-semibold flex">
+                        <div className="m-auto mr-4">
+                            Description:
+                        </div>
+                    </div>
+                    <div className="col-span-3">
+                        <textarea
+                            rows={3}
+                            value={marketDescription}
+                            onChange={(e: any) => {
+                                dispatch({ marketDescription: e.target.value })
+                            }}
+                            placeholder="What will be the total cryptocurrency market cap on Feb 6, 2025?"
+                            className="block w-full p-2  rounded-lg text-base bg-[#141F32] border border-gray/30 placeholder-gray text-white focus:outline-none"
+                        />
+                    </div>
+                    <div className="col-span-2 flex px-2">
+                        <button onClick={onSuggest} disabled={loading || isLoading} type="button" className="btn ml-2 my-auto  rounded-lg w-[180px] bg-white py-2.5 px-8  hover:text-black hover:bg-white flex flex-row">
+                            {(loading || isLoading)
+                                ?
+                                <Puff
+                                    stroke="#000"
+                                    className="w-5 h-5 mx-auto"
+                                />
+                                :
+                                <div className="mx-auto">
+                                    AI Suggest
+                                </div>}
+                        </button>
+                    </div>
+                    <div className="col-span-2 ">
+
+                    </div>
+                    <div className="col-span-3">
+                        {!hasError && <p className="text-sm py-2 pb-0 ">Define your market question or let AI suggest one.</p>}
+                        {hasError && <p className="text-sm py-2 pb-0 text-secondary">The number of requests exceeds the limit. Try again later.</p>}
+                    </div>
+
+                </div>
+
+                <div className="grid grid-cols-7 mt-4">
+                    <div className="col-span-2 text-white text-lg font-semibold flex">
+                        <div className="m-auto mr-4">
+                            Closing Date:
+                        </div>
+                    </div>
+                    <div className="col-span-3">
+                        <input
+                            type="datetime-local"
+                            value={marketClosingDate}
+                            onChange={(e: any) => {
+                                dispatch({ marketClosingDate: e.target.value })
+
+                                const closingDate = new Date(e.target.value)
+                                const tomorrowDate = new Date().valueOf() + 86400000
+
+                                if (closingDate.valueOf() < tomorrowDate) {
+                                    setErrors({ marketClosingDate: "Must be at least 24 hours from now." })
+                                } else {
+                                    setErrors({ marketClosingDate: undefined })
+                                }
+
+                            }}
+                            className="block w-full p-2  rounded-lg text-base bg-[#141F32] border border-gray/30 placeholder-gray text-white focus:outline-none"
+                        />
+                    </div>
+                    <div className="col-span-2 px-2 flex">
+                        {errors && errors.marketClosingDate && <p className="text-sm  my-auto text-secondary">{errors.marketClosingDate}</p>
+
+                        }
+                    </div>
+                    <div className="col-span-2 ">
+
+                    </div>
+                    <div className="col-span-3">
+                        <p className="text-sm py-2 pb-0 ">The last date and time users can place bets on the market.</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-7 mt-4">
+                    <div className="col-span-2 text-white text-lg font-semibold flex">
+                        <div className="m-auto mr-4">
+                            Resolution Date:
+                        </div>
+                    </div>
+                    <div className="col-span-3">
+                        <input
+                            type="datetime-local"
+                            value={marketResolutionDate}
+                            onChange={(e: any) => {
+                                dispatch({ marketResolutionDate: e.target.value })
+
+                                const resolutionDate = new Date(e.target.value)
+                                const closingDate = new Date(marketClosingDate)
+                                if (resolutionDate.valueOf() < closingDate.valueOf()) {
+                                    setErrors({ marketResolutionDate: "Must be after the closing date." })
+                                } else {
+                                    setErrors({ marketResolutionDate: undefined })
+                                }
+
+                            }}
+                            className="block w-full p-2  rounded-lg text-base bg-[#141F32] border border-gray/30 placeholder-gray text-white focus:outline-none"
+                        />
+                    </div>
+                    <div className="col-span-2 px-2 flex">
+                        {errors && errors.marketResolutionDate && <p className="text-sm  my-auto text-secondary">{errors.marketResolutionDate}</p>
+
+                        }
+                    </div>
+                    <div className="col-span-2 ">
+
+                    </div>
+                    <div className="col-span-3">
+                        <p className="text-sm py-2 pb-0 ">When the AI-agent finalizes the market outcome, should be aligned with the market description.</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-7 mt-4">
+                    <div className="col-span-2 text-white text-lg font-semibold flex">
+                        <div className="m-auto mr-4">
+                            Category:
+                        </div>
+                    </div>
+                    <div className="col-span-3">
+                        <select value={marketCategory} onChange={(e: any) => {
+                            dispatch({ marketCategory: e.target.value })
+                        }} className="block w-full p-2 cursor-pointer  rounded-lg text-base bg-[#141F32] border border-gray/30 placeholder-gray text-white focus:outline-none">
+                            {Categories.map((c: any, index: number) => (
+                                <option key={index} value={c}>{c}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="col-span-2 px-2 flex">
+
+                    </div>
+                    <div className="col-span-2 ">
+
+                    </div>
+                    <div className="col-span-3">
+                        <p className="text-sm py-2 pb-0 ">Select a category to classify your market.</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-7 mt-4">
+                    <div className="col-span-2 text-white text-lg font-semibold flex">
+                        <div className="m-auto mr-4">
+                            Outcomes:
+                        </div>
+                    </div>
+                    <div className="col-span-3">
+                        <div className="grid grid-cols-3 gap-2">
+                            {[2, 3, 4].map((value) => {
+                                return (
+                                    <div className="col-span-1">
+                                        <div onClick={() => {
+                                            setTotalOutcomes(value)
+                                        }} className="bg-[#141F32] p-1 rounded-lg flex  border border-gray/30 cursor-pointer">
+                                            <input type="radio" checked={totalOutcomes === value} name="disabled-radio" className="w-4 h-4 mr-0.5 my-auto ml-auto text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" />
+                                            <label className="ms-2 text-lg mr-auto font-semibold text-gray-400 dark:text-gray-500">{value}</label>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                    <div className="col-span-2 flex px-2">
+                        <button onClick={onSuggest} disabled={loading || isLoading} type="button" className="btn ml-2 my-auto  rounded-lg w-[180px] bg-white py-2.5 px-8  hover:text-black hover:bg-white flex flex-row">
+                            {(loading || isLoading)
+                                ?
+                                <Puff
+                                    stroke="#000"
+                                    className="w-5 h-5 mx-auto"
+                                />
+                                :
+                                <div className="mx-auto">
+                                    AI Suggest
+                                </div>}
+                        </button>
+                    </div>
+                    <div className="col-span-2 ">
+
+                    </div>
+                    <div className="col-span-3">
+                        {/* {!hasError && <p className="text-sm py-2 pb-0 ">Define your market question or let AI suggest one.</p>}
+                        {hasError && <p className="text-sm py-2 pb-0 text-secondary">The number of requests exceeds the limit. Try again later.</p>} */}
+                    </div>
+                </div>
+
+            </div>
+            <style>
+                {`
+                    ::-webkit-calendar-picker-indicator {
+                        filter: invert(1);
+                        cursor: pointer;
+                    }
+        `}
+            </style>
+        </>
+    )
+}
+
+export default MarketInformation

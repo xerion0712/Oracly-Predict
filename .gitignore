@@ -1,6 +1,5 @@
 node_modules/
-old/
-old_move/
-data/
-sui_v1/
-aptos_v1/
+.next/
+amplify_outputs.json
+
+.env
