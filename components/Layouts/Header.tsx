@@ -44,9 +44,9 @@ const Header = (props: any) => {
         })()
     }, [])
 
-    useEffect(() => { 
-        if (user && user.loginId) {
-            loadProfile(user.loginId)
+    useEffect(() => {  
+        if (user && user.userId) {
+            loadProfile(user.userId)
         }
     }, [user])
 
@@ -103,17 +103,11 @@ const Header = (props: any) => {
 
                                     {user && (
                                         <div className='text-white hover:text-secondary'>
-                                            {shortAddress(user.loginId, 6, -10)}
+                                            {/* {shortAddress(user.userId, 6, -10)} */}
+                                            <User/>
                                         </div>
-                                    )}
-
-                                </Link>
-                                {/* <button type="button" className="btn ml-0 gradient_anim_btn text-sm sm:text-base flex  px-6 py-3 sm:py-4 sm:px-8 flex-row ">
-                                            <div className='my-auto'>
-                                                Get Started{` `}
-                                            </div>
-                                            <ArrowRight size={18} className='mt-[3px] ml-1' />
-                                        </button> */}
+                                    )} 
+                                </Link> 
                             </div>
                         </div>
                         {/* <ul className="flex items-center gap-5  pr-5  lg:pl-5lg:pr-0 ">
