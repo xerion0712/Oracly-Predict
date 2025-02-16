@@ -11,7 +11,7 @@ const Overview = ({ profile }: any) => {
                     <p className="text-gray-300">Username</p>
                 </div>
                 <div className="col-span-5">
-                    <span className="text-white">
+                    <span className="text-white line-clamp-1">
                         {profile && profile.username}
                     </span>
                 </div>

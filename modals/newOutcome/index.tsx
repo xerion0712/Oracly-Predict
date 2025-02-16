@@ -1,13 +1,13 @@
 import { useContext, useReducer, useEffect, useState, useCallback } from "react"
 import BaseModal from "../base"
 import { Authenticator, useTheme, View, Heading, Image, Text, Button, ThemeProvider, Theme } from '@aws-amplify/ui-react'
-import '@aws-amplify/ui-react/styles.css'
-import { useRouter } from 'next/router';
+
 import { ArrowRight, Save } from "react-feather";
 import { Puff } from 'react-loading-icons'
 import useDatabase from "../../hooks/useDatabase";
 import useAtoma from "@/hooks/useAtoma";
-
+import { LegatoContext } from "@/hooks/useLegato";
+import Link from "next/link";
 
 interface IMarketModal {
     visible: boolean
@@ -39,7 +39,7 @@ enum STEP {
 }
 
 
-const NewOutcomeModal = ({ visible, close, roundId, marketId, increaseTick }: IMarketModal) => {
+const NewOutcomeModalOLD = ({ visible, close, roundId, marketId, increaseTick }: IMarketModal) => {
 
     const { generateOutcome } = useAtoma()
     const { getResources, crawl, addOutcome } = useDatabase()
@@ -147,7 +147,7 @@ const NewOutcomeModal = ({ visible, close, roundId, marketId, increaseTick }: IM
             dispatch({ outcome: undefined, cleanedText: undefined, errorMessage: undefined, step: STEP.PAGE_1 })
 
             increaseTick()
-            
+
             close()
 
         } catch (e: any) {
@@ -288,5 +288,42 @@ const NewOutcomeModal = ({ visible, close, roundId, marketId, increaseTick }: IM
         </BaseModal>
     )
 }
+
+const NewOutcomeModal = ({ visible, close, roundId, marketId, increaseTick }: IMarketModal) => {
+
+    const { currentProfile }: any = useContext(LegatoContext)
+
+    return (
+        <BaseModal
+            visible={visible}
+            close={close}
+            title={"Add New Outcome"}
+            maxWidth="max-w-xl"
+        >
+            {currentProfile && (
+                <View>
+                    <Authenticator>
+
+                        OK Now
+
+                    </Authenticator>
+                </View>
+            )}
+            {!currentProfile && (
+                <div className="h-[150px] flex flex-col">
+                    <Link href="/auth/profile" className="m-auto">
+                        <button type="button" className="btn m-auto mb-0 bg-white text-sm flex rounded-lg px-8 py-3 hover:scale-100  flex-row hover:text-black hover:bg-white ">
+                            Sign In
+                        </button>
+                        <p className="text-center m-auto mt-2 text-gray">You need to sign in to continue</p>
+                    </Link>
+                </div>
+            )
+
+            }
+        </BaseModal>
+    )
+}
+
 
 export default NewOutcomeModal
