@@ -8,7 +8,7 @@
 /// - **Market Creation & Management**: Supports the creation and administration of prediction markets.
 /// - **Bet Placement & Resolution**: Users can place bets on outcomes, with automated result resolution.
 /// - **Weighted Payout System**: Implements a flexible reward distribution using adjustable round weights.
-/// - **AI-Driven Data Sync**: Integrates with external sources to fetch and validate market data.
+/// - **Weight Assignment**: Utilizes an AI agent to dynamically adjust outcome weights.
 ///
 /// ## Core Components:
 /// - `MarketStore`: Stores all relevant market data, including outcomes, bets, and resolution states.
@@ -42,7 +42,7 @@ module legato_market::generalized {
 
     const SCALE: u64 = 10000; // Scaling factor for fixed-point calculations 
     const DEFAULT_WINNING_FEE: u64 = 1000; // Default commission fee
-    const DEFAULT_ROUND_INTERVAL: u64 = 86400; // 1 day in s
+    const DEFAULT_ROUND_INTERVAL: u64 = 604800; // 1 week in s
 
     // ======== Errors ========
 
@@ -62,22 +62,35 @@ module legato_market::generalized {
     const ERR_NOT_RESOLVED: u64 = 14;
     const ERR_NOT_HOLDER: u64 = 15;
     const ERR_ALREADY_CLAIMED: u64 = 16;
+    const ERR_ALREADY_FINALIZED: u64 = 17;
+    const ERR_NOT_DISPUTED: u64 = 18;
 
 
     // ======== Structs =========
 
+    struct Round has store {
+        total_bet_amount: u64, // Total amount of bets placed in the current round
+        total_paid_amount: u64, // Total amount of bets paid in the current round
+        total_disputed_amount: u64,// Total amount of bets in dispute cases
+        outcome_ids: vector<u64>, // List of all outcome IDs associated with the current round
+        position_ids: vector<u64>, // Track all position IDs within the round
+        outcome_weights: TableWithLength<u64, u64>, // Mapping: Outcome ID -> Weight assigned. Default is 1.0.
+        winning_outcomes: vector<u64>, // List of winning outcome IDs
+        dispute_claims: vector<u64>, // List of dispute outcome IDs
+        is_finalized: bool, // Flag indicating if the round has been finalized 
+        is_resolved: bool, // Flag indicating if the round results have been resolved
+        resolved_timestamp: u64, 
+        finalized_timestamp: u64
+    }
+
     struct MarketStore has store { 
+        rounds: TableWithLength<u64, Round>, // Mapping: Round ID -> Round Data
         outcome_bets: TableWithLength<u64, u64>, // Mapping: Outcome ID -> Total bet amount placed
-        round_bets: TableWithLength<u64, u64>, // Mapping: Round ID -> Total bet amount placed
         bet_pool: Object<FungibleStore>, // Stores all bets in FA assets
-        max_bet_amount: u64, // Maximum allowed by bet 
-        outcome_ids: vector<u64>, // List of all possible outcome IDs
+        max_bet_amount: u64, // Maximum allowed 
         round_weights: TableWithLength<u64, u64>, // Mapping: Round ID -> Weight assigned, referring to the percentage of total bet amount that can be distributed. Default is 1.0.
         created_time: u64, // Timestamp (s) when the market was created
         round_interval: u64, // Time interval (s) between each round
-        winning_outcomes: TableWithLength<u64, vector<u64>>, // Mapping: Round ID -> List of winning outcome IDs
-        current_round: u64, // Current active round number
-        resolved: TableWithLength<u64, u64>, // Mapping: Round ID -> Timestamp when the round is resolved 
         is_paused: bool // Whether the market is currently paused
     }
 
@@ -93,7 +106,7 @@ module legato_market::generalized {
     }
 
     struct MarketManager has key {
-        admin_list: vector<address>,
+        manager_list: vector<address>,
         extend_ref: ExtendRef,
         markets: TableWithLength<u64, MarketStore>, // Table containing market data
         positions: TableWithLength<u64, Position>, // Table containing position data
@@ -126,6 +139,7 @@ module legato_market::generalized {
     struct ClaimPrizeEvent has drop, store {
         position_id: u64,
         payout_amount: u64,
+        is_disputed: bool,
         timestamp: u64,
         sender: address
     }
@@ -134,7 +148,18 @@ module legato_market::generalized {
     struct ResolveMarketEvent has drop, store {
         market_id: u64,
         round_id: u64,
-        outcomes_list: vector<u64>, 
+        winning_outcomes: vector<u64>, 
+        dispute_outcomes: vector<u64>,
+        timestamp: u64, 
+        sender: address
+    }
+
+    #[event]
+    struct FinalizeMarketEvent has drop, store {
+        market_id: u64,
+        round_id: u64,
+        outcomes: vector<u64>, 
+        weights: vector<u64>,
         timestamp: u64, 
         sender: address
     }
@@ -145,11 +170,11 @@ module legato_market::generalized {
         let constructor_ref = object::create_object(signer::address_of(sender));
         let extend_ref = object::generate_extend_ref(&constructor_ref);
 
-        let admin_list = vector::empty<address>();
-        vector::push_back<address>(&mut admin_list, signer::address_of(sender));
+        let manager_list = vector::empty<address>();
+        vector::push_back<address>(&mut manager_list, signer::address_of(sender));
 
         move_to(sender, MarketManager {
-            admin_list,
+            manager_list,
             extend_ref,
             markets: table_with_length::new<u64, MarketStore>(),
             positions: table_with_length::new<u64, Position>(),
@@ -170,10 +195,7 @@ module legato_market::generalized {
         assert!(market_store.max_bet_amount >= bet_amount, ERR_MAX_BET_AMOUNT); 
         assert!(primary_fungible_store::balance(signer::address_of(sender), bet_token_metadata ) >= bet_amount, ERR_INSUFFICIENT_AMOUNT );
         assert!( market_store.is_paused == false, ERR_PAUSED );
-        assert!( timestamp::now_seconds() >= market_store.created_time+(round_id * market_store.round_interval), ERR_ROUND_ALREADY_ENDED  );
-        // Ensure the market is still active and accepting bets
-        assert!( table_with_length::contains( &market_store.resolved, round_id ) == false, ERR_ALREADY_RESOLVED);
-
+        
         // Deposit the token bet into the contract
         let input_token = primary_fungible_store::withdraw(sender, bet_token_metadata, bet_amount);
         fungible_asset::deposit(market_store.bet_pool, input_token);
@@ -187,18 +209,22 @@ module legato_market::generalized {
             table_with_length::add( &mut market_store.outcome_bets, outcome_id, bet_amount );
         };
 
-        // Update the total bets for the selected round
-        if (table_with_length::contains( &market_store.round_bets, round_id)) {
-            // If there is already a bet for the round, increase it
-            *table_with_length::borrow_mut( &mut market_store.round_bets, round_id ) = *table_with_length::borrow( &market_store.round_bets, round_id )+bet_amount;
-        } else {
-            // Otherwise, add a new entry
-            table_with_length::add( &mut market_store.round_bets, round_id, bet_amount );
+        let current_round = get_market_round_mut( market_store, round_id );
+
+        // Ensure the market is still active and accepting bets
+        assert!( current_round.is_finalized == false, ERR_ALREADY_FINALIZED );
+        assert!( current_round.is_resolved == false, ERR_ALREADY_RESOLVED);
+
+        let position_id = table_with_length::length( &global.positions );
+
+        if (vector::contains( &current_round.outcome_ids, &outcome_id ) == false) {
+            vector::push_back( &mut current_round.outcome_ids, outcome_id );
         };
 
-        if (vector::contains( &market_store.outcome_ids, &outcome_id ) == false) {
-            vector::push_back( &mut market_store.outcome_ids, outcome_id );
-        };
+        vector::push_back( &mut current_round.position_ids, position_id);
+
+        // Update the total bets for the selected round
+        current_round.total_bet_amount = current_round.total_bet_amount+bet_amount;
 
         // Create a new bet position
         let new_position = Position {
@@ -211,7 +237,6 @@ module legato_market::generalized {
             is_open: true
         };
 
-        let position_id = table_with_length::length( &global.positions );
         table_with_length::add( &mut global.positions, position_id, new_position );
 
         // Emit an event 
@@ -229,6 +254,7 @@ module legato_market::generalized {
 
     }
 
+
     // Allows a user to claim their winnings after the market has been resolved.
     public entry fun claim_prize(sender: &signer, position_id: u64) acquires MarketManager {
         // Calculate the payout amount for the position
@@ -237,9 +263,8 @@ module legato_market::generalized {
         let global = borrow_global_mut<MarketManager>(@legato_market); 
         let current_position = table_with_length::borrow_mut( &mut global.positions, position_id );
 
-        assert!( current_position.holder == signer::address_of(sender), ERR_NOT_HOLDER);
         assert!( current_position.is_open == true , ERR_ALREADY_CLAIMED);
-        
+
         let market_store = table_with_length::borrow_mut(&mut global.markets, current_position.market_id); 
         let bet_token_metadata = fungible_asset::store_metadata(market_store.bet_pool);
         let pool_signer = object::generate_signer_for_extending(&global.extend_ref);
@@ -247,10 +272,9 @@ module legato_market::generalized {
 
         // If there is a payout amount to be claimed
         if ( payout_amount > 0 ) {
-            
+
             // takes a fee if there's a surplus            
             if ( payout_amount > current_position.amount) {
-
                 // Apply a fee when the payout amount exceeds the original bet amount 
                 let fee_ratio = fixed_point64::create_from_rational( (global.winning_fee as u128), 10000);
                 let surplus_amount = payout_amount-current_position.amount;
@@ -265,19 +289,67 @@ module legato_market::generalized {
                 fungible_asset::deposit(store, token_fee);
 
                 // Send the remaining payout to the user
-                primary_fungible_store::ensure_primary_store_exists(signer::address_of(sender), bet_token_metadata);
-                let store = primary_fungible_store::primary_store(signer::address_of(sender), bet_token_metadata);
+                primary_fungible_store::ensure_primary_store_exists(current_position.holder, bet_token_metadata);
+                let store = primary_fungible_store::primary_store(current_position.holder, bet_token_metadata);
                 fungible_asset::deposit(store, token_out);
-
+                
             } else {
-                // If there is no surplus, transfer the full payout amount to the userr 
+                // If there is no surplus, transfer the full payout amount to the user 
                 let token_out = fungible_asset::withdraw(&pool_signer, market_store.bet_pool, payout_amount);
-                primary_fungible_store::ensure_primary_store_exists(signer::address_of(sender), bet_token_metadata);
-                let store = primary_fungible_store::primary_store(signer::address_of(sender), bet_token_metadata);
+                primary_fungible_store::ensure_primary_store_exists(current_position.holder, bet_token_metadata);
+                let store = primary_fungible_store::primary_store(current_position.holder, bet_token_metadata);
                 fungible_asset::deposit(store, token_out);
             };
 
         };
+
+        // Mark the position as claimed
+        current_position.is_open = false;
+
+        if (table_with_length::contains(&market_store.rounds, current_position.round_id) && payout_amount > 0 ) {
+            let current_round = table_with_length::borrow_mut(&mut market_store.rounds, current_position.round_id);
+            current_round.total_paid_amount = current_round.total_paid_amount+payout_amount;
+        };
+        
+        // Emit an event
+        event::emit(
+            ClaimPrizeEvent {
+                position_id,
+                payout_amount,
+                is_disputed: false,
+                timestamp: timestamp::now_seconds(),  
+                sender: signer::address_of(sender)
+            }
+        )
+    
+    }
+
+
+    // Refunds a bet to the user if the outcome is marked as disputed.
+    public entry fun refund(sender: &signer, position_id: u64) acquires MarketManager {
+        let global = borrow_global_mut<MarketManager>(@legato_market); 
+        let current_position = table_with_length::borrow_mut( &mut global.positions, position_id );
+
+        assert!( current_position.is_open == true , ERR_ALREADY_CLAIMED);
+
+        let market_store = table_with_length::borrow_mut(&mut global.markets, current_position.market_id);          
+        let pool_signer = object::generate_signer_for_extending(&global.extend_ref);
+        let bet_token_metadata = fungible_asset::store_metadata(market_store.bet_pool);
+        
+        assert!(table_with_length::contains(&market_store.rounds, current_position.round_id), ERR_NOT_FOUND);
+        let current_round = table_with_length::borrow( &market_store.rounds , current_position.round_id);
+
+        // Check if the outcome associated with the position is a dispute outcome
+        let (is_disputed, _) = vector::index_of<u64>(&current_round.dispute_claims, &(current_position.outcome_id));
+
+        assert!( is_disputed == true, ERR_NOT_DISPUTED );
+
+        let payout_amount = current_position.amount;
+
+        let token_out = fungible_asset::withdraw(&pool_signer, market_store.bet_pool, payout_amount);
+        primary_fungible_store::ensure_primary_store_exists(current_position.holder, bet_token_metadata);
+        let store = primary_fungible_store::primary_store(current_position.holder, bet_token_metadata);
+        fungible_asset::deposit(store, token_out);
 
         // Mark the position as claimed
         current_position.is_open = false;
@@ -287,12 +359,12 @@ module legato_market::generalized {
             ClaimPrizeEvent {
                 position_id,
                 payout_amount,
+                is_disputed: true,
                 timestamp: timestamp::now_seconds(),  
                 sender: signer::address_of(sender)
             }
         )
     }
-
 
     // ======== Public Functions =========
 
@@ -325,9 +397,21 @@ module legato_market::generalized {
         let global = borrow_global<MarketManager>(@legato_market); 
         assert!( table_with_length::contains( &global.markets, market_id ), ERR_NOT_FOUND);
         let market_store = table_with_length::borrow(&global.markets, market_id); 
-        assert!( table_with_length::contains( &market_store.winning_outcomes, round_id ), ERR_NOT_FOUND);
+        assert!(table_with_length::contains(&market_store.rounds, round_id), ERR_NOT_FOUND);
+        let current_round = table_with_length::borrow(&market_store.rounds, round_id);
 
-        *table_with_length::borrow(&market_store.winning_outcomes, round_id)
+        (current_round.winning_outcomes)
+    }
+
+    #[view] 
+    public fun check_dispute_outcomes(market_id: u64, round_id: u64) : vector<u64> acquires MarketManager {
+        let global = borrow_global<MarketManager>(@legato_market); 
+        assert!( table_with_length::contains( &global.markets, market_id ), ERR_NOT_FOUND);
+        let market_store = table_with_length::borrow(&global.markets, market_id); 
+        assert!(table_with_length::contains(&market_store.rounds, round_id), ERR_NOT_FOUND);
+        let current_round = table_with_length::borrow(&market_store.rounds, round_id);
+
+        (current_round.dispute_claims)
     }
 
     // Returns the bet position for a given ID
@@ -338,7 +422,6 @@ module legato_market::generalized {
         ( entry.market_id, entry.outcome_id, entry.round_id, entry.amount, entry.holder, entry.timestamp, entry.is_open )
     }
  
-
     #[view]
     public fun get_pool_object_address(): address acquires MarketManager {
         let global = borrow_global<MarketManager>(@legato_market);
@@ -369,17 +452,48 @@ module legato_market::generalized {
     }
 
     #[view]
-    public fun get_market_data(market_id: u64) : (u64, u64, u64, u64, u64, bool) acquires MarketManager {
+    public fun get_outcome_weights( market_id: u64, round_id: u64 ) : (vector<u64>, vector<u64>) acquires MarketManager {
+        let global = borrow_global<MarketManager>(@legato_market); 
+        assert!( table_with_length::contains( &global.markets, market_id ), ERR_NOT_FOUND);
+
+        let market_store = table_with_length::borrow(&global.markets, market_id);
+        assert!( table_with_length::contains( &market_store.rounds, round_id ), ERR_NOT_FOUND);
+        
+        let current_round = table_with_length::borrow( &market_store.rounds, round_id );
+
+        let outcome_ids = vector::empty<u64>();
+        let outcome_weights = vector::empty<u64>();
+
+        let count = 0;
+
+        while (count < vector::length(&( current_round.outcome_ids ))) {
+            let outcome_id = *vector::borrow( &current_round.outcome_ids, count );
+            let outcome_weight = if (table_with_length::contains( &current_round.outcome_weights, outcome_id )) {
+                *table_with_length::borrow(&current_round.outcome_weights, outcome_id)
+            } else {
+                SCALE
+            };
+
+            vector::push_back<u64>(&mut outcome_ids, outcome_id);
+            vector::push_back<u64>(&mut outcome_weights, outcome_weight);
+
+            count = count+1;
+        };
+
+        ( outcome_ids, outcome_weights )
+    }
+
+    #[view]
+    public fun get_market_data(market_id: u64) : (u64, u64, u64, u64, bool) acquires MarketManager {
         let global = borrow_global<MarketManager>(@legato_market); 
         assert!( table_with_length::contains( &global.markets, market_id ), ERR_NOT_FOUND);
         let market_store = table_with_length::borrow(&global.markets, market_id); 
     
-        (
-            table_with_length::length( &market_store.outcome_bets), 
+        ( 
             fungible_asset::balance(market_store.bet_pool),
+            market_store.max_bet_amount,
             market_store.created_time,
             market_store.round_interval,
-            market_store.current_round,
             market_store.is_paused
         )
     }
@@ -393,21 +507,15 @@ module legato_market::generalized {
         *table_with_length::borrow( &market_store.outcome_bets, outcome_id )
     }
 
-     #[view]
-    public fun get_market_round_bet_amount(market_id: u64, round_id: u64) : (u64) acquires MarketManager {
-        let global = borrow_global<MarketManager>(@legato_market); 
-        assert!( table_with_length::contains( &global.markets, market_id ), ERR_NOT_FOUND);
-        let market_store = table_with_length::borrow(&global.markets, market_id); 
-        assert!( table_with_length::contains( &market_store.round_bets, round_id ), ERR_NOT_FOUND);
-        *table_with_length::borrow( &market_store.round_bets, round_id )
-    }
-
     #[view]
-    public fun get_market_current_round(market_id: u64) : (u64) acquires MarketManager {
+    public fun get_market_round_bet_amount(market_id: u64, round_id: u64) : (u64, u64) acquires MarketManager {
         let global = borrow_global<MarketManager>(@legato_market); 
         assert!( table_with_length::contains( &global.markets, market_id ), ERR_NOT_FOUND);
         let market_store = table_with_length::borrow(&global.markets, market_id); 
-        market_store.current_round
+        assert!(table_with_length::contains(&market_store.rounds, round_id), ERR_NOT_FOUND);
+        let current_round = table_with_length::borrow(&market_store.rounds, round_id);
+
+        (current_round.total_bet_amount, current_round.total_paid_amount)
     }
 
     // ======== Only Governance =========
@@ -421,23 +529,19 @@ module legato_market::generalized {
         assert!( max_bet_amount > 0 , ERR_INVALID_VALUE );
 
         // Ensure that the caller has permission
-        verify_admin(signer::address_of(sender));
+        verify_caller(signer::address_of(sender));
         
         let global = borrow_global_mut<MarketManager>(@legato_market);
         let pool_signer = object::generate_signer_for_extending(&global.extend_ref);
 
         let new_market = MarketStore {
-            outcome_bets: table_with_length::new<u64, u64>(),
-            round_bets: table_with_length::new<u64, u64>(), 
+            rounds: table_with_length::new<u64, Round>(),
+            outcome_bets: table_with_length::new<u64, u64>(), 
             bet_pool: create_token_store(&pool_signer, bet_token),
-            max_bet_amount, 
-            outcome_ids: vector::empty<u64>(),
+            max_bet_amount,
             round_weights: table_with_length::new<u64, u64>(),
             created_time: timestamp::now_seconds(),
             round_interval: DEFAULT_ROUND_INTERVAL,
-            winning_outcomes: table_with_length::new<u64, vector<u64>>(),
-            current_round: 0,
-            resolved: table_with_length::new<u64, u64>(),
             is_paused: false
         };
 
@@ -456,21 +560,79 @@ module legato_market::generalized {
         )
     }
 
-    // Assigns the winning outcomes for the given market and round
-    public entry fun resolve_market(sender: &signer, market_id: u64, round_id: u64, outcomes_list: vector<u64> ) acquires MarketManager {
+    // Finalizes the market for a given round by locking in the final outcome weights.  
+    // Prevents further bets from being placed and prepares the round for resolution.
+    public entry fun finalize_market(sender: &signer, market_id: u64, round_id: u64, outcome_ids: vector<u64>, weights: vector<u64>) acquires MarketManager {
+        assert!( vector::length(&outcome_ids) == vector::length(&(weights)) , ERR_INVALID_LENGTH );
+        
+        verify_caller(signer::address_of(sender));
 
-        verify_admin(signer::address_of(sender));
+        let global = borrow_global_mut<MarketManager>(@legato_market);
+        assert!( table_with_length::contains( &global.markets, market_id ), ERR_NOT_FOUND);
+        let market_store = table_with_length::borrow_mut(&mut global.markets, market_id);
+        let current_round = get_market_round_mut(market_store, round_id);
+
+        assert!( current_round.is_resolved == false, ERR_ALREADY_RESOLVED );
+
+        let count = 0;
+
+        while (count < vector::length(&(outcome_ids))) {
+
+            let current_outcome_id = *vector::borrow_mut( &mut outcome_ids, count );
+            let current_weights = *vector::borrow_mut( &mut weights, count);
+
+            if (table_with_length::contains( &current_round.outcome_weights, current_outcome_id )) {
+                *table_with_length::borrow_mut(&mut current_round.outcome_weights, current_outcome_id) = current_weights;
+            } else {
+                table_with_length::add( &mut current_round.outcome_weights, current_outcome_id, current_weights );
+            };
+
+            count = count+1;
+        };
+
+        current_round.is_finalized = true;
+        current_round.finalized_timestamp = timestamp::now_seconds();
+
+        // Emit an event
+        event::emit(
+            FinalizeMarketEvent {
+                market_id,
+                round_id,
+                outcomes: outcome_ids,
+                weights,
+                timestamp: timestamp::now_seconds(),  
+                sender: signer::address_of(sender)
+            }
+        )
+    }
+
+    // Assigns the winning & dispute outcomes for the given market and round
+    public entry fun resolve_market(sender: &signer, market_id: u64, round_id: u64, winning_outcomes: vector<u64>, dispute_outcomes: vector<u64> ) acquires MarketManager {
+
+        verify_caller(signer::address_of(sender));
    
         let global = borrow_global_mut<MarketManager>(@legato_market);
         assert!( table_with_length::contains( &global.markets, market_id ), ERR_NOT_FOUND);
         let market_store = table_with_length::borrow_mut(&mut global.markets, market_id);
+        let current_round = get_market_round_mut(market_store, round_id);
 
-        if (table_with_length::contains( &market_store.winning_outcomes, round_id )) {
-            *table_with_length::borrow_mut(&mut market_store.winning_outcomes, round_id) = outcomes_list;
-            *table_with_length::borrow_mut(&mut market_store.resolved, round_id) = timestamp::now_seconds();
-        } else {
-            table_with_length::add( &mut market_store.winning_outcomes, round_id, outcomes_list );
-            table_with_length::add( &mut market_store.resolved, round_id, timestamp::now_seconds());
+        // Assign winning and disputed outcomes
+        current_round.winning_outcomes = winning_outcomes;
+        current_round.dispute_claims = dispute_outcomes;
+        current_round.is_resolved = true;
+        current_round.resolved_timestamp = timestamp::now_seconds();
+
+        // Calculate the total disputed amount
+        let position_count = 0;
+
+        while (position_count < vector::length( &(current_round.position_ids))) {
+            let position_id = *vector::borrow( &(current_round.position_ids), position_count  );
+            let this_position = table_with_length::borrow( &global.positions, position_id );
+            let (is_disputed, _) = vector::index_of<u64>(&dispute_outcomes, &this_position.outcome_id);
+            if (is_disputed) {
+                current_round.total_disputed_amount = current_round.total_disputed_amount+this_position.amount;
+            };
+            position_count = position_count+1;
         };
 
         // Emit an event
@@ -478,7 +640,8 @@ module legato_market::generalized {
             ResolveMarketEvent {
                 market_id,
                 round_id,
-                outcomes_list,
+                winning_outcomes,
+                dispute_outcomes,
                 timestamp: timestamp::now_seconds(),  
                 sender: signer::address_of(sender)
             }
@@ -486,20 +649,10 @@ module legato_market::generalized {
 
     }
 
-    public entry fun update_current_round(sender: &signer, market_id: u64, new_current_round: u64) acquires MarketManager {
-        // Ensure that the caller has permission
-        verify_admin(signer::address_of(sender));
-
-        let global = borrow_global_mut<MarketManager>(@legato_market);
-        assert!( table_with_length::contains( &global.markets, market_id ), ERR_NOT_FOUND);
-        let market_store = table_with_length::borrow_mut(&mut global.markets, market_id);
-        market_store.current_round = new_current_round;
-    }
-
     public entry fun update_market_max_bet_amount(sender: &signer, market_id: u64, new_bet_max_amount: u64) acquires MarketManager {
         assert!( new_bet_max_amount > 0 , ERR_INVALID_VALUE );
         // Ensure that the caller has permission
-        verify_admin(signer::address_of(sender));
+        verify_caller(signer::address_of(sender));
 
         let global = borrow_global_mut<MarketManager>(@legato_market);
         assert!( table_with_length::contains( &global.markets, market_id ), ERR_NOT_FOUND);
@@ -510,7 +663,7 @@ module legato_market::generalized {
     public entry fun update_market_round_interval(sender: &signer, market_id: u64, new_round_interval: u64 ) acquires MarketManager {
         assert!( new_round_interval > 0 , ERR_INVALID_VALUE );
         // Ensure that the caller has permission
-        verify_admin(signer::address_of(sender));
+        verify_caller(signer::address_of(sender));
 
         let global = borrow_global_mut<MarketManager>(@legato_market);
         assert!( table_with_length::contains( &global.markets, market_id ), ERR_NOT_FOUND);
@@ -520,7 +673,7 @@ module legato_market::generalized {
 
     public entry fun pause_market(sender: &signer, market_id: u64, is_paused: bool) acquires MarketManager { 
         // Ensure that the caller has permission
-        verify_admin(signer::address_of(sender));
+        verify_caller(signer::address_of(sender));
 
         let global = borrow_global_mut<MarketManager>(@legato_market);
         assert!( table_with_length::contains( &global.markets, market_id ), ERR_NOT_FOUND);
@@ -531,7 +684,7 @@ module legato_market::generalized {
     public entry fun update_round_weights(sender: &signer, market_id: u64, round_id: u64, weights: u64 ) acquires MarketManager {
         assert!( weights >= 5000  , ERR_INVALID_VALUE );
         // Ensure that the caller has permission
-        verify_admin(signer::address_of(sender));
+        verify_caller(signer::address_of(sender));
 
         let global = borrow_global_mut<MarketManager>(@legato_market);
         assert!( table_with_length::contains( &global.markets, market_id ), ERR_NOT_FOUND);
@@ -550,7 +703,7 @@ module legato_market::generalized {
         assert!( vector::length(&round_ids) == vector::length(&(weights)) , ERR_INVALID_LENGTH );
         
         // Ensure that the caller has permission
-        verify_admin(signer::address_of(sender));
+        verify_caller(signer::address_of(sender));
 
         let global = borrow_global_mut<MarketManager>(@legato_market);
         assert!( table_with_length::contains( &global.markets, market_id ), ERR_NOT_FOUND);
@@ -574,25 +727,25 @@ module legato_market::generalized {
         };
     }
 
-    // Adds a given address to the admin list.
-    public entry fun add_admin(sender: &signer, admin_address: address) acquires MarketManager {
+    // Adds a given address to the manager list.
+    public entry fun add_manager(sender: &signer, manager_address: address) acquires MarketManager {
         assert!( signer::address_of(sender) == @legato_market , ERR_UNAUTHORIZED);
         let global = borrow_global_mut<MarketManager>(@legato_market);
-        let (found, _) = vector::index_of<address>(&global.admin_list, &admin_address);
+        let (found, _) = vector::index_of<address>(&global.manager_list, &manager_address);
         assert!( found == false , ERR_DUPLICATED);
-        vector::push_back(&mut global.admin_list, admin_address );
+        vector::push_back(&mut global.manager_list, manager_address );
     }
 
-    // Removes a given address from the admin list.
-    public entry fun remove_admin(sender: &signer, admin_address: address) acquires MarketManager {
+    // Removes a given address from the manager list.
+    public entry fun remove_admin(sender: &signer, manager_address: address) acquires MarketManager {
         assert!( signer::address_of(sender) == @legato_market , ERR_UNAUTHORIZED);
         let global = borrow_global_mut<MarketManager>(@legato_market);
-        let (found, index) = vector::index_of<address>(&global.admin_list, &admin_address);
+        let (found, index) = vector::index_of<address>(&global.manager_list, &manager_address);
         assert!( found == true , ERR_NOT_FOUND);
-        vector::swap_remove<address>(&mut global.admin_list, index );
+        vector::swap_remove<address>(&mut global.manager_list, index );
     }
 
-    // Updates the treasury address that receives the commission fee.
+    // Updates the treasury address that receives the winning fee.
     public entry fun update_treasury_adddress(sender: &signer, new_address: address) acquires MarketManager {
         assert!( signer::address_of(sender) == @legato_market , ERR_UNAUTHORIZED);
         let global = borrow_global_mut<MarketManager>(@legato_market);
@@ -627,7 +780,7 @@ module legato_market::generalized {
 
     // Updates the winning fee.
     public entry fun update_winning_fee(sender: &signer, new_value: u64) acquires MarketManager {
-        verify_admin(signer::address_of(sender));
+        verify_caller(signer::address_of(sender));
         assert!(  new_value > 0 && new_value <= 4000, ERR_INVALID_VALUE ); // No more 40%
         let global = borrow_global_mut<MarketManager>(@legato_market);
         global.winning_fee = new_value;
@@ -648,28 +801,46 @@ module legato_market::generalized {
         // Ensure the market exists
         assert!(table_with_length::contains(&global.markets, market_id), ERR_NOT_FOUND);
         let market_store = table_with_length::borrow(&global.markets, market_id);
+        assert!(table_with_length::contains(&market_store.rounds, round_id), ERR_NOT_FOUND);
+        let current_round = table_with_length::borrow(&market_store.rounds, round_id);
 
         // Ensure the round has been resolved
-        assert!( table_with_length::contains( &market_store.resolved, round_id ) == true, ERR_NOT_RESOLVED);
-
+        assert!( current_round.is_resolved == true, ERR_NOT_RESOLVED);
+    
         // Check if the outcome associated with the position is a winning outcome
-        let winning_outcomes = table_with_length::borrow( &market_store.winning_outcomes, round_id );
-
-        let (is_winner, _) = vector::index_of<u64>(winning_outcomes, &outcome_id); 
+        let (is_winner, _) = vector::index_of<u64>(&current_round.winning_outcomes, &outcome_id); 
 
         if (is_winner) {
-
             // Get total bet amount before the given round
-            let previous_round_bets = get_bet_amount_before_round(&market_store.round_bets, round_id);
-            let total_pool_amount = previous_round_bets+*table_with_length::borrow(&market_store.round_bets, round_id);
-             
+            let previous_round_bets = get_bet_amount_before_round(&market_store.rounds, round_id);
+            let this_round_amount = if (current_round.total_bet_amount > current_round.total_disputed_amount) {
+                current_round.total_bet_amount-current_round.total_disputed_amount
+            } else {
+                0
+            };
+            let total_pool_amount = previous_round_bets+this_round_amount;
+            
             let total_winning_bets: u64 = 0;
             let outcome_count: u64 = 0;
+            let my_weight: u64 = 0;
 
             // Sum up the total bets placed on all winning outcomes
-            while (outcome_count < vector::length(winning_outcomes)) {
-                let winning_outcome_id = *vector::borrow( winning_outcomes, outcome_count );
-                total_winning_bets = total_winning_bets+*table_with_length::borrow( &market_store.outcome_bets, winning_outcome_id);
+            while (outcome_count < vector::length(&current_round.winning_outcomes)) {
+                let winning_outcome_id = *vector::borrow( &current_round.winning_outcomes, outcome_count );
+                let outcome_weights = if (table_with_length::contains( &current_round.outcome_weights, winning_outcome_id )) {
+                    *table_with_length::borrow(&current_round.outcome_weights, winning_outcome_id)
+                } else {
+                    SCALE
+                };
+
+                if ( outcome_id == winning_outcome_id ) {
+                    my_weight = outcome_weights;
+                };
+
+                let outcome_weight_ratio = fixed_point64::create_from_rational( (outcome_weights as u128)  , (SCALE as u128) );
+                let adjusted_bet_amount = fixed_point64::multiply_u128( (*table_with_length::borrow( &market_store.outcome_bets, winning_outcome_id) as u128) , outcome_weight_ratio); 
+
+                total_winning_bets = total_winning_bets+(adjusted_bet_amount as u64);
                 outcome_count = outcome_count+1;
             };
 
@@ -682,12 +853,13 @@ module legato_market::generalized {
 
             // Calculate weight ratio
             let weight_ratio = fixed_point64::create_from_rational( (current_round_weight as u128)  , (SCALE as u128) );
-            
             // Adjust the pool amount based on the weight ratio
             let adjusted_pool_amount = fixed_point64::multiply_u128( (total_pool_amount as u128) , weight_ratio); 
 
             // Calculate the share of the pool based on the user's contribution to the total winning bets
-            let user_bet_ratio = fixed_point64::create_from_rational( (current_position.amount as u128), (total_winning_bets as u128));
+            let my_outcome_weight_ratio = fixed_point64::create_from_rational( (my_weight as u128)  , (SCALE as u128) );
+            let my_adjusted_amount = fixed_point64::multiply_u128( (current_position.amount as u128) , my_outcome_weight_ratio); 
+            let user_bet_ratio = fixed_point64::create_from_rational( my_adjusted_amount, (total_winning_bets as u128));
             let payout_amount_for_holder = fixed_point64::multiply_u128( (adjusted_pool_amount) , user_bet_ratio);
 
             (payout_amount_for_holder as u64)
@@ -696,15 +868,24 @@ module legato_market::generalized {
         }
     }
 
-    fun get_bet_amount_before_round(round_bets: &TableWithLength<u64, u64>, round_id: u64) : u64 {
+ 
+    fun get_bet_amount_before_round(rounds: &TableWithLength<u64, Round>, round_id: u64) : u64 {
         let count: u64 = 0;
         let total_amount: u64 = 0;
 
         while ( count < round_id) {
 
-            if (table_with_length::contains( round_bets, count )) {
-                let round_bet = *table_with_length::borrow(round_bets, count);
-                total_amount = total_amount+round_bet;
+            if (table_with_length::contains( rounds, count )) {
+                let current_round = table_with_length::borrow(rounds, count);
+                let available_amount = if (current_round.total_bet_amount > current_round.total_paid_amount) {
+                    current_round.total_bet_amount-current_round.total_paid_amount
+                } else {
+                    0
+                };
+                if (available_amount > current_round.total_disputed_amount) {
+                    available_amount = available_amount-current_round.total_disputed_amount;
+                };
+                total_amount = total_amount+available_amount;
             };
 
             count = count+1;
@@ -713,9 +894,32 @@ module legato_market::generalized {
         (total_amount)
     }
 
-    fun verify_admin(admin_address: address) acquires MarketManager {
+    fun get_market_round_mut(market_store: &mut MarketStore, round_id: u64) : &mut Round {
+        if (table_with_length::contains( &market_store.rounds , round_id )) {
+            table_with_length::borrow_mut( &mut market_store.rounds, round_id )
+        } else {
+            let new_round = Round {
+                total_bet_amount: 0,
+                total_paid_amount: 0,
+                total_disputed_amount: 0,
+                outcome_ids: vector::empty<u64>(),
+                position_ids: vector::empty<u64>(),
+                outcome_weights: table_with_length::new<u64, u64>(),
+                winning_outcomes: vector::empty<u64>(),
+                dispute_claims: vector::empty<u64>(),
+                is_finalized: false,
+                is_resolved: false,
+                resolved_timestamp: 0,
+                finalized_timestamp: 0
+            };
+            table_with_length::add( &mut market_store.rounds, round_id, new_round );
+            table_with_length::borrow_mut( &mut market_store.rounds, round_id )
+        }
+    }
+
+    fun verify_caller(manager_address: address) acquires MarketManager {
         let global = borrow_global<MarketManager>(@legato_market);
-        let (found, _) = vector::index_of<address>(&global.admin_list, &admin_address);
+        let (found, _) = vector::index_of<address>(&global.manager_list, &manager_address);
         assert!( found, ERR_UNAUTHORIZED );
     }
 
