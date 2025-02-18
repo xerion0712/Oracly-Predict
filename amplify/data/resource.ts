@@ -1,6 +1,14 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
+import { faucet } from "../functions/faucet/resource";
 
 const schema = a.schema({
+  Faucet: a
+    .query()
+    .arguments({
+      name: a.string(),
+    })
+    .returns(a.string())
+    .handler(a.handler.function(faucet)),
   User: a
     .model({
       username: a.string().required(),
@@ -65,7 +73,7 @@ const schema = a.schema({
     totalPaidAmount: a.float(),
     totalDisputedAmount: a.float(),
     weight: a.float(),
-    outcomes:  a.hasMany('Outcome', "roundId"),
+    outcomes: a.hasMany('Outcome', "roundId"),
     winningOutcomes: a.integer().array(),
     disputedOutcomes: a.integer().array(),
     status: a.enum(["PENDING", "FINALIZED", "RESOLVED"]),

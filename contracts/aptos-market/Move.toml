@@ -4,7 +4,7 @@ version = "1.0.0"
 authors = []
 
 [addresses]
-legato_market="a354aea25485832cae78f9fa6593094af9d0b9f17f2a62f68e42ac81c8784d9d" 
+legato_market="ab3922ccb1794928abed8f5a5e8d9dac72fed24f88077e46593bed47dcdb7775" 
 
 [dev-addresses]
 
