@@ -8,7 +8,9 @@ const schema = a.schema({
       name: a.string(),
     })
     .returns(a.string())
-    .handler(a.handler.function(faucet)),
+    .handler(a.handler.function(faucet))
+    .authorization((allow) => [allow.publicApiKey()])
+    ,
   User: a
     .model({
       username: a.string().required(),
