@@ -8,10 +8,7 @@ const MarketDetails = () => {
     return (
         <>
             <div className=" grid grid-cols-1 sm:grid-cols-5 gap-3">
-            <div className="col-span-5 mb-2 bg-secondary/10 border-l-4 border-secondary text-secondary p-4 rounded-lg">
- 
-  <p>AI-Agent for this market is being redeployed. We will be back in a few days.</p>
-</div>
+                
                 <div className="col-span-3 flex flex-col ">
                     <Overview />
                     <WalletPanel />
@@ -24,7 +21,7 @@ const MarketDetails = () => {
                 </div>
 
                 <div className="col-span-5 ">
-                    <AllOutcomes/>
+                    <AllOutcomes />
 
                 </div>
 
