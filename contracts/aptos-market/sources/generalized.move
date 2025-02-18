@@ -388,6 +388,12 @@ module legato_market::generalized {
     }
 
     #[view]
+    public fun get_total_positions(): u64 acquires MarketManager {
+        let global = borrow_global<MarketManager>(@legato_market);
+        ( table_with_length::length(&(global.positions)))
+    }
+
+    #[view]
     public fun check_payout_amount(position_id: u64): u64 acquires MarketManager {
         calculate_payout_amount(position_id)
     }
