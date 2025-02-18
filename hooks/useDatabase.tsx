@@ -63,36 +63,37 @@ const useDatabase = () => {
     }
 
     const getOutcomes = async (marketId: string) => {
-        const resources = await client.models.Outcome.list({
-            filter: {
-                marketId: {
-                    eq: marketId
-                }
-            }
-        })
-        return resources.data
+        // const resources = await client.models.Outcome.list({
+        //     filter: {
+        //         marketId: {
+        //             eq: marketId
+        //         }
+        //     }
+        // })
+        // return resources.data
+        return []
     }
 
     const addOutcome = async ({ marketId, roundId, title, dataCrawled }: any) => {
 
-        const { data } = await client.models.Outcome.list()
+        // const { data } = await client.models.Outcome.list()
 
-        const maxTeamId = data.reduce((result: number, item: any) => {
-            if (item.onchainId > result) {
-                result = item.onchainId
-            }
-            return result
-        }, 0)
+        // const maxTeamId = data.reduce((result: number, item: any) => {
+        //     if (item.onchainId > result) {
+        //         result = item.onchainId
+        //     }
+        //     return result
+        // }, 0)
 
-        const onchainId = maxTeamId + 1
+        // const onchainId = maxTeamId + 1
 
-        await client.models.Outcome.create({
-            marketId,
-            onchainId,
-            roundId,
-            title,
-            crawledDataAtCreated: dataCrawled 
-        })
+        // await client.models.Outcome.create({
+        //     marketId,
+        //     onchainId,
+        //     roundId,
+        //     title,
+        //     crawledDataAtCreated: dataCrawled 
+        // })
 
     }
 
