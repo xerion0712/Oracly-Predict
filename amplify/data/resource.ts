@@ -65,7 +65,7 @@ const schema = a.schema({
     totalPaidAmount: a.float(),
     totalDisputedAmount: a.float(),
     weight: a.float(),
-    outcomes:  a.hasMany('Outcomes', "roundId"),
+    outcomes:  a.hasMany('Outcome', "roundId"),
     winningOutcomes: a.integer().array(),
     disputedOutcomes: a.integer().array(),
     status: a.enum(["PENDING", "FINALIZED", "RESOLVED"]),
