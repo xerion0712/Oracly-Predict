@@ -7,8 +7,6 @@ const useAptos = () => {
 
     const { account, signAndSubmitTransaction } = useWallet()
 
-    // const vaultConfig = VaultConfig.find(item => item.name === "aptos")
-
     const getAptosConfig = (isMainnet = true) => {
         const aptosConfig = new AptosConfig({ network: isMainnet ? Network.MAINNET : Network.TESTNET })
         const aptos = new Aptos(aptosConfig)
@@ -46,8 +44,28 @@ const useAptos = () => {
 
     }, [])
 
+    const getBalanceUSDC = useCallback(async (address: any) => {
+
+        const aptos = getAptosConfig(false)
+
+        const payload: InputViewFunctionData = {
+            function: `0x1::primary_fungible_store::balance`,
+            typeArguments: [
+                "0x1::fungible_asset::Metadata"
+            ],
+            functionArguments: [
+                address,
+                "0xc77afa5c74640e7d0f34a7cca073ea4e26d126c60c261b5c2b16c97ac6484f01"
+            ],
+        };
+        const result = await aptos.view({ payload });
+        return result[0] ? Number((BigNumber(`${result[0]}`)).dividedBy(BigNumber(10 ** 6))) : 0;
+
+    }, [])
+
     return {
-        getBalanceAPT
+        getBalanceAPT,
+        getBalanceUSDC
     }
 }
 

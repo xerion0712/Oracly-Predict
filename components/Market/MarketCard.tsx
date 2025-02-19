@@ -9,12 +9,12 @@ const MarketCard = () => {
     return (
         <Link href="/markets/coinmarketcap">
             <div className="flex flex-col group cursor-pointer">
-            <div  className={`  bg-black bg-gradient-to-b  from-white/[0.03]  to-transparent hidden  md:flex flex-row rounded  overflow-hidden  border  border-gray/30   h-[90px]  `} >
+            <div  className={`  bg-black bg-gradient-to-b  from-white/[0.03]  to-transparent hidden  md:flex flex-row rounded-lg  overflow-hidden  border  border-gray/30   h-[90px]  `} >
                 <img src={"./assets/images/coinmarketcap.png"} className="h-full scale-125 rotate-6" alt="" />
 
                 <h3 className="text-xl text-white font-semibold my-auto ml-[40px]">CoinMarketCap.com</h3>
                 <p className="my-auto px-4 ml-2 text-sm  lg:text-base">
-                    Predict anything listed on the 1st page from top token prices to market trends and trading volumes
+                Predict anything listed on the website from top token prices to market trends and trading volumes
                 </p>
 
                 <div className=" flex ml-auto px-4  ">
