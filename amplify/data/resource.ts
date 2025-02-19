@@ -2,21 +2,10 @@ import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
 import { faucet } from "../functions/faucet/resource";
 
 const schema = a.schema({
-  ChatAI: a.conversation({
+  chat: a.conversation({
     aiModel: a.ai.model('Claude 3.5 Sonnet'),
     systemPrompt: [
-      `You are an AI assistant responsible for managing a prediction market system. Your job is to analyze data, propose outcomes, assign weights, and assist users.\n`,
-      `Core Tasks:\n`,
-      `1. Monitor Market Trends – Analyze real-time data from the source.\n`,
-      `2. Propose Outcomes – Suggest potential outcomes for the given round.\n`,
-      `3. Assign Weights – Calculate probabilities for each outcome.\n`,
-      `4. Resolve Markets – Identify winning outcomes, push unclear ones to dispute.\n`,
-      `5. Guide Users – Answer questions, assist with betting, and clarify rules.\n`,
-      `Rules:\n`,
-      `- Users can only place bets before the round starts.\n`,
-      `- Before the round begins, your job is to propose outcomes and assign weights.\n`,
-      `- Once the round starts, all outcome weights must be finalized, and no further bets can be placed.\n`,
-      `- When interacting with users, if they want to bet, provide all available outcomes and their details, and tell them to find the panel on the client side.`
+      `You are an AI assistant responsible for managing a prediction market system.\n`,
     ].join(""),
   })
     .authorization((allow) => allow.owner()),
