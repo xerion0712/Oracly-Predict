@@ -3,7 +3,6 @@ import { Tab, TabGroup, TabList, TabPanel, TabPanels } from '@headlessui/react'
 const System = () => {
     return (
         <>
-
             <TabGroup className="mt-2 h-full flex flex-col ">
                 <TabList className="flex gap-3">
                     {["Top Outcomes", "Total Staked", "Guide"].map((name) => (

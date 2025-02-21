@@ -11,7 +11,7 @@ const app = new FirecrawlApp({ apiKey: FIRECRAWL_API_KEY });
 
 const useDatabase = () => {
 
-    const getProfile = async (userId: string) => { 
+    const getProfile = async (userId: string) => {
         const user = await client.models.User.list({
             filter: {
                 username: {
@@ -30,7 +30,32 @@ const useDatabase = () => {
             return newUser
         } else {
             return user.data[0]
-        } 
+        }
+    }
+
+    const getMarketData = async (marketId: number) => {
+        const markets = await client.models.Market.list({
+            filter: {
+                onchainId: {
+                    eq: marketId
+                }
+            }
+        })
+        return markets && markets.data[0] ? markets.data[0] : undefined
+    }
+
+    const getMyPositions = async (userId: string, marketId: string) => {
+        const positions = await client.models.Position.list({
+            filter: {
+                userId: {
+                    eq: userId
+                },
+                marketId: {
+                    eq: marketId
+                }
+            }
+        })
+        return positions.data 
     }
 
     const getMarkets = async (chainId: string) => {
@@ -62,42 +87,123 @@ const useDatabase = () => {
         return resources.data
     }
 
-    const getOutcomes = async (marketId: string) => {
-        // const resources = await client.models.Outcome.list({
-        //     filter: {
-        //         marketId: {
-        //             eq: marketId
-        //         }
-        //     }
-        // })
-        // return resources.data
-        return []
-    }
+    const getOutcomes = async (marketId: string, roundId: number) => {
 
-    const addOutcome = async ({ marketId, roundId, title, dataCrawled }: any) => {
+        const market = await client.models.Market.get({
+            id: marketId
+        })
 
-        // const { data } = await client.models.Outcome.list()
+        if (!market.data) {
+            throw new Error("Market not found")
+        }
 
-        // const maxTeamId = data.reduce((result: number, item: any) => {
-        //     if (item.onchainId > result) {
-        //         result = item.onchainId
-        //     }
-        //     return result
-        // }, 0)
+        let rounds = await market.data.rounds()
+        let thisRound: any = rounds.data.find((item: any) => item.onchainId === Number(roundId))
 
-        // const onchainId = maxTeamId + 1
-
-        // await client.models.Outcome.create({
-        //     marketId,
-        //     onchainId,
-        //     roundId,
-        //     title,
-        //     crawledDataAtCreated: dataCrawled 
-        // })
+        if (!thisRound) {
+            return []
+        } else {
+            const outcomes = await thisRound.outcomes()
+            return outcomes.data
+        }
 
     }
 
+    const addOutcome = async ({ marketId, roundId, title, resolutionDate }: any) => {
 
+        // create new round if not exist
+        const market = await client.models.Market.get({
+            id: marketId
+        })
+
+        if (!market.data) {
+            throw new Error("Market not found")
+        }
+
+        let rounds = await market.data.rounds()
+        let thisRound: any = rounds.data.find((item: any) => item.onchainId === Number(roundId))
+
+        if (!thisRound) {
+            await client.models.Round.create({
+                marketId,
+                onchainId: Number(roundId)
+            })
+            rounds = await market.data.rounds()
+            thisRound = rounds.data.find((item: any) => item.onchainId === Number(roundId))
+        }
+
+        const outcomes = await thisRound.outcomes()
+
+        const maxOutcomeId = outcomes.data.reduce((result: number, item: any) => {
+            if (item.onchainId > result) {
+                result = item.onchainId
+            }
+            return result
+        }, 0)
+
+        const onchainId = maxOutcomeId + 1
+
+        await client.models.Outcome.create({
+            roundId: thisRound.id,
+            onchainId,
+            title,
+            resolutionDate: Math.floor((new Date(resolutionDate)).valueOf() / 1000)
+        })
+
+    }
+
+    const addPosition = async ({ marketId, userId, roundId, outcomeId, amount }: any) => {
+
+        const positions = await client.models.Position.list()
+
+        const maxPositionId = positions.data.reduce((result: number, item: any) => {
+            if (item.onchainId > result) {
+                result = item.onchainId
+            }
+            return result
+        }, 0)
+
+        const onchainId = maxPositionId
+
+        await client.models.Position.create({
+            marketId,
+            userId,
+            roundId,
+            onchainId,
+            predictedOutcome: outcomeId,
+            betAmount: amount
+        })
+
+    }
+
+    const increaseOutcomeBetAmount = async ({ marketId, roundId, outcomeId, amount }: any) => {
+
+        const market = await client.models.Market.get({
+            id: marketId
+        })
+
+        if (!market.data) {
+            throw new Error("Market not found")
+        }
+
+        let rounds = await market.data.rounds()
+        let thisRound: any = rounds.data.find((item: any) => item.onchainId === Number(roundId))
+
+        const outcomes = await thisRound.outcomes()
+
+        const outcome = outcomes.data.find((item:any) => item.onchainId === outcomeId)
+        
+        await client.models.Outcome.update({
+            id: outcome.id,
+            totalBetAmount: outcome.totalBetAmount + amount
+        })
+
+        await client.models.Market.update({
+            id: marketId,
+            betPoolAmount: market.data.betPoolAmount + amount
+        })
+
+    }
 
 
     const crawl = async (resource: any) => {
@@ -134,7 +240,11 @@ const useDatabase = () => {
         getResources,
         getMarketsByCreator,
         addOutcome,
-        getOutcomes
+        getOutcomes,
+        getMarketData,
+        addPosition,
+        increaseOutcomeBetAmount,
+        getMyPositions
     }
 }
 

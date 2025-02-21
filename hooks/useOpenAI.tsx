@@ -1,15 +1,12 @@
- 
-import type { Schema } from "../amplify/data/resource"
-import { generateClient } from "aws-amplify/api"
 
-const client = generateClient<Schema>()
+import OpenAI from "openai";
 
-
-
-const useAI = () => {
+const useOpenAI = () => {
 
 
     const query = async (messages: any) => {
+
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, dangerouslyAllowBrowser: true });
 
         const tools: any = [{
             "type": "function",
@@ -65,12 +62,15 @@ const useAI = () => {
         }
         ];
 
-        const result: any = await client.queries.Chat({
-            messages: JSON.stringify(messages),
-            tools: JSON.stringify(tools)
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages,
+            tools,
+            store: false,
         })
- 
-        return JSON.parse(result.data)
+
+        return completion.choices[0].message
+
     }
 
     return {
@@ -78,4 +78,4 @@ const useAI = () => {
     }
 }
 
-export default useAI
+export default useOpenAI

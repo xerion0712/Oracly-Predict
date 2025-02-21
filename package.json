@@ -11,7 +11,7 @@
   "dependencies": {
     "@aptos-labs/wallet-adapter-ant-design": "2.3.2",
     "@aws-amplify/ui-react": "^6.5.5",
-    "@aws-amplify/ui-react-ai": "^1.0.0",
+    "@aws-amplify/ui-react-ai": "^1.3.0",
     "@bitget-wallet/aptos-wallet-adapter": "^0.1.2",
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "^2.1.1",
@@ -33,6 +33,7 @@
     "fewcha-plugin-wallet-adapter": "^0.1.3",
     "next": "14.2.10",
     "next-sitemap": "^4.2.3",
+    "openai": "^4.85.2",
     "petra-plugin-wallet-adapter": "^0.4.5",
     "react": "^18",
     "react-18-image-lightbox": "^5.1.4",
@@ -43,6 +44,8 @@
     "react-feather": "^2.0.10",
     "react-icons": "^5.4.0",
     "react-loading-icons": "^1.1.0",
+    "react-markdown": "^9.0.3",
+    "rehype-highlight": "^7.0.2",
     "swiper": "^10.0.0",
     "typewriter-effect": "^2.21.0",
     "usehooks-ts": "^2.16.0"

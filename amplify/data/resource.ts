@@ -1,6 +1,27 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
+import { faucet } from "../functions/faucet/resource";
+import { chat } from "../functions/chat/resource";
 
 const schema = a.schema({
+  Faucet: a
+    .query()
+    .arguments({
+      name: a.string(),
+    })
+    .returns(a.string())
+    .handler(a.handler.function(faucet))
+    .authorization((allow) => [allow.publicApiKey()])
+  ,
+  Chat: a
+    .query()
+    .arguments({
+      messages: a.json(),
+      tools: a.json(),
+    })
+    .returns(a.json())
+    .handler(a.handler.function(chat))
+    .authorization((allow) => [allow.publicApiKey()])
+  ,
   User: a
     .model({
       username: a.string().required(),
@@ -65,7 +86,7 @@ const schema = a.schema({
     totalPaidAmount: a.float(),
     totalDisputedAmount: a.float(),
     weight: a.float(),
-    outcomes:  a.hasMany('Outcome', "roundId"),
+    outcomes: a.hasMany('Outcome', "roundId"),
     winningOutcomes: a.integer().array(),
     disputedOutcomes: a.integer().array(),
     status: a.enum(["PENDING", "FINALIZED", "RESOLVED"]),
