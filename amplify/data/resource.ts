@@ -16,6 +16,7 @@ const schema = a.schema({
     .query()
     .arguments({
       messages: a.json(),
+      tools: a.json(),
     })
     .returns(a.json())
     .handler(a.handler.function(chat))

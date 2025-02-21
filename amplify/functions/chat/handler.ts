@@ -6,38 +6,13 @@ import OpenAI from "openai";
 export const handler: Schema["Chat"]["functionHandler"] = async (event) => {
  
   const messages: any = event.arguments.messages
+  const tools: any = event.arguments.tools
 
   console.log("incoming messages: ", messages)
+  console.log("incoming tools: ", tools)
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-  const tools: any = [{
-    "type": "function",
-    "function": {
-      "name": "create_outcome",
-      "description": "Create a new outcome with a title and the resolution date.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "description": "Outcome title."
-          },
-          "resolutionDate": {
-            "type": "string",
-            "description": "Outcome resolution date."
-          }
-        },
-        "required": [
-          "title",
-          "resolutionDate"
-        ],
-        "additionalProperties": false
-      },
-      "strict": true
-    }
-  }];
-
+ 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
     messages,
