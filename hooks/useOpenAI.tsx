@@ -33,7 +33,34 @@ const useOpenAI = () => {
                 },
                 "strict": true
             }
-        }];
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "place_bet",
+                "description": "Place a bet with the round ID and outcome ID.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "roundId": {
+                            "type": "number",
+                            "description": "Round ID."
+                        },
+                        "outcomeId": {
+                            "type": "number",
+                            "description": "Outcome ID."
+                        }
+                    },
+                    "required": [
+                        "roundId",
+                        "outcomeId"
+                    ],
+                    "additionalProperties": false
+                },
+                "strict": true
+            }
+        }
+        ];
 
         const completion = await openai.chat.completions.create({
             model: "gpt-4o",

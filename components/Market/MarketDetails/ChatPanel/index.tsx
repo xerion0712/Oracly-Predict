@@ -12,18 +12,23 @@ import Agent from "../../../../amplify/lib/agent"
 import { parseTables } from "../../../../helpers"
 // import useAtoma from '@/hooks/useAtoma';
 import useOpenAI from '@/hooks/useOpenAI';
+import useAI from "../../../../hooks/useAI"
 import NewOutcomeModal from '@/modals/newOutcome/new';
+
+
 
 const ChatPanel = ({
     currentRound,
     marketData,
-    onchainMarket
+    onchainMarket,
+    openBetModal
 }: any) => {
 
 
     const [isConnected, setConnected] = useState<boolean>(true)
     const { getOutcomes, crawl } = useDatabase()
-    const { query } = useOpenAI()
+    // const { query } = useOpenAI()
+    const { query } = useAI()
 
     const { currentProfile }: any = useContext(LegatoContext)
 
@@ -75,7 +80,7 @@ const ChatPanel = ({
             const outcomes = await getOutcomes(marketData.id, currentRound)
             const outcomePrompt = agent.getOutcomePrompt(outcomes)
             messages[1] = outcomePrompt
-            
+
             dispatch({
                 messages
             })
@@ -102,39 +107,9 @@ const ChatPanel = ({
 
         try {
 
-            const result = await query([...messages, userPrompt])
+            const result :any = await query([...messages, userPrompt])
 
-            // const result: any = {
-            //     "role": "assistant",
-            //     "content": null,
-            //     "tool_calls": [
-            //         {
-            //             "id": "call_xaZ8ASYIlShsdHcNhldIxD9p",
-            //             "type": "function",
-            //             "function": {
-            //                 "name": "create_outcome",
-            //                 "arguments": "{\"title\": \"Bitcoin (BTC) to exceed $100,000 by March 4, 2025\", \"resolutionDate\": \"2025-03-04\"}"
-            //             }
-            //         },
-            //         {
-            //             "id": "call_cJB1mrUI7EWxMJ2nUTqwa75A",
-            //             "type": "function",
-            //             "function": {
-            //                 "name": "create_outcome",
-            //                 "arguments": "{\"title\": \"Ethereum (ETH) to rise above $3,000 by March 4, 2025\", \"resolutionDate\": \"2025-03-04\"}"
-            //             }
-            //         },
-            //         {
-            //             "id": "call_7Ak9LZCmhil4ulYxoVrjM8Kx",
-            //             "type": "function",
-            //             "function": {
-            //                 "name": "create_outcome",
-            //                 "arguments": "{\"title\": \"XRP to reach $3 by March 4, 2025\", \"resolutionDate\": \"2025-03-04\"}"
-            //             }
-            //         }
-            //     ],
-            //     "refusal": null
-            // }
+            console.log("result: ", result)
 
             if (result.content) {
                 dispatch({
@@ -144,17 +119,39 @@ const ChatPanel = ({
                     }]
                 })
             } else if (result.tool_calls) {
-                const outcomes = result.tool_calls.map((tool: any) => {
+
+                const outcomes = result.tool_calls.filter((tool:any) => tool.function.name === "create_outcome").map((tool: any) => {
                     return JSON.parse(tool.function.arguments)
                 })
 
-                dispatch({
-                    outcomes: [...outcomes],
-                    messages: [...messages, userPrompt, {
-                        role: "assistant",
-                        content: "A confirmation popup will appear."
-                    }]
+                if (outcomes.length > 0) {
+                    dispatch({
+                        outcomes: [...outcomes],
+                        messages: [...messages, userPrompt, {
+                            role: "assistant",
+                            content: "A confirmation popup will appear."
+                        }]
+                    })
+                }
+
+                const bets = result.tool_calls.filter((tool:any) => tool.function.name === "place_bet").map((tool: any) => {
+                    return JSON.parse(tool.function.arguments)
                 })
+
+                if (bets.length > 0) {
+                    dispatch({
+                        messages: [...messages, userPrompt, {
+                            role: "assistant",
+                            content: "A confirmation popup will appear."
+                        }]
+                    })
+                    const currentBet = bets[0] 
+                    openBetModal({
+                        marketId: marketData.id,
+                        roundId: currentBet.roundId,
+                        outcomeId: currentBet.outcomeId,
+                    })
+                }
 
             }
 
@@ -168,7 +165,7 @@ const ChatPanel = ({
             loading: false
         })
 
-    }, [text, messages])
+    }, [text, messages, marketData])
 
     const chatContainerRef: any = useRef(null);
 

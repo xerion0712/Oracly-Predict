@@ -44,6 +44,20 @@ const useDatabase = () => {
         return markets && markets.data[0] ? markets.data[0] : undefined
     }
 
+    const getMyPositions = async (userId: string, marketId: string) => {
+        const positions = await client.models.Position.list({
+            filter: {
+                userId: {
+                    eq: userId
+                },
+                marketId: {
+                    eq: marketId
+                }
+            }
+        })
+        return positions.data 
+    }
+
     const getMarkets = async (chainId: string) => {
         // const markets = await client.models.Market.list({
         //     filter: {
@@ -74,7 +88,7 @@ const useDatabase = () => {
     }
 
     const getOutcomes = async (marketId: string, roundId: number) => {
-        
+
         const market = await client.models.Market.get({
             id: marketId
         })
@@ -84,15 +98,15 @@ const useDatabase = () => {
         }
 
         let rounds = await market.data.rounds()
-        let thisRound: any = rounds.data.find((item:any) => item.onchainId === Number(roundId) )
+        let thisRound: any = rounds.data.find((item: any) => item.onchainId === Number(roundId))
 
-        if (!thisRound) { 
+        if (!thisRound) {
             return []
         } else {
             const outcomes = await thisRound.outcomes()
             return outcomes.data
         }
-            
+
     }
 
     const addOutcome = async ({ marketId, roundId, title, resolutionDate }: any) => {
@@ -107,19 +121,19 @@ const useDatabase = () => {
         }
 
         let rounds = await market.data.rounds()
-        let thisRound: any = rounds.data.find((item:any) => item.onchainId === Number(roundId) )
+        let thisRound: any = rounds.data.find((item: any) => item.onchainId === Number(roundId))
 
-        if (!thisRound) { 
+        if (!thisRound) {
             await client.models.Round.create({
                 marketId,
                 onchainId: Number(roundId)
             })
             rounds = await market.data.rounds()
-            thisRound = rounds.data.find((item:any) => item.onchainId === Number(roundId) )
+            thisRound = rounds.data.find((item: any) => item.onchainId === Number(roundId))
         }
 
         const outcomes = await thisRound.outcomes()
- 
+
         const maxOutcomeId = outcomes.data.reduce((result: number, item: any) => {
             if (item.onchainId > result) {
                 result = item.onchainId
@@ -137,6 +151,60 @@ const useDatabase = () => {
         })
 
     }
+
+    const addPosition = async ({ marketId, userId, roundId, outcomeId, amount }: any) => {
+
+        const positions = await client.models.Position.list()
+
+        const maxPositionId = positions.data.reduce((result: number, item: any) => {
+            if (item.onchainId > result) {
+                result = item.onchainId
+            }
+            return result
+        }, 0)
+
+        const onchainId = maxPositionId
+
+        await client.models.Position.create({
+            marketId,
+            userId,
+            roundId,
+            onchainId,
+            predictedOutcome: outcomeId,
+            betAmount: amount
+        })
+
+    }
+
+    const increaseOutcomeBetAmount = async ({ marketId, roundId, outcomeId, amount }: any) => {
+
+        const market = await client.models.Market.get({
+            id: marketId
+        })
+
+        if (!market.data) {
+            throw new Error("Market not found")
+        }
+
+        let rounds = await market.data.rounds()
+        let thisRound: any = rounds.data.find((item: any) => item.onchainId === Number(roundId))
+
+        const outcomes = await thisRound.outcomes()
+
+        const outcome = outcomes.data.find((item:any) => item.onchainId === outcomeId)
+        
+        await client.models.Outcome.update({
+            id: outcome.id,
+            totalBetAmount: outcome.totalBetAmount + amount
+        })
+
+        await client.models.Market.update({
+            id: marketId,
+            betPoolAmount: market.data.betPoolAmount + amount
+        })
+
+    }
+
 
     const crawl = async (resource: any) => {
 
@@ -173,7 +241,10 @@ const useDatabase = () => {
         getMarketsByCreator,
         addOutcome,
         getOutcomes,
-        getMarketData
+        getMarketData,
+        addPosition,
+        increaseOutcomeBetAmount,
+        getMyPositions
     }
 }
 

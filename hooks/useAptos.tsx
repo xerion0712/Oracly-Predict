@@ -94,10 +94,39 @@ const useAptos = () => {
 
     }, [])
 
+    const placeBet = useCallback(async (marketId: number, roundId: number, outcomeId: number, betAmount: number) => {
+
+        if (!account) {
+            return
+        }
+
+        const aptos = getAptosConfig(false)
+
+        const transaction: any = {
+            data: {
+                function: `0xab3922ccb1794928abed8f5a5e8d9dac72fed24f88077e46593bed47dcdb7775::generalized::place_bet`,
+                functionArguments: [
+                    marketId,
+                    roundId,
+                    outcomeId,
+                    `${(BigNumber(betAmount)).multipliedBy(BigNumber(10 ** 6))}`
+                ]
+            }
+        }
+
+        const response = await signAndSubmitTransaction(transaction);
+        // wait for transaction
+        await aptos.waitForTransaction({ transactionHash: response.hash });
+
+        return response.hash
+
+    }, [account])
+
     return {
         getBalanceAPT,
         getBalanceUSDC,
-        getMarketInfo
+        getMarketInfo,
+        placeBet
     }
 }
 

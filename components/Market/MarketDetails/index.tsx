@@ -11,6 +11,10 @@ import System from "./System"
 import WalletPanel from "./WalletPanel"
 import useAptos from '@/hooks/useAptos'
 import useDatabase from '@/hooks/useDatabase'
+import { ArrowLeft, ArrowRight } from "react-feather"
+import AvailableBets from './AvailableBets'
+import PlaceBetModal from "../../../modals/placeBet"
+import MyBetPositions from './MyBetPositions'
 
 // Fixed on this version
 const MARKET_ID = 1
@@ -20,18 +24,23 @@ const MarketDetails = () => {
     const [modal, setModal] = useState(false)
 
     const { getMarketInfo } = useAptos()
-    const {  getMarketData } = useDatabase()
+    const { getMarketData } = useDatabase()
 
     const [marketData, setMarketData] = useState<any>()
     const [onchainMarket, setOnchainMarket] = useState<any>()
+    const [bet, setBet] = useState<any>(undefined)
 
     useEffect(() => {
         getMarketInfo(MARKET_ID).then(setOnchainMarket)
     }, [])
 
     useEffect(() => {
-        getMarketData(MARKET_ID ).then(setMarketData)
+        getMarketData(MARKET_ID).then(setMarketData)
     }, [])
+
+    const openBetModal = (entry: any) => {
+        setBet(entry)
+    }
 
     const currentRound = onchainMarket ? onchainMarket.round : 0
 
@@ -41,6 +50,12 @@ const MarketDetails = () => {
             <FaucetModal
                 visible={modal}
                 close={() => setModal(false)}
+            />
+
+            <PlaceBetModal
+                visible={bet}
+                close={() => setBet(undefined)}
+                bet={bet}
             />
 
             <TabGroup className=" grid grid-cols-1 sm:grid-cols-5 gap-3">
@@ -61,7 +76,6 @@ const MarketDetails = () => {
                         }}
                     />
 
-
                     <TabList className="flex gap-3 mt-2.5">
                         {["💬 Chat", "🎯 Available Outcomes", "⚡ My Positions"].map((name) => (
                             <Tab
@@ -78,26 +92,40 @@ const MarketDetails = () => {
 
                 <div className="col-span-2 flex flex-col h-full  ">
 
-                    <Ranking />
+                    <Ranking
+                        currentRound={currentRound}
+                        marketData={marketData}
+                    />
 
                 </div>
 
                 <div className="col-span-5">
 
                     <TabPanels className="mt-2 h-full ">
-                        <TabPanel className="    ">
-                            <ChatPanel 
+                        <TabPanel >
+                            <ChatPanel
                                 currentRound={currentRound}
                                 marketData={marketData}
                                 onchainMarket={onchainMarket}
+                                openBetModal={openBetModal}
                             />
 
                         </TabPanel>
-                        <TabPanel className=" ">
-                            BBB
+                        <TabPanel >
+
+                            <AvailableBets
+                                currentRound={currentRound}
+                                marketData={marketData}
+                                onchainMarket={onchainMarket}
+                                openBetModal={openBetModal}
+                            />
                         </TabPanel>
-                        <TabPanel className=" ">
-                            CCC
+                        <TabPanel >
+
+                            <MyBetPositions
+                                marketData={marketData}
+                            />
+
                         </TabPanel>
 
                     </TabPanels>
