@@ -28,9 +28,9 @@ const WalletBalance = () => {
                         <WalletSelector />
                     </div>
                 </div>
-                <div className={`  `}>
+                <div className={`  text-lg`}>
                     <div className="flex flex-row">
-                        <h2 className="my-auto">
+                        <h2 className="my-auto font-semibold">
                             Your Balance
                         </h2>
                         <img src="https://s2.coinmarketcap.com/static/img/coins/64x64/3408.png" className="h-5 w-5 my-auto mx-1.5" />

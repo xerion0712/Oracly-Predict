@@ -13,6 +13,39 @@ const useAtoma = () => {
         }
     )
 
+    const query = async (messages: any) => {
+
+        const response = await axios.post(
+            'https://api.atoma.network/v1/chat/completions',
+            {
+                stream: false,
+                model: 'deepseek-ai/DeepSeek-R1',
+                messages,
+                max_tokens: 1024
+            },
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${ATOMA_API_KEY}`
+                }
+            }
+        )
+
+        let result = response.data.choices[0].message.content
+
+        const lastThinkIndex = result.lastIndexOf("</think>");
+
+        if (lastThinkIndex !== -1) {
+            result = result.slice(lastThinkIndex + 8).trim(); // Content after the last colon
+        }
+
+        return result
+
+    }
+
+
+    // From below are unused
+
     const generateOutcome = async ({ context, topic, asset }: any) => {
 
         let messages = [
@@ -24,7 +57,7 @@ const useAtoma = () => {
                 role: 'user',
                 content: [
                     `Suggest a possible prediction outcome on the topic ${topic} from the provided content.\n`,
-                    asset ? "And around asset "+asset : "",
+                    asset ? "And around asset " + asset : "",
                     `With the resolution date set within the week if today is ${(new Date()).toDateString()}\n`,
                     "Provided content:",
                     context
@@ -44,21 +77,21 @@ const useAtoma = () => {
             },
             getHeader()
         )
- 
+
         let content = response.data.choices[0].message.content
         content = content.split("</think>")[1]
-        
+
         console.log("final content : ", content)
- 
+
         const regex = /\*\*.*?\*\*\s*([\s\S]*?)(?=\n\*\*|$)/;
 
         const match = content.match(regex);
-        if (match) { 
-          return (match[1].trim()).replaceAll("*", "")
+        if (match) {
+            return (match[1].trim()).replaceAll("*", "")
         } else {
-          return undefined
+            return undefined
         }
-        
+
     }
 
     const fetchTeams = async ({ context, hackathon }: any) => {
@@ -284,7 +317,8 @@ const useAtoma = () => {
     return {
         fetchTeams,
         reviewTeam,
-        generateOutcome
+        generateOutcome,
+        query
     }
 
 }

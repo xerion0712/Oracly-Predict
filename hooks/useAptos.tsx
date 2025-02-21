@@ -63,9 +63,41 @@ const useAptos = () => {
 
     }, [])
 
+    const getMarketInfo = useCallback(async (marketId: number) => {
+
+        const aptos = getAptosConfig(false)
+
+        const payload: InputViewFunctionData = {
+            function: `0xab3922ccb1794928abed8f5a5e8d9dac72fed24f88077e46593bed47dcdb7775::generalized::get_market_data`,
+            functionArguments: [
+                marketId
+            ],
+        };
+
+        const result = await aptos.view({ payload });
+
+        const entry = {
+            balance: result[0],
+            maxBet: result[1],
+            createdTime: result[2],
+            interval: result[3]
+        }
+
+        const diff = (new Date().valueOf()) - (Number(entry.createdTime) * 1000)
+        const interval = Number(entry.interval) * 1000
+        const round = Math.round(diff / interval) + 1
+
+        return {
+            round,
+            ...entry
+        }
+
+    }, [])
+
     return {
         getBalanceAPT,
-        getBalanceUSDC
+        getBalanceUSDC,
+        getMarketInfo
     }
 }
 

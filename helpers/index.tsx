@@ -1,6 +1,6 @@
 
 export const shortAddress = (address: string, first = 6, last = -4) => {
-    if (!address) return '' 
+    if (!address) return ''
     return `${address.slice(0, first)}...${address.slice(last)}`
 }
 
@@ -147,9 +147,9 @@ export const vaultTypeToTokenName = (vaultType: string) => {
 
 export const parseCoinType = (input: string | undefined) => {
     if (input === undefined) {
-        return 
+        return
     }
-    
+
     input = input.replaceAll("0x", "")
 
     if (input === "2::sui::SUI") {
@@ -157,4 +157,17 @@ export const parseCoinType = (input: string | undefined) => {
     }
 
     return input
+}
+
+ 
+
+export const parseTables = (input: string) => {
+    const tableRegex = /\|.*\|\n(\|[-| ]+\|\n)?([\s\S]*?)\|.*\|/g;
+    const tables = input.match(tableRegex);
+    return tables ? cleanUrls(tables.join("\n")) : undefined
+}
+
+export const cleanUrls = (input: string) => {
+    const cleanTable = (input.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1')).replace(/!\[.*?<br><br>(.*?)<br><br>.*?\]\(.*?\)/g, '$1');
+    return cleanTable
 }
