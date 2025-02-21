@@ -1,14 +1,8 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
 import { faucet } from "../functions/faucet/resource";
+import { chat } from "../functions/chat/resource";
 
 const schema = a.schema({
-  chat: a.conversation({
-    aiModel: a.ai.model('Claude 3.5 Sonnet'),
-    systemPrompt: [
-      `You are an AI assistant responsible for managing a prediction market system.\n`,
-    ].join(""),
-  })
-    .authorization((allow) => allow.owner()),
   Faucet: a
     .query()
     .arguments({
@@ -16,6 +10,15 @@ const schema = a.schema({
     })
     .returns(a.string())
     .handler(a.handler.function(faucet))
+    .authorization((allow) => [allow.publicApiKey()])
+  ,
+  Chat: a
+    .query()
+    .arguments({
+      messages: a.json(),
+    })
+    .returns(a.json())
+    .handler(a.handler.function(chat))
     .authorization((allow) => [allow.publicApiKey()])
   ,
   User: a
