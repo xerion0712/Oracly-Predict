@@ -10,5 +10,6 @@ export const chat = defineFunction({
   entry: './handler.ts',
   environment: {
     OPENAI_API_KEY: secret('OPENAI_API_KEY')
-  }
+  },
+  timeoutSeconds: 100
 });
