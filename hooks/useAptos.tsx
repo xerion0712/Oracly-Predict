@@ -85,7 +85,7 @@ const useAptos = () => {
 
         const diff = (new Date().valueOf()) - (Number(entry.createdTime) * 1000)
         const interval = Number(entry.interval) * 1000
-        const round = Math.round(diff / interval) + 1
+        const round = Math.floor(diff / interval) + 1
 
         return {
             round,
