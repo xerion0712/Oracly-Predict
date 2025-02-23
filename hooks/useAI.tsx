@@ -7,7 +7,6 @@ const client = generateClient<Schema>()
 
 const useAI = () => {
 
-
     const query = async (messages: any) => {
 
         const tools: any = getUserTools()
@@ -15,6 +14,14 @@ const useAI = () => {
         const result: any = await client.queries.Chat({
             messages: JSON.stringify(messages),
             tools: JSON.stringify(tools)
+        })
+
+        return JSON.parse(result.data)
+    }
+
+    const parse = async (messages: any) => {
+        const result: any = await client.queries.WeightAssignment({
+            messages: JSON.stringify(messages)
         })
 
         return JSON.parse(result.data)
@@ -77,7 +84,8 @@ const useAI = () => {
     }
 
     return {
-        query
+        query,
+        parse
     }
 }
 

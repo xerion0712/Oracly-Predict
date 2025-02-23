@@ -5,11 +5,12 @@ import Agent from "../../../../amplify/lib/agent"
 import { parseTables } from "../../../../helpers"
 import { useInterval } from "@/hooks/useInterval"
 import useOpenAI from "@/hooks/useOpenAI"
-
+import useAI from "@/hooks/useAI"
 
 const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }: any) => {
 
-    const { parse } = useOpenAI()
+    // const { parse } = useOpenAI()
+    const { parse } = useAI()
 
     const [interval, setInterval] = useState(100)
 
