@@ -48,7 +48,8 @@
     "rehype-highlight": "^7.0.2",
     "swiper": "^10.0.0",
     "typewriter-effect": "^2.21.0",
-    "usehooks-ts": "^2.16.0"
+    "usehooks-ts": "^2.16.0",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@aws-amplify/backend": "^1.7.0",

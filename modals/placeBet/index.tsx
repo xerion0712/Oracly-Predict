@@ -31,21 +31,21 @@ const PlaceBetModal = ({ visible, close, bet }: any) => {
             amount: 0,
             errorMessage: undefined,
             loading: false,
-            outcome: undefined
+            outcome: undefined,
+            outcomes: []
         }
     )
 
-   
+    const { outcome, amount, loading, errorMessage, outcomes } = values
 
-    const { outcome, amount, loading, errorMessage } = values
- 
     useEffect(() => {
-        dispatch({outcome: undefined})
+        dispatch({ outcome: undefined, outcomes: [] })
         bet && getOutcomes(bet.marketId, bet.roundId).then(
             (outcomes) => {
                 const entry = outcomes.find((item: any) => item.onchainId === bet.outcomeId)
                 dispatch({
-                    outcome: entry
+                    outcome: entry,
+                    outcomes
                 })
             }
         )
@@ -69,7 +69,7 @@ const PlaceBetModal = ({ visible, close, bet }: any) => {
             dispatch({ errorMessage: "Invalid amount" })
             return
         }
-        
+
         dispatch({ loading: true })
 
         try {
@@ -84,7 +84,7 @@ const PlaceBetModal = ({ visible, close, bet }: any) => {
             const marketId = bet.marketId
             const walletAddress = address
 
-            await addPosition({ marketId, userId, roundId, outcomeId, amount, walletAddress})
+            await addPosition({ marketId, userId, roundId, outcomeId, amount, walletAddress })
             await increaseOutcomeBetAmount({ marketId, roundId, outcomeId, amount })
 
             dispatch({ amount: 0 })
@@ -101,7 +101,41 @@ const PlaceBetModal = ({ visible, close, bet }: any) => {
 
         dispatch({ loading: false })
 
-    },[amount, bet, address, currentProfile])
+    }, [amount, bet, address, currentProfile])
+
+    const totalPool = outcomes.reduce((output: number, item: any) => {
+        if (item && item.totalBetAmount) {
+            output = output + item.totalBetAmount
+        }
+        return output
+    }, 0)
+
+    let minPayout = 0
+    let maxPayout = 0
+    let odds = 0
+
+    if (outcome && outcomes) {
+        const totalPoolAfter = totalPool + amount
+
+        // Assumes all outcomes won
+        const totalShares = outcomes.reduce((output: number, item: any) => {
+            if (item && item.totalBetAmount) {
+                output = output + (item.totalBetAmount * (item.weight))
+            }
+            if (item.onchainId === outcome.onchainId) {
+                output = output + (amount * (item.weight))
+            }
+            return output
+        }, 0)
+        const outcomeShares = (outcome.totalBetAmount + amount) * (outcome.weight)
+        const ratio = outcomeShares / totalShares
+        
+        odds =  ((ratio) * totalPoolAfter) * (1 / (outcome.totalBetAmount + 1))
+        minPayout = ((ratio) * totalPoolAfter) * (amount / (outcome.totalBetAmount + amount))
+
+        // when only selected outcome won
+        maxPayout = totalPoolAfter * (amount / (outcome.totalBetAmount + amount))
+    }
 
     return (
         <BaseModal visible={visible} close={close} title={"Place Your Bet"} maxWidth="max-w-xl">
@@ -129,10 +163,17 @@ const PlaceBetModal = ({ visible, close, bet }: any) => {
                                                 {` ${(new Date(Number(outcome.resolutionDate) * 1000)).toUTCString()}`}
                                             </div>
                                         </div>
+
                                         <div className=" py-0.5 text-sm  flex flex-row">
                                             <span className="font-bold mr-2">Current Odds:</span>
                                             <div className={`   flex flex-row  text-white text-sm `}>
-                                                N/A
+                                                {`${outcome.weight ? odds.toLocaleString() : "N/A"}`}
+                                            </div>
+                                        </div>
+                                        <div className=" py-0.5 text-sm  flex flex-row">
+                                            <span className="font-bold mr-2">Round Pool:</span>
+                                            <div className={`   flex flex-row  text-white text-sm `}>
+                                                {`${totalPool} USDC`}
                                             </div>
                                         </div>
                                         {/* <div className=" py-0.5 text-sm  flex flex-row">
@@ -183,8 +224,8 @@ const PlaceBetModal = ({ visible, close, bet }: any) => {
                                         <div className="px-1 mt-4">
                                             <ListGroup
                                                 items={[
-                                                    // ["Potential payout", `${(1 * amount).toLocaleString()} APT`],
-                                                    ["Estimate payout date", `N/A`],
+                                                    ["Potential payout", `${(minPayout).toLocaleString()} - ${(maxPayout.toLocaleString())} USDC`],
+                                                    // ["Estimate payout date", `N/A`],
                                                     ["Winning fee", "10%"],
                                                 ]}
                                             />
@@ -211,25 +252,25 @@ const PlaceBetModal = ({ visible, close, bet }: any) => {
 
                                         </div>
 
-                                            {errorMessage && (
-                                                <div className='text-gray-400 mt-2 text-sm font-medium  text-center w-full '>
-                                                    <div className='p-2 pb-0 text-secondary'>
-                                                        {errorMessage}
-                                                    </div>
+                                        {errorMessage && (
+                                            <div className='text-gray-400 mt-2 text-sm font-medium  text-center w-full '>
+                                                <div className='p-2 pb-0 text-secondary'>
+                                                    {errorMessage}
                                                 </div>
-                                            )}
-                                            <style>
-                                                {
+                                            </div>
+                                        )}
+                                        <style>
+                                            {
 
-                                                    `
+                                                `
                                         .wallet-button {
                                             width: 100%;
                                             z-index: 1;
                                             border-width: 0px;
                                         } 
                                         `
-                                                }
-                                            </style>
+                                            }
+                                        </style>
 
                                     </div>
                                 </div>

@@ -55,7 +55,7 @@ const useDatabase = () => {
                 }
             }
         })
-        return positions.data 
+        return positions.data
     }
 
     const getMarkets = async (chainId: string) => {
@@ -152,6 +152,43 @@ const useDatabase = () => {
 
     }
 
+    const updateOutcomeWeight = async ({ marketId, roundId, weights }: any) => {
+
+        const market = await client.models.Market.get({
+            id: marketId
+        })
+
+        if (!market.data) {
+            throw new Error("Market not found")
+        }
+
+        const rounds = await market.data.rounds()
+        const thisRound: any = rounds.data.find((item: any) => item.onchainId === Number(roundId))
+
+        const outcomes = await thisRound.outcomes()
+
+        for (let outcome of outcomes.data) {
+
+            const currentOutcome = weights.find((item: any) => item.outcomeId === outcome.onchainId)
+            const weight = currentOutcome.outcomeWeight
+
+            console.log("updating..", outcome.id, weight)
+
+            await client.models.Outcome.update({
+                id: outcome.id,
+                weight
+            })
+
+        }
+
+        const lastWeightUpdatedAt = Math.floor((new Date().valueOf()) / 1000)
+
+        await client.models.Round.update({
+            id: thisRound.id,
+            lastWeightUpdatedAt
+        })
+    }
+
     const addPosition = async ({ marketId, userId, roundId, outcomeId, amount, walletAddress }: any) => {
 
         const positions = await client.models.Position.list()
@@ -192,8 +229,8 @@ const useDatabase = () => {
 
         const outcomes = await thisRound.outcomes()
 
-        const outcome = outcomes.data.find((item:any) => item.onchainId === outcomeId)
-        
+        const outcome = outcomes.data.find((item: any) => item.onchainId === outcomeId)
+
         await client.models.Outcome.update({
             id: outcome.id,
             totalBetAmount: outcome.totalBetAmount + amount
@@ -245,7 +282,8 @@ const useDatabase = () => {
         getMarketData,
         addPosition,
         increaseOutcomeBetAmount,
-        getMyPositions
+        getMyPositions,
+        updateOutcomeWeight
     }
 }
 

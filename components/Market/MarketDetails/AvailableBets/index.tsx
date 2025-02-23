@@ -1,22 +1,107 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { ArrowLeft, ArrowRight } from "react-feather"
 import useDatabase from "../../../../hooks/useDatabase"
-
+import Agent from "../../../../amplify/lib/agent"
+import { parseTables } from "../../../../helpers"
+import { useInterval } from "@/hooks/useInterval"
+import useOpenAI from "@/hooks/useOpenAI"
+import useAI from "@/hooks/useAI"
 
 const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }: any) => {
 
-    const { getOutcomes } = useDatabase()
+    // const { parse } = useOpenAI()
+    const { parse } = useAI()
+
+    const [interval, setInterval] = useState(100)
+
+    const { getOutcomes, crawl, updateOutcomeWeight } = useDatabase()
 
     const [outcomes, setOutcomes] = useState([])
     const [current, setCurrent] = useState(0)
+    const [tick, setTick] = useState<number>(0)
 
     useEffect(() => {
         currentRound && setCurrent(currentRound)
     }, [currentRound])
 
+    const increaseTick = useCallback(() => {
+        setTick(tick + 1)
+    }, [tick])
+
     useEffect(() => {
         current > 0 && marketData ? getOutcomes(marketData.id, current).then(setOutcomes) : setOutcomes([])
-    }, [marketData, current])
+    }, [marketData, current, tick])
+
+    useInterval(
+        () => {
+            if (outcomes.length > 0 && onchainMarket && marketData) {
+                updateWeights(outcomes, currentRound, marketData, onchainMarket)
+                setInterval(10000)
+            }
+
+        }, interval
+    )
+
+    const updateWeights = useCallback(async (outcomes: any, currentRound: number, marketData: any, onchainMarket: any) => {
+
+        const rounds = await marketData.rounds()
+        const thisRound: any = rounds.data.find((item: any) => item.onchainId === Number(currentRound))
+
+        if (!thisRound) {
+            return
+        }
+
+        let need_update = false
+
+        if (thisRound.lastWeightUpdatedAt === undefined) {
+            need_update = true
+        } else if ((new Date().valueOf() / 1000) - thisRound.lastWeightUpdatedAt > 86400) {
+            need_update = true
+        }
+
+        if (!need_update) {
+            return
+        }
+
+        const resource = await marketData.resource()
+
+        if (resource && resource.data) {
+
+            const source = resource.data.name
+            const context = await crawl(resource.data)
+
+            const startPeriod = (Number(onchainMarket.createdTime) * 1000) + (onchainMarket.round * (Number(onchainMarket.interval) * 1000))
+            const endPeriod = startPeriod + (Number(onchainMarket.interval) * 1000)
+            const period = `${new Date(startPeriod).toDateString()} - ${new Date(endPeriod).toDateString()}`
+
+            const agent = new Agent()
+            const systemPrompt = agent.getSystemPrompt(currentRound, source, parseTables(context), period)
+            const outcomePrompt = agent.getOutcomePrompt(outcomes)
+
+            const messages = [systemPrompt, outcomePrompt]
+
+            const output = await parse([...messages, {
+                role: 'user',
+                content: "help assign weight for each outcome"
+            }])
+
+            console.log(output)
+
+            if (output.length > 0) {
+                await updateOutcomeWeight({ marketId: marketData.id, roundId: currentRound, weights: output })
+                increaseTick()
+            }
+
+        }
+
+    }, [increaseTick])
+
+    const totalPool = outcomes.reduce((output: number, item: any) => {
+        if (item && item.totalBetAmount) {
+            output = output + item.totalBetAmount
+        }
+        return output
+    }, 0)
 
     return (
         <div className="flex flex-col my-2">
@@ -44,31 +129,53 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
             </div> */}
 
             <div className="my-4 grid grid-cols-3 gap-3">
-                {outcomes.map((item, index) => {
+                {outcomes.map((entry: any, index:number) => {
+
+                    let odds = 0
+
+                    if (entry && outcomes) {
+                        const totalPoolAfter = totalPool + 1
+
+                        // Assumes all outcomes won
+                        const totalShares = outcomes.reduce((output: number, item: any) => {
+                            if (item && item.totalBetAmount) {
+                                output = output + (item.totalBetAmount * (item.weight))
+                            }
+                            if (item.onchainId === entry.onchainId) {
+                                output = output + (1 * (item.weight))
+                            }
+                            return output
+                        }, 0)
+                        const outcomeShares = (entry.totalBetAmount + 1) * (entry.weight)
+                        const ratio = outcomeShares / totalShares
+
+                        odds = ((ratio) * totalPoolAfter) * (1 / (entry.totalBetAmount + 1))
+                    }
+
                     return (
-                        <OutcomeCard
-                            index={index}
-                            item={item}
-                            openBetModal={openBetModal}
-                            marketData={marketData}
-                            current={current}
-                        />
+                        <div key={index}>
+                            <OutcomeCard
+                                index={index}
+                                item={entry}
+                                openBetModal={openBetModal}
+                                marketData={marketData}
+                                current={current}
+                                odds={odds}
+                            />
+                        </div>
                     )
                 })}
             </div>
-
-
-
         </div>
     )
 }
 
 
 
-const OutcomeCard = ({ index, item, current, marketData, openBetModal }: any) => {
+const OutcomeCard = ({ index, item, current, marketData, openBetModal, odds }: any) => {
 
     return (
-        <div key={index} onClick={() => {
+        <div onClick={() => {
 
             openBetModal({
                 marketId: marketData.id,
@@ -93,16 +200,16 @@ const OutcomeCard = ({ index, item, current, marketData, openBetModal }: any) =>
                 <div className=" ">
                     <p className="text-white text-base font-semibold">⚡{` ${item.totalBetAmount || 0} USDC`}</p>
                 </div>
-                { item.totalBetAmount && (
+                {item.totalBetAmount && (
                     <div className=" ">
-                    <p className="text-white  font-semibold"> 🔥 </p>
-                </div> 
+                        <p className="text-white  font-semibold"> 🔥 </p>
+                    </div>
                 )}
                 {/* <div className=" ">
                     <p className="text-white  font-semibold">🕒{` ${ (new Date( Number(item.resolutionDate) * 1000 )).toLocaleDateString()}`}</p>
                 </div> */}
                 <div className=" ">
-                    <p className="text-white text-base font-semibold">🎲{` N/A`}</p>
+                    <p className="text-white text-base font-semibold">🎲{` ${item.weight ? odds.toLocaleString() : "N/A"}`}</p>
                 </div>
 
             </div>

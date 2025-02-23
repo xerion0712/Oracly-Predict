@@ -1,10 +1,10 @@
-// import axios from "axios";
+ 
 
-// const ATOMA_API_KEY = process.env.ATOMA_API_KEY || ""
+
 
 class Agent {
 
-    // messages
+    
 
     constructor() {
 
@@ -54,49 +54,36 @@ class Agent {
             ].join("")
         }
     }
-
-    // query = async (query) => {
-
-    //     this.messages.push({
-    //         role: "user",
-    //         content: query
-    //     })
-
-    //     const response = await axios.post(
-    //         'https://api.atoma.network/v1/chat/completions',
-    //         {
-    //             stream: false,
-    //             model: 'deepseek-ai/DeepSeek-R1',
-    //             messages: this.messages,
-    //             max_tokens: 2048
-    //         },
-    //         this.getHeader()
-    //     )
-
-    //     let result = response.data.choices[0].message.content
-    
-    //     if (result.indexOf("</think>") !== -1) {
-    //         result = result.split("</think>")[1]
-    //     }
-
-    //     this.messages.push({
-    //         role: "assistant",
-    //         content: result
-    //     })
-
-    //     return result
-    // }
-
-    // getHeader = () => {
-    //     return {
-    //         headers: {
-    //             "Content-Type": "application/json",
-    //             "Authorization": `Bearer ${ATOMA_API_KEY}`
-    //         }
-    //     }
-    // }
-
-
+ 
+    getWeightPrompt = (roundNumber, source, context, period) => {
+        return {
+            role: "system",
+            content: [
+                `You are an AI agent responsible for assigning probability weights to prediction market outcomes in the Legato DeFi system.\n`,
+                `Your goal is to analyze the latest market data and assign a fair probability (0 to 1) to each possible outcome.\n`,
+                `Round Details:\n`,
+                `Round Number: ${roundNumber}\n`,
+                `Source: ${source} – The latest data has been fetched and provided as follows:\n`,
+                `${context}\n`,
+                `Predicting Period: ${period} \n`, 
+                `Today's Date: ${ (new Date().toDateString()) }\n\n`,
+                `**Weight Assignment Criteria:**\n`,
+                `1. **Probability Distribution:**\n`,
+                "   - **Existing Outcomes** → Evaluate all available outcomes in the system.\n",
+                "   - **Already Occurred Outcomes** → Assign weight = 0 (if the event has already happened).\n",
+                "   - **High Likelihood Outcomes** → Assign a lower weight (if an outcome is very likely, it should have a smaller share).\n",
+                "   - **Unlikely but Possible Outcomes** → Assign a moderate weight (more uncertainty means more weight).\n",
+                "   - **Extremely Rare Outcomes** → Assign a higher weight (high-risk outcomes need greater incentives).\n",
+                "2. **Normalization Rule:**\n",
+                "   - The sum of all weights **must equal 1**.\n",
+                "   - Distribute weights fairly based on historical data and real-time trends.\n",
+                "3. **Market Volatility Consideration:**\n",
+                "   - If recent price movements indicate increased uncertainty, adjust weights accordingly.\n",
+                "   - If volatility is low, spread weights more evenly.\n",
+                "Your job is to ensure probability assignments are **accurate, fair, and based on the most recent market data**."
+            ].join("")
+        }
+    }
 
 }
 
