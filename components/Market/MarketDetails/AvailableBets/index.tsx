@@ -133,6 +133,7 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
 
                     let minOdds = 0
                     let maxOdds = 0
+                    let odds = "Medium"
 
                     if (entry && outcomes) {
                         const totalPoolAfter = totalPool + 1
@@ -152,6 +153,16 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
 
                         minOdds = ((ratio) * totalPoolAfter) * (1 / (entry.totalBetAmount + 1))
                         maxOdds = entry.totalBetAmount > 0 ? (totalPoolAfter) * (1 / (entry.totalBetAmount + 1)) : -1
+                    
+                        if (minOdds >= 3) {
+                            odds = "Very High"
+                        } else if (minOdds >= 2) {
+                            odds = "High"
+                        } else if (minOdds >= 1) {
+                            odds = "Medium"
+                        }  else  {
+                            odds = "Low"
+                        } 
                     }
 
                     return (
@@ -164,6 +175,7 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
                                 current={current}
                                 minOdds={minOdds}
                                 maxOdds={maxOdds}
+                                odds={odds}
                             />
                         </div>
                     )
@@ -175,7 +187,7 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
 
 
 
-const OutcomeCard = ({ index, item, current, marketData, openBetModal, minOdds, maxOdds }: any) => {
+const OutcomeCard = ({ index, item, current, marketData, openBetModal, minOdds, maxOdds, odds }: any) => {
 
     return (
         <div onClick={() => {
@@ -212,7 +224,7 @@ const OutcomeCard = ({ index, item, current, marketData, openBetModal, minOdds, 
                     <p className="text-white  font-semibold">🕒{` ${ (new Date( Number(item.resolutionDate) * 1000 )).toLocaleDateString()}`}</p>
                 </div> */}
                 <div className=" ">
-                    <p className="text-white text-base font-semibold">🎲{`${item.weight ? `${((minOdds)).toLocaleString()}` : "N/A"}`}</p>
+                    <p className="text-white text-base font-semibold">🎲{`${item.weight ? ` ${odds}` : "N/A"}`}</p>
                 </div>
 
             </div>

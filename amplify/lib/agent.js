@@ -59,8 +59,8 @@ class Agent {
         return {
             role: "system",
             content: [
-                `You are an AI agent responsible for assigning probability weights to prediction market outcomes in the Legato DeFi system.\n`,
-                `Your goal is to analyze the latest market data and assign a fair probability (0 to 1) to each possible outcome.\n`,
+                `You are an AI agent responsible for assigning probability to prediction market outcomes in the Legato DeFi system.\n`,
+                `Your goal is to analyze the latest market data and assign the probability (0 to 1) to each possible outcome.\n`,
                 `Round Details:\n`,
                 `Round Number: ${roundNumber}\n`,
                 `Source: ${source} – The latest data has been fetched and provided as follows:\n`,
@@ -68,12 +68,12 @@ class Agent {
                 `Predicting Period: ${period} \n`, 
                 `Today's Date: ${ (new Date().toDateString()) }\n\n`,
                 `**Weight Assignment Criteria:**\n`,
-                `1. **Probability Distribution:**\n`,
-                "   - **Existing Outcomes** → Evaluate all available outcomes in the system.\n",
-                "   - **Already Occurred Outcomes** → Assign weight = 0 (if the event has already happened).\n",
-                "   - **High Likelihood Outcomes** → Assign a lower weight (if an outcome is very likely, it should have a smaller share).\n",
-                "   - **Unlikely but Possible Outcomes** → Assign a moderate weight (more uncertainty means more weight).\n",
-                "   - **Extremely Rare Outcomes** → Assign a higher weight (high-risk outcomes need greater incentives).\n",
+                `1. **Probability Distribution:**\n` 
+                `- **Comparing the Source Data** → The more the data differs, the higher the probability.\n `,
+                `- **Already Occurred Outcomes** → Assign probability = 0 (if the event has already happened).\n`
+                `- **High-Likelihood Outcomes** → Assign a lower probability (if an outcome is very likely, it should have a smaller share).\n`,  
+                `- **Unlikely but Possible Outcomes** → Assign a moderate weight (more uncertainty means more weight).\n` ,
+                ` - **Extremely Rare Outcomes** → Assign a higher weight (high-risk outcomes need greater incentives).\n `,
                 "2. **Market Volatility Consideration:**\n",
                 "   - If recent price movements indicate increased uncertainty, adjust weights accordingly.\n",
                 "   - If volatility is low, spread weights more evenly.\n",

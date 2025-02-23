@@ -187,7 +187,7 @@ const PlaceBetModal = ({ visible, close, bet }: any) => {
                                         <div className=" py-0.5 text-sm  flex flex-row">
                                             <span className="font-bold mr-2">Current Odds:</span>
                                             <div className={`   flex flex-row  text-white text-sm `}>
-                                                {`${outcome.weight ? `${minOdds.toLocaleString()}/${`${maxOdds !== -1 ? maxOdds.toLocaleString() :"10"}`}` : "N/A"}`}
+                                                {`${outcome.weight ? `${minOdds.toLocaleString()}-${`${maxOdds !== -1 ? maxOdds.toLocaleString() :"10"}`}` : "N/A"}`}
                                             </div>
                                         </div>
                                         <div className=" py-0.5 text-sm  flex flex-row">
