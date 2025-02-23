@@ -151,7 +151,7 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
                         const ratio = outcomeShares / totalShares
 
                         minOdds = ((ratio) * totalPoolAfter) * (1 / (entry.totalBetAmount + 1))
-                        maxOdds = (totalPoolAfter) * (1 / (entry.totalBetAmount + 1))
+                        maxOdds = entry.totalBetAmount > 0 ? (totalPoolAfter) * (1 / (entry.totalBetAmount + 1)) : minOdds
                     }
 
                     return (

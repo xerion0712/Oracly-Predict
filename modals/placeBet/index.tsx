@@ -154,7 +154,7 @@ const PlaceBetModal = ({ visible, close, bet }: any) => {
         const ratio = outcomeShares / totalShares
 
         minOdds = ((ratio) * totalPoolAfter) * (1 / (outcome.totalBetAmount + 1))
-        maxOdds = (totalPoolAfter) * (1 / (outcome.totalBetAmount + 1))
+        maxOdds = outcome.totalBetAmount > 0 ? (totalPoolAfter) * (1 / (outcome.totalBetAmount + 1)) : minOdds
     }
 
     return (
