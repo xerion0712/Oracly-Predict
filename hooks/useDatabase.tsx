@@ -152,7 +152,7 @@ const useDatabase = () => {
 
     }
 
-    const addPosition = async ({ marketId, userId, roundId, outcomeId, amount }: any) => {
+    const addPosition = async ({ marketId, userId, roundId, outcomeId, amount, walletAddress }: any) => {
 
         const positions = await client.models.Position.list()
 
@@ -171,7 +171,8 @@ const useDatabase = () => {
             roundId,
             onchainId,
             predictedOutcome: outcomeId,
-            betAmount: amount
+            betAmount: amount,
+            walletAddress
         })
 
     }

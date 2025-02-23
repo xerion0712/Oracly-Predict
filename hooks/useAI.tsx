@@ -1,9 +1,8 @@
- 
+
 import type { Schema } from "../amplify/data/resource"
 import { generateClient } from "aws-amplify/api"
 
 const client = generateClient<Schema>()
-
 
 
 const useAI = () => {
@@ -11,7 +10,18 @@ const useAI = () => {
 
     const query = async (messages: any) => {
 
-        const tools: any = [{
+        const tools: any = getUserTools()
+
+        const result: any = await client.queries.Chat({
+            messages: JSON.stringify(messages),
+            tools: JSON.stringify(tools)
+        })
+
+        return JSON.parse(result.data)
+    }
+
+    const getUserTools = () => {
+        return [{
             "type": "function",
             "function": {
                 "name": "create_outcome",
@@ -64,13 +74,6 @@ const useAI = () => {
             }
         }
         ];
-
-        const result: any = await client.queries.Chat({
-            messages: JSON.stringify(messages),
-            tools: JSON.stringify(tools)
-        })
- 
-        return JSON.parse(result.data)
     }
 
     return {

@@ -687,6 +687,16 @@ module legato_market::generalized {
         market_store.is_paused = is_paused;
     }
 
+    public entry fun update_created_time(sender: &signer, market_id: u64, new_created_time: u64) acquires MarketManager { 
+        // Ensure that the caller has permission
+        verify_caller(signer::address_of(sender));
+
+        let global = borrow_global_mut<MarketManager>(@legato_market);
+        assert!( table_with_length::contains( &global.markets, market_id ), ERR_NOT_FOUND);
+        let market_store = table_with_length::borrow_mut(&mut global.markets, market_id);
+        market_store.created_time = new_created_time;
+    }
+
     public entry fun update_round_weights(sender: &signer, market_id: u64, round_id: u64, weights: u64 ) acquires MarketManager {
         assert!( weights >= 5000  , ERR_INVALID_VALUE );
         // Ensure that the caller has permission

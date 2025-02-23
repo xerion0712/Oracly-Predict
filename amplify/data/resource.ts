@@ -52,8 +52,7 @@ const schema = a.schema({
       betPoolAmount: a.float(),
       comments: a.hasMany('Comment', "marketId"),
       positions: a.hasMany('Position', "marketId"),
-      rounds: a.hasMany('Round', "marketId"),
-      totalOutcomes: a.integer()
+      rounds: a.hasMany('Round', "marketId")
     })
     .authorization((allow) => [allow.publicApiKey()]),
   Comment: a.model({
@@ -86,15 +85,13 @@ const schema = a.schema({
     totalPaidAmount: a.float(),
     totalDisputedAmount: a.float(),
     weight: a.float(),
+    lastWeightUpdatedAt: a.timestamp(),
     outcomes: a.hasMany('Outcome', "roundId"),
     winningOutcomes: a.integer().array(),
     disputedOutcomes: a.integer().array(),
     status: a.enum(["PENDING", "FINALIZED", "RESOLVED"]),
     finalizedTimestamp: a.timestamp(),
-    resolvedTimestamp: a.timestamp(),
-    agentName: a.string(),
-    agentMessages: a.json().array(),
-    agentConfig: a.json(),
+    resolvedTimestamp: a.timestamp()
   }).authorization((allow) => [allow.publicApiKey()]),
   Outcome: a.model({
     roundId: a.id().required(),

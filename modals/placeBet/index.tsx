@@ -82,8 +82,9 @@ const PlaceBetModal = ({ visible, close, bet }: any) => {
 
             const userId = currentProfile.id
             const marketId = bet.marketId
+            const walletAddress = address
 
-            await addPosition({ marketId, userId, roundId, outcomeId, amount})
+            await addPosition({ marketId, userId, roundId, outcomeId, amount, walletAddress})
             await increaseOutcomeBetAmount({ marketId, roundId, outcomeId, amount })
 
             dispatch({ amount: 0 })
