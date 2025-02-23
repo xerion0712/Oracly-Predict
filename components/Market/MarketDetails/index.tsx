@@ -1,6 +1,6 @@
 
 import { Tab, TabGroup, TabList, TabPanel, TabPanels } from '@headlessui/react'
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import Alert from "../../../components/Alert"
 import FaucetModal from "../../../modals/faucet"
 import AllOutcomes from "./AllOutcomes"
@@ -28,7 +28,7 @@ const MarketDetails = () => {
 
     const [marketData, setMarketData] = useState<any>()
     const [onchainMarket, setOnchainMarket] = useState<any>()
-    const [bet, setBet] = useState<any>(undefined)
+    const [bet, setBet] = useState<any>(undefined) 
 
     useEffect(() => {
         getMarketInfo(MARKET_ID).then(setOnchainMarket)
@@ -117,7 +117,7 @@ const MarketDetails = () => {
                                 currentRound={currentRound}
                                 marketData={marketData}
                                 onchainMarket={onchainMarket}
-                                openBetModal={openBetModal}
+                                openBetModal={openBetModal} 
                             />
                         </TabPanel>
                         <TabPanel >

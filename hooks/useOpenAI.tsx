@@ -1,5 +1,18 @@
 
 import OpenAI from "openai";
+import { z } from "zod";
+import { zodResponseFormat } from "openai/helpers/zod";
+
+const OutcomeWeight = z.object({
+    outcomeId: z.number(),
+    outcomeWeight: z.number(),
+});
+
+const OutcomeWeights = z.object({
+    outcomes: z.array(OutcomeWeight)
+});
+
+// This uses for local testing only
 
 const useOpenAI = () => {
 
@@ -73,8 +86,24 @@ const useOpenAI = () => {
 
     }
 
+    const parse = async (messages: any) => {
+
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, dangerouslyAllowBrowser: true });
+
+        const completion = await openai.beta.chat.completions.parse({
+            model: "gpt-4o",
+            messages: messages,
+            response_format: zodResponseFormat(OutcomeWeights, "outcome_weights"),
+        });
+
+        const event = completion.choices[0].message.parsed;
+
+        return (event && event?.outcomes) ? event.outcomes : []
+    }
+
     return {
-        query
+        query,
+        parse
     }
 }
 
