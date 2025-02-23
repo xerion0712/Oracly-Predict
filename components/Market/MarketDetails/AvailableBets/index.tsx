@@ -151,7 +151,7 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
                         const ratio = outcomeShares / totalShares
 
                         minOdds = ((ratio) * totalPoolAfter) * (1 / (entry.totalBetAmount + 1))
-                        maxOdds = entry.totalBetAmount > 0 ? (totalPoolAfter) * (1 / (entry.totalBetAmount + 1)) : minOdds
+                        maxOdds = entry.totalBetAmount > 0 ? (totalPoolAfter) * (1 / (entry.totalBetAmount + 1)) : -1
                     }
 
                     return (
@@ -212,7 +212,7 @@ const OutcomeCard = ({ index, item, current, marketData, openBetModal, minOdds, 
                     <p className="text-white  font-semibold">🕒{` ${ (new Date( Number(item.resolutionDate) * 1000 )).toLocaleDateString()}`}</p>
                 </div> */}
                 <div className=" ">
-                    <p className="text-white text-base font-semibold">🎲{` ${item.weight ? `${((minOdds)).toLocaleString()}/${maxOdds.toLocaleString()}` : "N/A"}`}</p>
+                    <p className="text-white text-base font-semibold">🎲{` ${item.weight ? `${((minOdds)).toLocaleString()}/${`${maxOdds !== -1 ? maxOdds.toLocaleString() :"1.5"}`}` : "N/A"}`}</p>
                 </div>
 
             </div>
