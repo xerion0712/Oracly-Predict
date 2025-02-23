@@ -131,7 +131,8 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
             <div className="my-4 grid grid-cols-3 gap-3">
                 {outcomes.map((entry: any, index:number) => {
 
-                    let odds = 0
+                    let minOdds = 0
+                    let maxOdds = 0
 
                     if (entry && outcomes) {
                         const totalPoolAfter = totalPool + 1
@@ -149,7 +150,8 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
                         const outcomeShares = (entry.totalBetAmount + 1) * (entry.weight)
                         const ratio = outcomeShares / totalShares
 
-                        odds = ((ratio) * totalPoolAfter) * (1 / (entry.totalBetAmount + 1))
+                        minOdds = ((ratio) * totalPoolAfter) * (1 / (entry.totalBetAmount + 1))
+                        maxOdds = (totalPoolAfter) * (1 / (entry.totalBetAmount + 1))
                     }
 
                     return (
@@ -160,7 +162,8 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
                                 openBetModal={openBetModal}
                                 marketData={marketData}
                                 current={current}
-                                odds={odds}
+                                minOdds={minOdds}
+                                maxOdds={maxOdds}
                             />
                         </div>
                     )
@@ -172,7 +175,7 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
 
 
 
-const OutcomeCard = ({ index, item, current, marketData, openBetModal, odds }: any) => {
+const OutcomeCard = ({ index, item, current, marketData, openBetModal, minOdds, maxOdds }: any) => {
 
     return (
         <div onClick={() => {
@@ -209,7 +212,7 @@ const OutcomeCard = ({ index, item, current, marketData, openBetModal, odds }: a
                     <p className="text-white  font-semibold">🕒{` ${ (new Date( Number(item.resolutionDate) * 1000 )).toLocaleDateString()}`}</p>
                 </div> */}
                 <div className=" ">
-                    <p className="text-white text-base font-semibold">🎲{` ${item.weight ? odds.toLocaleString() : "N/A"}`}</p>
+                    <p className="text-white text-base font-semibold">🎲{` ${item.weight ? `${((minOdds)).toLocaleString()}/${maxOdds.toLocaleString()}` : "N/A"}`}</p>
                 </div>
 
             </div>

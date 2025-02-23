@@ -112,9 +112,10 @@ const PlaceBetModal = ({ visible, close, bet }: any) => {
 
     let minPayout = 0
     let maxPayout = 0
-    let odds = 0
+    let minOdds = 0
+    let maxOdds = 0
 
-    if (outcome && outcomes) {
+    if (amount > 0 && outcome && outcomes) {
         const totalPoolAfter = totalPool + amount
 
         // Assumes all outcomes won
@@ -130,11 +131,30 @@ const PlaceBetModal = ({ visible, close, bet }: any) => {
         const outcomeShares = (outcome.totalBetAmount + amount) * (outcome.weight)
         const ratio = outcomeShares / totalShares
         
-        odds =  ((ratio) * totalPoolAfter) * (1 / (outcome.totalBetAmount + 1))
         minPayout = ((ratio) * totalPoolAfter) * (amount / (outcome.totalBetAmount + amount))
 
         // when only selected outcome won
         maxPayout = totalPoolAfter * (amount / (outcome.totalBetAmount + amount))
+    }
+
+    if (outcome && outcomes) {
+        const totalPoolAfter = totalPool + 1
+
+        // Assumes all outcomes won
+        const totalShares = outcomes.reduce((output: number, item: any) => {
+            if (item && item.totalBetAmount) {
+                output = output + (item.totalBetAmount * (item.weight))
+            }
+            if (item.onchainId === outcome.onchainId) {
+                output = output + (1 * (item.weight))
+            }
+            return output
+        }, 0)
+        const outcomeShares = (outcome.totalBetAmount + 1) * (outcome.weight)
+        const ratio = outcomeShares / totalShares
+
+        minOdds = ((ratio) * totalPoolAfter) * (1 / (outcome.totalBetAmount + 1))
+        maxOdds = (totalPoolAfter) * (1 / (outcome.totalBetAmount + 1))
     }
 
     return (
@@ -167,7 +187,7 @@ const PlaceBetModal = ({ visible, close, bet }: any) => {
                                         <div className=" py-0.5 text-sm  flex flex-row">
                                             <span className="font-bold mr-2">Current Odds:</span>
                                             <div className={`   flex flex-row  text-white text-sm `}>
-                                                {`${outcome.weight ? odds.toLocaleString() : "N/A"}`}
+                                                {`${outcome.weight ? `${minOdds.toLocaleString()}/${maxOdds.toLocaleString()}` : "N/A"}`}
                                             </div>
                                         </div>
                                         <div className=" py-0.5 text-sm  flex flex-row">
@@ -224,7 +244,7 @@ const PlaceBetModal = ({ visible, close, bet }: any) => {
                                         <div className="px-1 mt-4">
                                             <ListGroup
                                                 items={[
-                                                    ["Potential payout", `${(minPayout).toLocaleString()} - ${(maxPayout.toLocaleString())} USDC`],
+                                                    ["Potential payout", `${(minPayout).toLocaleString()}-${(maxPayout.toLocaleString())} USDC`],
                                                     // ["Estimate payout date", `N/A`],
                                                     ["Winning fee", "10%"],
                                                 ]}
