@@ -74,10 +74,7 @@ class Agent {
                 "   - **High Likelihood Outcomes** → Assign a lower weight (if an outcome is very likely, it should have a smaller share).\n",
                 "   - **Unlikely but Possible Outcomes** → Assign a moderate weight (more uncertainty means more weight).\n",
                 "   - **Extremely Rare Outcomes** → Assign a higher weight (high-risk outcomes need greater incentives).\n",
-                "2. **Normalization Rule:**\n",
-                "   - The sum of all weights **must equal 1**.\n",
-                "   - Distribute weights fairly based on historical data and real-time trends.\n",
-                "3. **Market Volatility Consideration:**\n",
+                "2. **Market Volatility Consideration:**\n",
                 "   - If recent price movements indicate increased uncertainty, adjust weights accordingly.\n",
                 "   - If volatility is low, spread weights more evenly.\n",
                 "Your job is to ensure probability assignments are **accurate, fair, and based on the most recent market data**."
