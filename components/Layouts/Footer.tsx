@@ -18,11 +18,11 @@ const Footer = () => {
                                     Privacy Policy
                                 </Link>
                             </div>
-                            <div className="text-sm px-2">
+                            {/* <div className="text-sm px-2">
                                 <Link href="/terms-of-service" className="text-white transition hover:text-secondary">
                                     Terms of Service
                                 </Link>
-                            </div>
+                            </div> */}
                         </div> 
                     </div>
                 </div>

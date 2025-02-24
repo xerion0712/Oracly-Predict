@@ -137,7 +137,7 @@ const Hero = () => {
                         </div>
                         <div className='mx-2 sm:mx-6'>
                             <p className="mt-[20px] sm:mt-[40px] text-center mx-auto mb-[20px] max-w-[700px]   text-sm sm:text-lg lg:text-xl font-normal sm:font-semibold">
-                                Legato's AI tracks major trusted sources, letting you propose any future outcomes and earn rewards when you're right
+                                Legato's AI tracks major trusted sources, letting you propose any future outcomes and earn when you're right
                             </p>
                         </div>
                         <div className='mx-2 sm:mx-4 flex w-full mb-6'>

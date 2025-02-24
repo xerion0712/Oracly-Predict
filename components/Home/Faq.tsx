@@ -16,20 +16,20 @@ const DATA = [
         answer: 'We support Sui and Aptos chains as of now. We may consider expanding to other blockchains, especially Move-based blockchains.',
     },
     {
-        id: 3,
-        question: 'How does AI work in DeFi?',
-        answer: 'AI is used to produce constant variables that matter for each DeFi service. For instance, in liquid staking, the engine collects unstructured data like news feeds combines with structured data like current staked amounts and trading volume and uses AI to determine the best validator to stake with.',
+        "id": 3,
+        "question": "Is the new version live?",
+        "answer": "Yes! The latest version is currently live on Aptos Testnet. You can try the AI-powered prediction markets and help us improve before the mainnet launch."
     },
-    // {
-    //     id: 6,
-    //     question: "How Legato DEX works?",
-    //     answer: "Legato decentralized exchange is based on custom weight AMM, which allows anyone wanting to list tokens to set custom weights. This can help reduce initial capital on settlement assets like USDC or SUI by around 3x to 5x."
-    // },
-    // {
-    //     id: 7,
-    //     question: 'Has your smart contract been audited?',
-    //     answer: "The smart contract is currently being audited by the audit team at Tamago Labs. We will post the report on the website once it's completed.",
-    // },
+    {
+        "id": 4,
+        "question": "How does AI work in DeFi?",
+        "answer": "AI is used to generate dynamic variables for DeFi services. For example, in prediction markets, the AI analyzes real-time market data and proposes outcomes with weighted probabilities, enhancing fair market resolution."
+    },
+    {
+        "id": 5,
+        "question": "Can anyone create a market?",
+        "answer": "Yes! You can propose new outcomes by interacting with the AI-Agent, which will validate and assign weights before finalization."
+    },
     {
         id: 9,
         question: 'How can I contact your team?',
