@@ -4,6 +4,7 @@ import { useContext, useEffect, useState } from 'react';
 import BlockchainList from "../../data/blockchain.json"
 import MarketCard from './MarketCard';
 import { Swiper, SwiperSlide } from 'swiper/react';
+import { secondsToDDHHMMSS } from '@/helpers';
 
 // Import Swiper styles
 import 'swiper/css';
@@ -13,6 +14,7 @@ import 'swiper/css/navigation';
 import { Autoplay, Navigation } from 'swiper/modules';
 import BaseModal from '@/modals/base';
 import { LegatoContext } from '@/hooks/useLegato';
+import useDatabase from '@/hooks/useDatabase';
 
 const DUMMY_CARDS = [
     {
@@ -100,7 +102,7 @@ const Hero = () => {
                     <li><b>Ever-Increasing Payouts:</b> Unclaimed amounts adding to the next round's prize </li>
                     <li><b>With DeepSeek R1:</b> Via Atoma’s Decentralized AI Network </li>
                 </div>
-              
+
                 <div className='text-center mt-5'>
                     <button onClick={() => {
                         localStorage.setItem("new_version", "true")
@@ -109,8 +111,8 @@ const Hero = () => {
                         close
                     </button>
                 </div>
-                  <p className="text-center mx-auto max-w-full sm:max-w-md text-xs sm:text-sm text-secondary/90 font-semibold mt-4 mb-2  ">
-                This new version is currently available on the Aptos Testnet, with Mainnet and Sui launching soon
+                <p className="text-center mx-auto max-w-full sm:max-w-md text-xs sm:text-sm text-secondary/90 font-semibold mt-4 mb-2  ">
+                    This new version is currently available on the Aptos Testnet, with Mainnet and Sui launching soon
                 </p>
             </BaseModal>
             <section className="bg-white bg-[url(/assets/images/banner-bg-1.png)]  bg-bottom bg-no-repeat  dark:bg-black">
@@ -135,158 +137,132 @@ const Hero = () => {
                         </div>
                         <div className='mx-2 sm:mx-6'>
                             <p className="mt-[20px] sm:mt-[40px] text-center mx-auto mb-[20px] max-w-[700px]   text-sm sm:text-lg lg:text-xl font-normal sm:font-semibold">
-                                Legato's AI tracks major trusted sources, letting you propose future outcomes and earn rewards when you're right
+                                Legato's AI tracks major trusted sources, letting you propose any future outcomes and earn when you're right
                             </p>
                         </div>
                         <div className='mx-2 sm:mx-4 flex w-full mb-6'>
-                                    <Link href={`/markets`} className='mx-auto'>
-                                        <button type="button" className="btn bg-white text-xs sm:text-base flex rounded-lg px-6 py-3 sm:py-4 sm:px-12 flex-row hover:text-black hover:bg-white ">
-                                            <div className='my-auto'>
-                                                Explore{` `}
-                                            </div>
-                                            <ArrowRight size={18} className='mt-[3px] ml-1' />
-                                        </button>
-                                    </Link>
-                                </div>
-                    </div>
-                    <div className="px-6 sm:px-1">
-
-                        <div className='text-center text-secondary font-normal  mb-2 sm:mb-4 text-sm sm:text-base tracking-widest'>
-                            highlighted markets
-                        </div>
-
-                        <Swiper
-                            spaceBetween={30}
-                            centeredSlides={false}
-                            slidesPerView={5}
-                            autoplay={{
-                                delay: 5000,
-                                disableOnInteraction: false,
-                            }}
-                            loop={false}
-                            navigation={true}
-                            modules={[Autoplay, Navigation]}
-                            className="mySwiper"
-                            breakpoints={{
-                                320: {
-                                    slidesPerView: 1,
-                                    spaceBetween: 20,
-                                },
-                                640: {
-                                    slidesPerView: 2,
-                                    spaceBetween: 20,
-                                },
-                                768: {
-                                    slidesPerView: 4,
-                                    spaceBetween: 30,
-                                },
-                                1024: {
-                                    slidesPerView: 5,
-                                    spaceBetween: 30,
-                                },
-                            }}
-                        >
-                            {DUMMY_CARDS.map((item, index) => (
-                                <SwiperSlide key={index}>
-                                    <MarketCard
-                                        market_name={item.market_name}
-                                        icon={item.icon}
-                                        popular_outcome={item.popular_outcome}
-                                        close_in={item.close_in}
-                                        chains={item.chains}
-                                        tag={item.tag}
-                                    />
-                                </SwiperSlide>
-                            ))}
-                        </Swiper>
-
-                        <div className='mx-2 sm:mx-6 flex mt-[20px] sm:mt-[40px]'>
-                            <div className='flex flex-row  container'>
-                                {/* <div className='mx-2 sm:mx-4'>
-                                    <Link href={`/markets`}>
-                                        <button type="button" className="btn bg-white text-xs sm:text-base flex rounded-lg px-6 py-3 sm:py-4 sm:px-12 flex-row hover:text-black hover:bg-white ">
-                                            <div className='my-auto'>
-                                                Explore{` `}
-                                            </div>
-                                            <ArrowRight size={18} className='mt-[3px] ml-1' />
-                                        </button>
-                                    </Link>
-                                </div> */}
-                                {/* <div className=' '>
-                                    <button type="button" className="btn bg-secondary  text-white text-xs sm:text-base flex rounded-lg px-6 py-3 sm:py-4 sm:px-12 flex-row hover:text-black hover:bg-white ">
-                                        <div className='my-auto'>
-                                            Learn More{` `}
-                                        </div> 
-                                    </button>
-                                </div> */}
-
-                                {/* <div className='my-auto flex'>
-                                <div className=" flex  flex-row  mx-auto my-auto  ">
-                                    <div className="text-xs sm:text-sm mt-auto mb-auto text-white">
-                                        Available on
+                            <Link href={`/markets`} className='mx-auto'>
+                                <button type="button" className="btn bg-white text-xs sm:text-base flex rounded-lg px-6 py-3 sm:py-4 sm:px-12 flex-row hover:text-black hover:bg-white ">
+                                    <div className='my-auto'>
+                                        Explore{` `}
                                     </div>
-                                    <div className='flex flex-row mt-0.5 sm:mt-0 ml-0 sm:ml-2'>
-                                        {BlockchainList.map((item, index) => (<img src={item.image} key={index} alt="" className='w-[20px] sm:w-[30px] mx-0.5 sm:mx-1' />))}
-                                    </div>
-                                </div>
-                            </div> */}
-                            </div>
-                        </div>
-
-                        {/* <div className='my-[10px] sm:my-[30px] mx-2 sm:mx-6 flex'>
-                        <div className='flex flex-col mx-auto'>
-                            <div className='mx-auto '>
-                                <Link href={`/markets`}>
-                                    <button type="button" className="btn bg-white text-xs sm:text-base flex rounded-lg px-8 py-3 sm:py-4 sm:px-12 flex-row hover:text-black hover:bg-white ">
-                                        <div className='my-auto'>
-                                            Explore{` `}
-                                        </div>
-                                        <ArrowRight size={18} className='mt-[3px] ml-1' />
-                                    </button>
-                                </Link>
-                            </div>
-                            <div className='mx-auto mt-2 sm:mt-4 flex'>
-                                <div className=" flex flex-col sm:flex-row  mx-auto my-auto  ">
-                                    <div className="text-xs sm:text-sm mt-auto mb-auto text-white">
-                                        Available on
-                                    </div>
-                                    <div className='flex flex-row mt-0.5 sm:mt-0 ml-0 sm:ml-2'>
-                                        {BlockchainList.map((item, index) => (<img src={item.image} key={index} alt="" className='w-[20px] sm:w-[30px] mx-0.5 sm:mx-1' />))}
-                                    </div>
-                                </div>
-                            </div>
+                                    <ArrowRight size={18} className='mt-[3px] ml-1' />
+                                </button>
+                            </Link>
                         </div>
                     </div>
-                    <div className="mt-[20px]  max-w-[600px] mx-auto gap-3 grid grid-cols-3">
-                        <div className=" p-4 border-2 border-white/[0.1] bg-transparent bg-gradient-to-b from-white/5 to-transparent rounded-lg " >
-                            <p className="text-sm font-semibold">
-                                ROI
-                            </p>
-                            <div className="flex justify-between  text-white">
-                                <div className="text-lg sm:text-2xl my-auto  font-bold">125%</div>
-                            </div>
-                        </div>
-                        <div className="  p-4 border-2 border-white/[0.1] bg-transparent bg-gradient-to-b from-white/5 to-transparent rounded-lg  " >
-                            <p className="  text-sm font-semibold">
-                                TVL
-                            </p>
-                            <div className="flex justify-between  text-white">
-                                <div className="text-lg sm:text-2xl my-auto  font-bold">{`<$10k`}</div>
-                            </div>
-                        </div>
-                        <div className="  p-4 border-2 border-white/[0.1] bg-transparent bg-gradient-to-b from-white/5 to-transparent rounded-lg  " >
-                            <p className=" text-sm font-semibold">
-                                Trades
-                            </p>
-                            <div className="flex justify-between  text-white">
-                                <div className="text-lg sm:text-2xl my-auto  font-bold">100+</div>
-                            </div>
-                        </div>
-                    </div> */}
-                    </div>
+
+                    <Highlighted />
+
                 </div>
             </section>
         </>
+    )
+}
+
+
+const Highlighted = () => {
+
+    const { getAllOutcomes } = useDatabase()
+    const [outcomes, setOutcomes] = useState([])
+
+    useEffect(() => {
+        getAllOutcomes().then(setOutcomes)
+    }, [])
+
+
+    return (
+        <div className="px-6 sm:px-1">
+
+            <div className='text-center text-secondary font-normal  mb-2 sm:mb-4 text-sm sm:text-base tracking-widest'>
+                highlighted markets
+            </div>
+
+            <Swiper
+                spaceBetween={30}
+                centeredSlides={false}
+                slidesPerView={5}
+                autoplay={{
+                    delay: 5000,
+                    disableOnInteraction: false,
+                }}
+                loop={false}
+                navigation={true}
+                modules={[Autoplay, Navigation]}
+                className="mySwiper"
+                breakpoints={{
+                    320: {
+                        slidesPerView: 1,
+                        spaceBetween: 20,
+                    },
+                    640: {
+                        slidesPerView: 2,
+                        spaceBetween: 20,
+                    },
+                    768: {
+                        slidesPerView: 4,
+                        spaceBetween: 30,
+                    },
+                    1024: {
+                        slidesPerView: 5,
+                        spaceBetween: 30,
+                    },
+                }}
+            >
+                {outcomes.map((item: any, index: number) => {
+
+                    let icon = "/assets/images/aptos-logo.png"
+
+                    if (item && (item.title.includes("BTC") || item.title.includes("Bitcoin"))) {
+                        icon = "/assets/images/btc-icon.png"
+                    } else if (item && (item.title.includes("Tether") || item.title.includes("USDT"))) {
+                        icon = "/assets/images/usdt-logo.png"
+                    } else if (item && (item.title.includes("Cardano"))) {
+                        icon = "/assets/images/cardano-icon.webp"
+                    } else if (item && (item.title.includes("XRP"))) {
+                        icon = "/assets/images/xrp-icon.png"
+                    } else if (item && (item.title.includes("Ethereum") || item.title.includes("ETH"))) {
+                        icon = "/assets/images/eth-icon.png"
+                    } else if (item && (item.title.includes("Solana") || item.title.includes("SOL"))) {
+                        icon = "/assets/images/solana-icon.png"
+                    }
+
+                    let countdown = "0"
+
+                    const diffTime = (new Date(Number(item.resolutionDate) * 1000)).valueOf() - (new Date()).valueOf()
+                    const totals = Math.floor(diffTime / 1000)
+                    const { days } = secondsToDDHHMMSS(totals)
+
+                    if (Number(days) > 0) {
+                        countdown = `${days}`
+                    }
+
+
+                    return (
+                        (
+                            <SwiperSlide key={index}>
+                                <MarketCard
+                                    market_name={item.title}
+                                    icon={icon}
+                                    popular_outcome={item.totalBetAmount}
+                                    close_in={countdown}
+                                // chains={item.chains}
+                                // tag={item.tag}
+                                />
+                            </SwiperSlide>
+                        )
+                    )
+                })}
+            </Swiper>
+
+            <div className='mx-2 sm:mx-6 flex mt-[20px] sm:mt-[40px]'>
+                <div className='flex flex-row  container'>
+
+                </div>
+            </div>
+
+
+        </div>
     )
 }
 

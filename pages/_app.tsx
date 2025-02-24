@@ -23,7 +23,7 @@ export default function App({ Component, pageProps }: AppProps) {
     <Suspense>
       <Head>
         <title>
-          Legato - AI-Powered Prediction Markets for Smarter DeFi
+          Legato - The Most Interactive AI-Powered Prediction Markets
         </title>
         <meta charSet="UTF-8" />
         <meta

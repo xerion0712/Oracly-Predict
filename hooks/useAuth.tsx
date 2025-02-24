@@ -35,7 +35,7 @@ const components = {
                     <span className='hidden md:inline-flex'>Copyright</span>© {new Date().getFullYear() + ' '}
                     <Link href="https://legato.finance" className=" underline transition text-secondary  ">
                         Legato
-                    </Link>
+                    </Link> 
                 </Text>
             </View>
         );
