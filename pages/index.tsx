@@ -2,6 +2,7 @@ import 'swiper/css';
 import Head from 'next/head';
 import Link from 'next/link'; 
 import About from '@/components/Home/About';
+import AboutNew from '@/components/Home/AboutNew';
 import Blog from '@/components/Home/Blog';
 
 import dynamic from 'next/dynamic'
@@ -24,6 +25,7 @@ export default function Index() {
             <Hero />
 
             <Features/>
+            <AboutNew/>
             
             {/* <About /> */}
             {/*

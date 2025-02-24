@@ -31,7 +31,12 @@ const DATA = [
         "answer": "Yes! You can propose new outcomes by interacting with the AI-Agent, which will validate and assign weights before finalization."
     },
     {
-        id: 9,
+        "id": 6,
+        "question": "What happens to the liquidity vault product?",
+        "answer": "We have temporarily stopped our staking vault service to focus on the prediction market product. It will return with AI-agent capabilities in the future."
+    },
+    {
+        id: 7,
         question: 'How can I contact your team?',
         answer: 'DM us on Twitter/X account or send us an email at support@tamagolabs.com.',
     },

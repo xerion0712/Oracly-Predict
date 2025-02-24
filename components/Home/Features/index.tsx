@@ -20,9 +20,8 @@ const Features = () => {
                         ensuring smarter actions and fairer outcomes in every market round
                     </p>
                 </div>
-
-                <Tabs />
-
+ 
+                <Tabs /> 
             </div>
 
         </section>

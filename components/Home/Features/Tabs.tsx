@@ -28,7 +28,7 @@ const Tabs = () => {
                     </div>
                 </div>
 
-                <div className=' p-2  text-sm sm:text-base'>
+                <div className=' p-2 text-sm sm:text-base'>
 
                     {tab === Tab.Outcome && (
                         <>
@@ -58,7 +58,7 @@ const Tabs = () => {
                         <>
                             <img className="w-full my-4 rounded" src={"./assets/images/screenshot-market-finalize.png"} alt="" />
                             <div className="text-center p-4 pt-2">
-                            Every bet adds to the prize pool. The AI-Agent periodically reviews proposed outcomes, assigns weights based on market data. Winners receive payouts based on their stake.
+                                Every bet adds to the prize pool. The AI-Agent periodically reviews proposed outcomes, assigns weights based on market data. Winners receive payouts based on their stake.
                             </div>
                         </>
                     )
