@@ -14,14 +14,14 @@ export default function Index() {
         <div>
              <Head>
                 <title>
-                    Legato - AI-Powered Prediction Markets for Smarter DeFi
+                    Legato - The Most Interactive AI-Powered Prediction Markets
                 </title>
             </Head>
 
             <div className="h-20 bg-black lg:h-[104px]"></div>
             <Hero />
             
-            <About />
+            {/* <About /> */}
             {/*
             <Blog />
 */}
