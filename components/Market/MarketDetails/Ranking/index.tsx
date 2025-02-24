@@ -50,7 +50,7 @@ const Ranking = ({ currentRound, marketData }: any) => {
                         // const odds = `${(item.odds / 100).toFixed(0)}%`
                         // const allocation = totalBetsAmount*(item.odds/10000)
 
-                        if (index > 5) {
+                        if (index > 2) {
                             return
                         }
 
