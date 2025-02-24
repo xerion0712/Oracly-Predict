@@ -109,6 +109,26 @@ const useDatabase = () => {
 
     }
 
+    const getAllOutcomes = async () => {
+
+        const markets = await client.models.Market.list()
+
+
+        let output: any = []
+
+        for (let market of markets.data) {
+            let rounds = await market.rounds()
+            for (let round of rounds.data) {
+                const outcomes = await round.outcomes()
+                output = output.concat(outcomes.data)
+            }
+        }
+
+
+        if (output.length <= 8) return output;
+        return output.sort(() => 0.5 - Math.random()).slice(0, 8);
+    }
+
     const addOutcome = async ({ marketId, roundId, title, resolutionDate }: any) => {
 
         // create new round if not exist
@@ -283,7 +303,8 @@ const useDatabase = () => {
         addPosition,
         increaseOutcomeBetAmount,
         getMyPositions,
-        updateOutcomeWeight
+        updateOutcomeWeight,
+        getAllOutcomes
     }
 }
 

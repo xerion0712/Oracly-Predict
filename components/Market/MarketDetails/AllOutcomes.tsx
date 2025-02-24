@@ -22,8 +22,6 @@ const AllOutcomes = () => {
     const [tick, setTick] = useState(1)
     const [outcomes, setOutcomes] = useState<any[]>([])
 
-
-
     const increaseTick = useCallback(() => {
         setTick(tick + 1)
     }, [tick])
