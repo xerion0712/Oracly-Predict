@@ -225,6 +225,8 @@ const Highlighted = () => {
                         icon = "/assets/images/eth-icon.png"
                     } else if (item && (item.title.includes("Solana") || item.title.includes("SOL"))) {
                         icon = "/assets/images/solana-icon.png"
+                    } else if (item && (item.title.includes("SUI") || item.title.includes("Sui"))) {
+                        icon = "/assets/images/sui-sui-logo.svg"
                     }
 
                     let countdown = "0"

@@ -16,7 +16,6 @@ const AllOutcomes = () => {
 
     const { getOutcomes }: any = useDatabase()
 
-
     const [currentRound, setRound] = useState(1)
 
     const [tick, setTick] = useState(1)
@@ -29,8 +28,6 @@ const AllOutcomes = () => {
     useEffect(() => {
         getOutcomes().then(setOutcomes)
     }, [tick])
-
-
 
     return (
         <>
@@ -116,52 +113,14 @@ const AllOutcomes = () => {
                             item={item}
                         />
                     )
-                })
-
-                }
+                })}
             </div>
-
-
-            {/* <TabGroup className="  w-full my-4">
-                <TabList className="grid grid-cols-5 gap-3 ">
-                    <div className="col-span-4 space-x-2">
-                        {[1, 2, 3, 4].map((name) => (
-                            <Tab
-                                key={name}
-                                className="rounded-lg text-sm cursor-pointer py-1.5 px-8   text-white border border-gray/30  focus:outline-none data-[selected]:bg-[#141F32] data-[hover]:bg-[#141F32] data-[selected]:data-[hover]:bg-[#141F32] data-[focus]:outline-1 data-[focus]:outline-white"
-                            >
-                                Round {name}
-                            </Tab>
-                        ))}
-                    </div>
-                    <div className="col-span-1">
-                    <span className="text-secondary ">
-                        Ends in
-                    </span>
-
-                </div>
-
-                </TabList>
-
-            </TabGroup> */}
-
-
-            {/* <div className="col-span-4">
-                   
-                </div>
-                <div className="col-span-1">
-                    <span className="text-secondary ">
-                        Ends in
-                    </span>
-
-                </div> */}
-
         </>
     )
 }
 
 
-const OutcomeCard = ({ index,item,  market_name, icon, popular_outcome, close_in, chains, tag }: any) => {
+const OutcomeCard = ({ index, item, market_name, icon, popular_outcome, close_in, chains, tag }: any) => {
 
     return (
         <div key={index} className="  p-4 px-2 border-2 flex flex-col cursor-pointer border-white/[0.1] bg-transparent bg-gradient-to-b from-white/5 to-transparent rounded-lg" >
@@ -175,16 +134,9 @@ const OutcomeCard = ({ index,item,  market_name, icon, popular_outcome, close_in
                 </div>
             </div>
             <div className="flex flex-row my-1 mt-auto justify-between">
-            <div className=" ">
+                <div className=" ">
                     <p className="text-white text-base font-semibold">⚡{` 0 USDC`}</p>
                 </div>
-                {/* <div className=" ">
-                    <p className="text-white text-base font-semibold">🕒{` in ${close_in} days`}</p>
-                </div>
-                <div className=" ">
-                    <p className="text-white text-base font-semibold">🔥{` ${popular_outcome}`}</p>
-                </div> */}
-
             </div>
 
         </div>

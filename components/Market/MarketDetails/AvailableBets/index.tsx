@@ -9,7 +9,6 @@ import useAI from "@/hooks/useAI"
 
 const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }: any) => {
 
-    // const { parse } = useOpenAI()
     const { parse } = useAI()
 
     const [interval, setInterval] = useState(100)
@@ -35,7 +34,7 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
     useInterval(
         () => {
             if (outcomes.length > 0 && onchainMarket && marketData) {
-                updateWeights(outcomes, currentRound, marketData, onchainMarket)
+                updateWeights(outcomes, currentRound, marketData, onchainMarket) 
                 setInterval(10000)
             }
 

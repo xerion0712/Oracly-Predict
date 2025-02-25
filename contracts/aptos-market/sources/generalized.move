@@ -524,6 +524,8 @@ module legato_market::generalized {
         (current_round.total_bet_amount, current_round.total_paid_amount)
     }
 
+    // TODO: get round info
+
     // ======== Only Governance =========
 
     // Adds a new market 
