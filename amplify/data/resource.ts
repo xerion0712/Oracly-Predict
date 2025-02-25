@@ -1,7 +1,8 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
 import { faucet } from "../functions/faucet/resource";
 import { chat } from "../functions/chat/resource";
-import { weight } from "../functions/weight/resource" 
+import { weight } from "../functions/weight/resource"
+import { scheduler } from "../functions/scheduler/resource"
 
 const schema = a.schema({
   Faucet: a
@@ -31,7 +32,7 @@ const schema = a.schema({
     .returns(a.json())
     .handler(a.handler.function(weight))
     .authorization((allow) => [allow.publicApiKey()])
-  , 
+  ,
   User: a
     .model({
       username: a.string().required(),
@@ -64,7 +65,7 @@ const schema = a.schema({
       positions: a.hasMany('Position', "marketId"),
       rounds: a.hasMany('Round', "marketId")
     })
-    .authorization((allow) => [allow.publicApiKey()]), 
+    .authorization((allow) => [allow.publicApiKey()]),
   Comment: a.model({
     marketId: a.id().required(),
     userId: a.id().required(),
@@ -124,7 +125,7 @@ const schema = a.schema({
     crawledData: a.string(),
     lastCrawledAt: a.timestamp()
   }).authorization((allow) => [allow.publicApiKey()]),
-});
+}).authorization((allow) => [allow.resource(scheduler)]);
 
 export type Schema = ClientSchema<typeof schema>;
 

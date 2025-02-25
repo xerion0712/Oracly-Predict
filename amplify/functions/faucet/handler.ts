@@ -7,6 +7,7 @@ import {
   Network,
   Ed25519PrivateKey
 } from "@aptos-labs/ts-sdk";
+import { env } from '$amplify/env/faucet';
 
 export const handler: Schema["Faucet"]["functionHandler"] = async (event) => {
   const { name } = event.arguments
@@ -16,7 +17,7 @@ export const handler: Schema["Faucet"]["functionHandler"] = async (event) => {
   const aptos = new Aptos(config);
 
   const privateKey = new Ed25519PrivateKey(
-    `${process.env.APTOS_MANAGED_KEY}`
+    `${env.APTOS_MANAGED_KEY}`
   );
 
   const account = Account.fromPrivateKey({

@@ -4,6 +4,7 @@ import type { Schema } from "../../data/resource"
 import OpenAI from "openai";
 import { z } from "zod";
 import { zodResponseFormat } from "openai/helpers/zod";
+import { env } from '$amplify/env/weight';
 
 const OutcomeWeight = z.object({
   outcomeId: z.number(),
@@ -18,7 +19,7 @@ export const handler: Schema["WeightAssignment"]["functionHandler"] = async (eve
 
   const messages: any = event.arguments.messages
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
 
   const completion = await openai.beta.chat.completions.parse({
     model: "gpt-4o",
