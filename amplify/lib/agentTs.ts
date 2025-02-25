@@ -10,7 +10,7 @@ class Agent {
 
     }
 
-    getSystemPrompt = (roundNumber, source, context, period) => {
+    getSystemPrompt = (roundNumber : number, source : any, context: any, period: any) => {
         return {
             role: "system",
             content: [
@@ -40,9 +40,9 @@ class Agent {
         }
     }
 
-    getOutcomePrompt = (outcomes) => {
+    getOutcomePrompt = (outcomes: any) => {
 
-        const context = outcomes.length === 0 ? "None" : outcomes.map((outcome) => {
+        const context = outcomes.length === 0 ? "None" : outcomes.map((outcome: any) => {
             return `**${outcome.title}**\nOutcome ID: ${outcome.onchainId}\nResolution Date: ${ (new Date( Number(outcome.resolutionDate) * 1000 )).toDateString() }\n`
         }).join("\n\n")
 
@@ -55,7 +55,7 @@ class Agent {
         }
     }
  
-    getWeightPrompt = (roundNumber, source, context, period) => {
+    getWeightPrompt = (roundNumber : number, source: any, context: any, period: any) => {
         return {
             role: "system",
             content: [

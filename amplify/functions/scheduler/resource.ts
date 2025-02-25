@@ -7,7 +7,8 @@ export const scheduler = defineFunction({
     resourceGroupName: "data",
     entry: './handler.ts',
     environment: {
-        APTOS_MANAGED_KEY: secret('APTOS_MANAGED_KEY')
+        APTOS_MANAGED_KEY: secret('APTOS_MANAGED_KEY'),
+        FIRECRAWL_API_KEY: secret('FIRECRAWL_API_KEY')
     },
     timeoutSeconds: 100
 })

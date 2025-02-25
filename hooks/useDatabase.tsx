@@ -209,6 +209,46 @@ const useDatabase = () => {
         })
     }
 
+    // const finalizeWeights = async (roundId: number) => {
+
+    //     const market: any = await getMarketData(1)
+    //     const rounds: any = await market.rounds()
+
+    //     for (let round of rounds.data) {
+    //         if (roundId > round.onchainId) {
+    //             if (!round.finalizedTimestamp) {
+
+    //                 const { data } = await round.outcomes()
+    //                 const outcomes = data.sort((a: any, b: any) => {
+    //                     return a.onchainId - b.onchainId
+    //                 })
+
+    //                 let outcomeIds = []
+    //                 let outcomeWeights = []
+
+    //                 for (let outcome of outcomes) {
+
+    //                     if (outcome.onchainId && outcome.weight) {
+    //                         const outcomeId = outcome.onchainId
+    //                         const outcomeWeight = outcome.weight
+
+    //                         outcomeIds.push(outcomeId)
+    //                         outcomeWeights.push(outcomeWeight*100)
+    //                     }
+
+    //                 }
+
+    //                 // update weights
+                    
+
+    //             }
+    //         }
+
+
+    //     }
+
+    // }
+
     const addPosition = async ({ marketId, userId, roundId, outcomeId, amount, walletAddress }: any) => {
 
         const positions = await client.models.Position.list()
@@ -304,7 +344,8 @@ const useDatabase = () => {
         increaseOutcomeBetAmount,
         getMyPositions,
         updateOutcomeWeight,
-        getAllOutcomes
+        getAllOutcomes,
+        // finalizeWeights
     }
 }
 
