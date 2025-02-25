@@ -19,7 +19,7 @@ const MarketCard = ({ market_name, icon, popular_outcome, close_in, chains, tag 
             <div className="p-4 px-2 border-2 cursor-pointer border-white/[0.1] bg-transparent bg-gradient-to-b from-white/5 to-transparent rounded-lg">
                 <div className="flex flex-row">
                     <img className="h-8 sm:h-10 w-8 sm:w-10 my-auto rounded-full" src={icon} alt="" />
-                    <div className="px-2">
+                    <div className="px-2 min-h-[70px]">
                         <p className="text-white font-semibold line-clamp-3">
                             {market_name}
                         </p>
