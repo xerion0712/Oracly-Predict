@@ -35,15 +35,82 @@ export const handler: EventBridgeHandler<"Scheduled Event", null, void> = async 
 
   const currentRound: number = await getOnchainCurrentRound(aptos)
   const market: any = await getMarket(MARKET_ID)
-  const rounds = await market.rounds()
+  const rounds: any = await market.rounds()
+
+  // Finalize
 
   for (let round of rounds.data) {
 
-    const roundId = round.onchainId
+    if (currentRound > round.onchainId) {
+      if (!round.finalizedTimestamp) {
 
-    console.log("Checking Round:", roundId)
+        const { data } = await round.outcomes()
+        const outcomes = data.sort((a: any, b: any) => {
+          return a.onchainId - b.onchainId
+        })
+
+        let outcomeIds = []
+        let outcomeWeights = []
+
+        for (let outcome of outcomes) {
+
+          if (outcome.onchainId && outcome.weight) {
+            const outcomeId = outcome.onchainId
+            const outcomeWeight = outcome.weight
+
+            outcomeIds.push(outcomeId)
+            outcomeWeights.push(outcomeWeight * 100)
+          }
+
+        }
+
+        // Update smart contract
+
+        console.log("Updating smart contract...")
+
+        const account = Account.fromPrivateKey({
+          privateKey
+        })
+
+        const transaction = await aptos.transaction.build.simple({
+          sender: account.accountAddress,
+          data: {
+            function: `0xab3922ccb1794928abed8f5a5e8d9dac72fed24f88077e46593bed47dcdb7775::generalized::finalize_market`,
+            functionArguments: [
+              MARKET_ID,
+              round.onchainId,
+              outcomeIds,
+              outcomeWeights
+            ],
+          },
+        });
+
+        const senderAuthenticator = aptos.transaction.sign({
+          signer: account,
+          transaction,
+        });
+
+        const submittedTransaction = await aptos.transaction.submit.simple({
+          transaction,
+          senderAuthenticator,
+        });
+
+        console.log(`Submitted Tx: ${submittedTransaction.hash}`)
+
+        // Add timestamp
+        await client.models.Round.update({
+          id: round.id,
+          finalizedTimestamp: Math.floor((new Date().valueOf()) / 1000)
+        })
+
+      }
+    }
 
   }
+
+  // TODO: Update outcome weight
+
+  // TODO: Resolution
 
 }
 

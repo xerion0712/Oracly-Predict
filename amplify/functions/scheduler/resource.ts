@@ -8,5 +8,6 @@ export const scheduler = defineFunction({
     entry: './handler.ts',
     environment: {
         APTOS_MANAGED_KEY: secret('APTOS_MANAGED_KEY')
-    }
+    },
+    timeoutSeconds: 100
 })
