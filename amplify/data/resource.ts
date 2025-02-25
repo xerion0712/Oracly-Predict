@@ -1,8 +1,7 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
 import { faucet } from "../functions/faucet/resource";
 import { chat } from "../functions/chat/resource";
-import { weight } from "../functions/weight/resource"
-import { scheduler } from "../functions/scheduler/resource"
+import { weight } from "../functions/weight/resource" 
 
 const schema = a.schema({
   Faucet: a
@@ -32,11 +31,7 @@ const schema = a.schema({
     .returns(a.json())
     .handler(a.handler.function(weight))
     .authorization((allow) => [allow.publicApiKey()])
-  ,
-  Scheduler: a
-    .mutation()
-    .handler(a.handler.function(scheduler))
-  ,
+  , 
   User: a
     .model({
       username: a.string().required(),
