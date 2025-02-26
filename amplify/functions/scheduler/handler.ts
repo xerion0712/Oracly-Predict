@@ -47,8 +47,6 @@ export const handler: EventBridgeHandler<"Scheduled Event", null, void> = async 
   // Update outcome weights
   await updateWeights(currentRound, market, rounds)
 
-  // TODO: Resolution
-
 }
 
 

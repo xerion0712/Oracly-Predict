@@ -3,6 +3,7 @@ import { faucet } from "../functions/faucet/resource";
 import { chat } from "../functions/chat/resource";
 import { weight } from "../functions/weight/resource"
 import { scheduler } from "../functions/scheduler/resource"
+import { resolution } from "../functions/resolution/resource"
 
 const schema = a.schema({
   Faucet: a
@@ -114,7 +115,10 @@ const schema = a.schema({
     resolutionDate: a.timestamp(),
     status: a.enum(["PENDING", "WIN", "LOSE", "CANCELLED"]),
     crawledDataAtCreated: a.string(),
-    result: a.string()
+    result: a.string(),
+    revealedTimestamp: a.timestamp(),
+    isWon: a.boolean(),
+    isDisputed: a.boolean()
   }).authorization((allow) => [allow.publicApiKey()]),
   Resource: a.model({
     marketId: a.id().required(),
@@ -125,7 +129,10 @@ const schema = a.schema({
     crawledData: a.string(),
     lastCrawledAt: a.timestamp()
   }).authorization((allow) => [allow.publicApiKey()]),
-}).authorization((allow) => [allow.resource(scheduler)]);
+}).authorization((allow) => [
+  allow.resource(scheduler),
+  allow.resource(resolution)
+]);
 
 export type Schema = ClientSchema<typeof schema>;
 
