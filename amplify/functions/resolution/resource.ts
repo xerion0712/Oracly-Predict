@@ -11,5 +11,5 @@ export const resolution = defineFunction({
         FIRECRAWL_API_KEY: secret('FIRECRAWL_API_KEY'),
         OPENAI_API_KEY: secret('OPENAI_API_KEY')
     },
-    timeoutSeconds: 100
+    timeoutSeconds: 200
 })

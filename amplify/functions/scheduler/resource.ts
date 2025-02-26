@@ -10,5 +10,5 @@ export const scheduler = defineFunction({
         APTOS_MANAGED_KEY: secret('APTOS_MANAGED_KEY'),
         FIRECRAWL_API_KEY: secret('FIRECRAWL_API_KEY')
     },
-    timeoutSeconds: 100
+    timeoutSeconds: 200
 })

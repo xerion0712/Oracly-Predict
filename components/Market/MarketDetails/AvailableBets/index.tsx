@@ -1,34 +1,94 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useReducer } from "react"
 import { ArrowLeft, ArrowRight } from "react-feather"
 import useDatabase from "../../../../hooks/useDatabase"
 import Agent from "../../../../amplify/lib/agent"
-import { parseTables } from "../../../../helpers"
+import { parseTables, secondsToDDHHMMSS } from "../../../../helpers"
 import { useInterval } from "@/hooks/useInterval"
 import useOpenAI from "@/hooks/useOpenAI"
 import useAI from "@/hooks/useAI"
+import BigNumber from "bignumber.js"
+
+enum SortBy {
+    MostPopular = "MostPopular",
+    HighestOdds = "HighestOdds",
+    LowestOdds = "LowestOdds",
+    Newest = "Newest"
+}
 
 const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }: any) => {
 
-    const { parse } = useAI()
-
-    const [interval, setInterval] = useState(100)
-
-    const { getOutcomes, crawl, updateOutcomeWeight } = useDatabase()
+    const { getOutcomes } = useDatabase()
 
     const [outcomes, setOutcomes] = useState([])
     const [current, setCurrent] = useState(0)
     const [tick, setTick] = useState<number>(0)
 
+    const [values, dispatch] = useReducer(
+        (curVal: any, newVal: any) => ({ ...curVal, ...newVal }),
+        {
+            sorted: SortBy.MostPopular
+        })
+
+    const { sorted } = values
+
     useEffect(() => {
         currentRound && setCurrent(currentRound)
     }, [currentRound])
 
-    const increaseTick = useCallback(() => {
-        setTick(tick + 1)
-    }, [tick])
+    // const increaseTick = useCallback(() => {
+    //     setTick(tick + 1)
+    // }, [tick])
 
     useEffect(() => {
-        current > 0 && marketData ? getOutcomes(marketData.id, current).then(setOutcomes) : setOutcomes([])
+        current > 0 && marketData ? getOutcomes(marketData.id, current).then(
+            (outcomes) => {
+                const outcomesWithOdds = outcomes.map((outcome: any, index: number) => {
+                    let minOdds = 0
+                    let maxOdds = 0
+                    let odds = "Medium"
+
+                    if (outcome && outcomes) {
+                        const totalPoolAfter = totalPool + 1
+
+                        // Assumes all outcomes won
+                        const totalShares = outcomes.reduce((output: number, item: any) => {
+                            if (item && item.totalBetAmount) {
+                                output = output + (item.totalBetAmount * (item.weight))
+                            }
+                            if (item.onchainId === outcome.onchainId) {
+                                output = output + (1 * (item.weight))
+                            }
+                            return output
+                        }, 0)
+                        const outcomeShares = (outcome.totalBetAmount + 1) * (outcome.weight)
+                        const ratio = outcomeShares / totalShares
+
+                        minOdds = ((ratio) * totalPoolAfter) * (1 / (outcome.totalBetAmount + 1))
+                        maxOdds = outcome.totalBetAmount > 0 ? (totalPoolAfter) * (1 / (outcome.totalBetAmount + 1)) : -1
+
+                        if (minOdds >= 3) {
+                            odds = "Very High"
+                        } else if (minOdds >= 2) {
+                            odds = "High"
+                        } else if (minOdds >= 1) {
+                            odds = "Medium"
+                        } else {
+                            odds = "Low"
+                        }
+                    }
+
+                    return {
+                        minOdds,
+                        maxOdds,
+                        odds,
+                        ...outcome,
+                        totalBetAmount: outcome.totalBetAmount ? outcome.totalBetAmount : 0
+                    }
+                })
+
+                setOutcomes(outcomesWithOdds)
+            }
+        ) : setOutcomes([])
     }, [marketData, current, tick])
 
     // useInterval(
@@ -102,6 +162,43 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
         return output
     }, 0)
 
+
+    let outcomesSorted = []
+
+    if (sorted === SortBy.MostPopular) {
+        outcomesSorted = outcomes.sort(function (a: any, b: any) {
+            return Number(b.totalBetAmount) - Number(a.totalBetAmount)
+        })
+    } else if (sorted === SortBy.HighestOdds) {
+        outcomesSorted = outcomes.sort(function (a: any, b: any) {
+            return Number(b.minOdds) - Number(a.minOdds)
+        })
+    } else if (sorted === SortBy.LowestOdds) {
+        outcomesSorted = outcomes.sort(function (a: any, b: any) {
+            return Number(a.minOdds) - Number(b.minOdds)
+        })
+    } else if (sorted === SortBy.Newest) {
+        outcomesSorted = outcomes.sort(function (a: any, b: any) {
+            return Number(b.onchainId) - Number(a.onchainId)
+        })
+    } else {
+        outcomesSorted = outcomes
+    }
+
+    const poolSize = onchainMarket ? Number(BigNumber(onchainMarket.balance).dividedBy(10 ** 6)) : 0
+    const endTimestamp = onchainMarket ? (Number(onchainMarket.createdTime) * 1000) + (current * (Number(onchainMarket.interval) * 1000)) : 0
+
+    let endIn = "0"
+    if (endTimestamp) {
+        const now = new Date().valueOf()
+        const diff = endTimestamp - now
+        if (diff > 0) {
+            const totals = Math.floor(diff / 1000)
+            const { days } = secondsToDDHHMMSS(totals)
+            endIn = `${days}`
+        }
+    }
+
     return (
         <div className="flex flex-col my-2">
 
@@ -113,14 +210,47 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
                     <div className='my-auto'>Previous Round</div>
                 </div>
                 <div className=" uppercase text-2xl font-bold text-white  text-center px-4">
-                    Round {current} {current === currentRound && " (Current)"}
+                    Round {current} {current === currentRound && " 🆕"}
                 </div>
-                <div className=" flex text-secondary   cursor-pointer" onClick={() => setCurrent(current + 1)}>
-                    <div className='my-auto'>Next Round</div>
-                    <ArrowRight className="my-auto " />
+                {currentRound > current ? (
+                    <div className=" flex text-secondary cursor-pointer" onClick={() => setCurrent(current + 1)}>
+                        <div className='my-auto'>Next Round</div>
+                        <ArrowRight className="my-auto " />
+                    </div>
+                ) : <div className="flex w-[100px]"></div>}
+
+            </div>
+
+            <div className="grid grid-cols-3 my-1 mb-0">
+                <div className="flex flex-row">
+                    <div className="text-white my-auto text-sm mr-2 font-semibold">
+                        Sort by
+                    </div>
+                    <select value={sorted} onChange={(e: any) => {
+                        dispatch({ sorted: e.target.value })
+                    }} className="  p-2 px-3 py-1 cursor-pointer my-auto rounded-lg text-sm bg-[#141F32] border border-gray/30 placeholder-gray text-white focus:outline-none">
+                        <option value={SortBy.MostPopular}>Most Popular</option>
+                        <option value={SortBy.HighestOdds}>Highest Odds</option>
+                        <option value={SortBy.LowestOdds}>Lowest Odds</option>
+                        <option value={SortBy.Newest}>Newest</option>
+                    </select>
+                </div>
+                <div className="text-center flex">
+                    {currentRound === current && (
+                        <div className="text-white text-sm my-auto mx-auto font-semibold">
+                            🕒 Started revealing results in {endIn}d
+                        </div>
+                    )}
+                    {currentRound > current && (
+                        <div className="text-white text-sm my-auto mx-auto font-semibold">
+                            👀 The outcomes are being revealed
+                        </div>
+                    )}
 
                 </div>
-
+                <div className="text-white my-auto text-sm ml-auto font-semibold">
+                    🏦 Current Pool Size: {poolSize.toLocaleString() || 0} USDC
+                </div>
             </div>
 
             {/* <div className="mx-auto text-white font-semibold my-1">
@@ -128,41 +258,7 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
             </div> */}
 
             <div className="my-4 grid grid-cols-3 gap-3">
-                {outcomes.map((entry: any, index:number) => {
-
-                    let minOdds = 0
-                    let maxOdds = 0
-                    let odds = "Medium"
-
-                    if (entry && outcomes) {
-                        const totalPoolAfter = totalPool + 1
-
-                        // Assumes all outcomes won
-                        const totalShares = outcomes.reduce((output: number, item: any) => {
-                            if (item && item.totalBetAmount) {
-                                output = output + (item.totalBetAmount * (item.weight))
-                            }
-                            if (item.onchainId === entry.onchainId) {
-                                output = output + (1 * (item.weight))
-                            }
-                            return output
-                        }, 0)
-                        const outcomeShares = (entry.totalBetAmount + 1) * (entry.weight)
-                        const ratio = outcomeShares / totalShares
-
-                        minOdds = ((ratio) * totalPoolAfter) * (1 / (entry.totalBetAmount + 1))
-                        maxOdds = entry.totalBetAmount > 0 ? (totalPoolAfter) * (1 / (entry.totalBetAmount + 1)) : -1
-                    
-                        if (minOdds >= 3) {
-                            odds = "Very High"
-                        } else if (minOdds >= 2) {
-                            odds = "High"
-                        } else if (minOdds >= 1) {
-                            odds = "Medium"
-                        }  else  {
-                            odds = "Low"
-                        } 
-                    }
+                {outcomesSorted.map((entry: any, index: number) => {
 
                     return (
                         <div key={index}>
@@ -172,9 +268,10 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
                                 openBetModal={openBetModal}
                                 marketData={marketData}
                                 current={current}
-                                minOdds={minOdds}
-                                maxOdds={maxOdds}
-                                odds={odds}
+                                minOdds={entry.minOdds}
+                                maxOdds={entry.maxOdds}
+                                odds={entry.odds}
+                                isPast={currentRound > current}
                             />
                         </div>
                     )
@@ -186,12 +283,12 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
 
 
 
-const OutcomeCard = ({ index, item, current, marketData, openBetModal, minOdds, maxOdds, odds }: any) => {
+const OutcomeCard = ({ index, item, current, marketData, openBetModal, minOdds, maxOdds, odds, isPast }: any) => {
 
     return (
         <div onClick={() => {
 
-            openBetModal({
+            !isPast && openBetModal({
                 marketId: marketData.id,
                 roundId: current,
                 outcomeId: item.onchainId,
@@ -200,7 +297,6 @@ const OutcomeCard = ({ index, item, current, marketData, openBetModal, minOdds, 
         }} className=" h-[150px] p-4 px-2 border-2 flex flex-col cursor-pointer border-white/[0.1] bg-transparent bg-gradient-to-b from-white/5 to-transparent rounded-lg" >
 
             <div className="flex flex-row">
-                {/* <img className="h-8 sm:h-10 w-8 sm:w-10 my-auto rounded-full" src={icon} alt="" /> */}
                 <div className="px-2">
                     <p className="text-white font-semibold line-clamp-2">
                         {item?.title}
@@ -208,22 +304,29 @@ const OutcomeCard = ({ index, item, current, marketData, openBetModal, minOdds, 
                 </div>
             </div>
             <div className="px-2 text-sm font-semibold my-1">
-                Resolution: {` ${(new Date(Number(item.resolutionDate) * 1000)).toUTCString()}`}
+                At: {` ${(new Date(Number(item.resolutionDate) * 1000)).toUTCString()}`}
             </div>
             <div className="flex px-2 flex-row my-1 mt-auto justify-between">
                 <div className=" ">
-                    <p className="text-white text-base font-semibold">⚡{` ${item.totalBetAmount || 0} USDC`}</p>
+                    <p className="text-white text-base font-semibold">🔥{` ${item.totalBetAmount || 0} USDC`}</p>
                 </div>
-                {item.totalBetAmount && (
+                {/* {item.totalBetAmount && (
                     <div className=" ">
                         <p className="text-white  font-semibold"> 🔥 </p>
                     </div>
-                )}
+                )} */}
                 {/* <div className=" ">
                     <p className="text-white  font-semibold">🕒{` ${ (new Date( Number(item.resolutionDate) * 1000 )).toLocaleDateString()}`}</p>
                 </div> */}
-                <div className=" ">
-                    <p className="text-white text-base font-semibold">🎲{`${item.weight ? ` ${odds}` : "N/A"}`}</p>
+
+                {isPast && (
+                    <div className=" ">
+                        { item.revealedTimestamp && <> {item.isWon ? "✅" : "❌"} </>  }
+                    </div>
+                )}
+
+                <div className=" flex flex-row">
+                    <p className="text-white text-base font-semibold">🔢{`${item.weight ? ` ${item.weight.toLocaleString()}%` : "N/A"}`}</p>
                 </div>
 
             </div>
