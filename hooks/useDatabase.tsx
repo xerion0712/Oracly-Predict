@@ -87,6 +87,17 @@ const useDatabase = () => {
         return resources.data
     }
 
+    const getOutcomeById = async (outcomeId: number) => {
+        const outcomes = await client.models.Outcome.list({
+            filter: {
+                onchainId: {
+                    eq: outcomeId
+                }
+            }
+        })
+        return outcomes && outcomes.data[0] ? outcomes.data[0] : undefined
+    }
+
     const getOutcomes = async (marketId: string, roundId: number) => {
 
         const market = await client.models.Market.get({
@@ -151,7 +162,7 @@ const useDatabase = () => {
             rounds = await market.data.rounds()
             thisRound = rounds.data.find((item: any) => item.onchainId === Number(roundId))
         }
- 
+
         const outcomes = await client.models.Outcome.list()
 
         const maxOutcomeId = outcomes.data.reduce((result: number, item: any) => {
@@ -239,7 +250,7 @@ const useDatabase = () => {
     //                 }
 
     //                 // update weights
-                    
+
 
     //             }
     //         }
@@ -345,6 +356,7 @@ const useDatabase = () => {
         getMyPositions,
         updateOutcomeWeight,
         getAllOutcomes,
+        getOutcomeById
         // finalizeWeights
     }
 }
