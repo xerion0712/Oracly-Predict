@@ -74,7 +74,7 @@ const reveal = async (currentRound: number, market: any, rounds: any) => {
                         need_check = true
                     }
 
-                    if (need_check) {
+                    if (need_check && !outcome.revealedTimestamp) {
                         console.log("need check for outcome : ", outcome)
                         checkingOutcomes.push(outcome)
                     }
@@ -101,6 +101,27 @@ const reveal = async (currentRound: number, market: any, rounds: any) => {
                         const output = await parse(messages)
 
                         console.log("output: ", output)
+
+                        if (output.length > 0) {
+                            for (let outcome of checkingOutcomes) {
+                                const currentOutcome = output.find((item: any) => item.outcomeId === outcome.onchainId)
+                                const isWon = currentOutcome?.isWon
+                                const isDisputed = currentOutcome?.isDisputed
+                                const explanation = currentOutcome?.explanation
+
+                                console.log("updating..", outcome.id, explanation, isWon, isDisputed)
+
+                                await client.models.Outcome.update({
+                                    id: outcome.id,
+                                    isWon,
+                                    isDisputed,
+                                    result: explanation,
+                                    revealedTimestamp: Math.floor((new Date().valueOf()) / 1000)
+                                })
+
+                            }
+
+                        }
 
                     }
 
