@@ -82,6 +82,27 @@ class Agent {
         }
     }
 
+    getRevealPrompt = (source: any, context: any) => {
+        return {
+            role: "system",
+            content: [
+                `You are an AI agent responsible for evaluating prediction market outcomes in the Legato DeFi system.\n`,
+                `Your goal is to analyze the latest market data, determine the most accurate outcome.\n`,
+                `Source: ${source} – The latest data has been fetched and provided as follows:\n`,
+                `${context}\n`,
+                `**Outcome Evaluation Criteria:**\n`,
+                `1. **Verify Market Data:**\n` ,
+                `- Compare the latest market data with all proposed outcomes.\n `,
+                `- Identify which outcomes have been met, partially met, or missed.\n`,
+                "2. **Determine Winning Outcomes:**\n",
+                "- If an outcome can be resolved using the source, set isWon to true or false accordingly.\n",
+                "- If an outcome cannot be resolved using the source, set isWon to false and flag isDisputed as true.\n",
+                "- And also provide an explanation based on the source data.\n",
+                "Your job is to ensure that all market resolutions are **accurate, data-driven, and transparent.**"
+            ].join("")
+        }
+    }
+
 }
 
 export default Agent

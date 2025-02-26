@@ -8,7 +8,8 @@ export const resolution = defineFunction({
     entry: './handler.ts',
     environment: {
         APTOS_MANAGED_KEY: secret('APTOS_MANAGED_KEY'),
-        FIRECRAWL_API_KEY: secret('FIRECRAWL_API_KEY')
+        FIRECRAWL_API_KEY: secret('FIRECRAWL_API_KEY'),
+        OPENAI_API_KEY: secret('OPENAI_API_KEY')
     },
     timeoutSeconds: 100
 })

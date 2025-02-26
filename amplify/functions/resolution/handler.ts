@@ -15,7 +15,9 @@ import {
 } from "@aptos-labs/ts-sdk";
 import FirecrawlApp from '@mendable/firecrawl-js';
 import Agent from "../../lib/agentTs"
-
+import { z } from "zod";
+import { zodResponseFormat } from "openai/helpers/zod";
+import OpenAI from "openai";
 
 const { resourceConfig, libraryOptions } = await getAmplifyDataClientConfig(env);
 
@@ -62,6 +64,8 @@ const reveal = async (currentRound: number, market: any, rounds: any) => {
                 const { data } = await round.outcomes()
                 const outcomes = data.filter((item: any) => item.resolutionDate)
 
+                let checkingOutcomes = []
+
                 for (let outcome of outcomes) {
 
                     let need_check = false
@@ -72,6 +76,32 @@ const reveal = async (currentRound: number, market: any, rounds: any) => {
 
                     if (need_check) {
                         console.log("need check for outcome : ", outcome)
+                        checkingOutcomes.push(outcome)
+                    }
+
+                }
+
+                if (checkingOutcomes.length > 0) {
+
+                    const resource = await market.resource()
+
+                    if (resource && resource.data) {
+                        const source = resource.data.name
+                        const context = await crawl(resource.data)
+
+                        const agent = new Agent()
+                        const systemPrompt = agent.getRevealPrompt(source, context)
+                        const outcomePrompt = agent.getOutcomePrompt(checkingOutcomes)
+
+                        const messages = [systemPrompt, outcomePrompt, {
+                            role: 'user',
+                            content: "help reveal the result for each outcome"
+                        }]
+
+                        const output = await parse(messages)
+
+                        console.log("output: ", output)
+
                     }
 
                 }
@@ -116,4 +146,58 @@ const getMarket = async (marketId = 1) => {
         }
     })
     return markets && markets.data[0] ? markets.data[0] : undefined
+}
+
+const crawl = async (resource: any) => {
+
+    let need_update = false
+
+    if (resource.lastCrawledAt === undefined) {
+        need_update = true
+    } else if ((new Date().valueOf() / 1000) - resource.lastCrawledAt > 86400) {
+        need_update = true
+    }
+
+    if (need_update) {
+
+        const result: any = (await app.scrapeUrl(resource.url, { formats: ['markdown', 'html'] }))
+
+        await client.models.Resource.update({
+            id: resource.id,
+            lastCrawledAt: Math.floor((new Date().valueOf()) / 1000),
+            crawledData: result.markdown
+        })
+
+        return result.markdown
+
+    } else {
+        return resource.crawledData
+    }
+}
+
+
+const OutcomeResult = z.object({
+    outcomeId: z.number(),
+    isWon: z.boolean(),
+    isDisputed: z.boolean(),
+    explanation: z.string()
+});
+
+const OutcomeResults = z.object({
+    outcomes: z.array(OutcomeResult)
+});
+
+const parse = async (messages: any) => {
+
+    const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+
+    const completion = await openai.beta.chat.completions.parse({
+        model: "gpt-4o",
+        messages: messages,
+        response_format: zodResponseFormat(OutcomeResults, "outcome_results"),
+    });
+
+    const output = completion.choices[0].message.parsed;
+
+    return (output && output?.outcomes) ? output.outcomes : []
 }
