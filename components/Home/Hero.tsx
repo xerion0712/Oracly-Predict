@@ -91,16 +91,16 @@ const Hero = () => {
                 title="🚀 What’s New?"
                 visible={modal}
                 close={() => setModal(false)}
-                maxWidth='max-w-xl'
+                maxWidth='max-w-2xl'
             >
 
                 <p className="text-center text-sm sm:text-lg mt-4 mb-4">
-                    We've made huge updates to make your prediction experience more fun and rewarding:
+                    We've made huge updates to make your prediction experience more fun:
                 </p>
                 <div className="text-white/70 text-sm sm:text-lg">
                     <li><b>Endlessly Flexible:</b> Propose any outcomes with AI tracking and revealing the results automatically</li>
                     <li><b>Ever-Increasing Payouts:</b> Unclaimed amounts adding to the next round's prize </li>
-                    <li><b>With DeepSeek R1:</b> Via Atoma’s Decentralized AI Network </li>
+                    <li><b>Robust AI:</b> With OpenAI GPT-4 and supported by AWS AI Services </li>
                 </div>
 
                 <div className='text-center mt-5'>

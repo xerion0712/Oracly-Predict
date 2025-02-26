@@ -31,69 +31,69 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
         current > 0 && marketData ? getOutcomes(marketData.id, current).then(setOutcomes) : setOutcomes([])
     }, [marketData, current, tick])
 
-    useInterval(
-        () => {
-            if (outcomes.length > 0 && onchainMarket && marketData) {
-                updateWeights(outcomes, currentRound, marketData, onchainMarket) 
-                setInterval(10000)
-            }
+    // useInterval(
+    //     () => {
+    //         if (outcomes.length > 0 && onchainMarket && marketData) {
+    //             updateWeights(outcomes, currentRound, marketData, onchainMarket) 
+    //             setInterval(10000)
+    //         }
 
-        }, interval
-    )
+    //     }, interval
+    // )
 
-    const updateWeights = useCallback(async (outcomes: any, currentRound: number, marketData: any, onchainMarket: any) => {
+    // const updateWeights = useCallback(async (outcomes: any, currentRound: number, marketData: any, onchainMarket: any) => {
 
-        const rounds = await marketData.rounds()
-        const thisRound: any = rounds.data.find((item: any) => item.onchainId === Number(currentRound))
+    //     const rounds = await marketData.rounds()
+    //     const thisRound: any = rounds.data.find((item: any) => item.onchainId === Number(currentRound))
 
-        if (!thisRound) {
-            return
-        }
+    //     if (!thisRound) {
+    //         return
+    //     }
 
-        let need_update = false
+    //     let need_update = false
 
-        if (thisRound.lastWeightUpdatedAt === undefined) {
-            need_update = true
-        } else if ((new Date().valueOf() / 1000) - thisRound.lastWeightUpdatedAt > 86400) {
-            need_update = true
-        }
+    //     if (thisRound.lastWeightUpdatedAt === undefined) {
+    //         need_update = true
+    //     } else if ((new Date().valueOf() / 1000) - thisRound.lastWeightUpdatedAt > 86400) {
+    //         need_update = true
+    //     }
 
-        if (!need_update) {
-            return
-        }
+    //     if (!need_update) {
+    //         return
+    //     }
 
-        const resource = await marketData.resource()
+    //     const resource = await marketData.resource()
 
-        if (resource && resource.data) {
+    //     if (resource && resource.data) {
 
-            const source = resource.data.name
-            const context = await crawl(resource.data)
+    //         const source = resource.data.name
+    //         const context = await crawl(resource.data)
 
-            const startPeriod = (Number(onchainMarket.createdTime) * 1000) + (onchainMarket.round * (Number(onchainMarket.interval) * 1000))
-            const endPeriod = startPeriod + (Number(onchainMarket.interval) * 1000)
-            const period = `${new Date(startPeriod).toDateString()} - ${new Date(endPeriod).toDateString()}`
+    //         const startPeriod = (Number(onchainMarket.createdTime) * 1000) + (onchainMarket.round * (Number(onchainMarket.interval) * 1000))
+    //         const endPeriod = startPeriod + (Number(onchainMarket.interval) * 1000)
+    //         const period = `${new Date(startPeriod).toDateString()} - ${new Date(endPeriod).toDateString()}`
 
-            const agent = new Agent()
-            const systemPrompt = agent.getSystemPrompt(currentRound, source, parseTables(context), period)
-            const outcomePrompt = agent.getOutcomePrompt(outcomes)
+    //         const agent = new Agent()
+    //         const systemPrompt = agent.getSystemPrompt(currentRound, source, parseTables(context), period)
+    //         const outcomePrompt = agent.getOutcomePrompt(outcomes)
 
-            const messages = [systemPrompt, outcomePrompt]
+    //         const messages = [systemPrompt, outcomePrompt]
 
-            const output = await parse([...messages, {
-                role: 'user',
-                content: "help assign weight for each outcome"
-            }])
+    //         const output = await parse([...messages, {
+    //             role: 'user',
+    //             content: "help assign weight for each outcome"
+    //         }])
 
-            console.log(output)
+    //         console.log(output)
 
-            if (output.length > 0) {
-                await updateOutcomeWeight({ marketId: marketData.id, roundId: currentRound, weights: output })
-                increaseTick()
-            }
+    //         if (output.length > 0) {
+    //             await updateOutcomeWeight({ marketId: marketData.id, roundId: currentRound, weights: output })
+    //             increaseTick()
+    //         }
 
-        }
+    //     }
 
-    }, [increaseTick])
+    // }, [increaseTick])
 
     const totalPool = outcomes.reduce((output: number, item: any) => {
         if (item && item.totalBetAmount) {
