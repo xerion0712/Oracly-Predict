@@ -60,7 +60,7 @@ class Agent {
             role: "system",
             content: [
                 `You are an AI agent responsible for assigning probability to prediction market outcomes in the Legato DeFi system.\n`,
-                `Your goal is to analyze the latest market data and assign the probability (0 to 1) to each possible outcome.\n`,
+                `Your goal is to analyze the latest market data and assign the probability (0 to 100) to each possible outcome.\n`,
                 `Round Details:\n`,
                 `Round Number: ${roundNumber}\n`,
                 `Source: ${source} – The latest data has been fetched and provided as follows:\n`,

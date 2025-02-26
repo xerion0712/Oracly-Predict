@@ -113,7 +113,7 @@ const updateWeights = async (currentRound: number, market: any, rounds: any) => 
           const period = `${new Date(startPeriod).toDateString()} - ${new Date(endPeriod).toDateString()}`
 
           const agent = new Agent()
-          const systemPrompt = agent.getSystemPrompt(currentRound, source, parseTables(context), period)
+          const systemPrompt = agent.getWeightPrompt(currentRound, source, parseTables(context), period)
 
           const outcomes = await round.outcomes()
           const outcomePrompt = agent.getOutcomePrompt(outcomes.data)
@@ -138,7 +138,7 @@ const updateWeights = async (currentRound: number, market: any, rounds: any) => 
 
               await client.models.Outcome.update({
                 id: outcome.id,
-                weight
+                weight: weight > 1 ? weight : (weight * 100)
               })
 
             }

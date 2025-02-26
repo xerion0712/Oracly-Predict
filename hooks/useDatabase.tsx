@@ -151,8 +151,8 @@ const useDatabase = () => {
             rounds = await market.data.rounds()
             thisRound = rounds.data.find((item: any) => item.onchainId === Number(roundId))
         }
-
-        const outcomes = await thisRound.outcomes()
+ 
+        const outcomes = await client.models.Outcome.list()
 
         const maxOutcomeId = outcomes.data.reduce((result: number, item: any) => {
             if (item.onchainId > result) {
