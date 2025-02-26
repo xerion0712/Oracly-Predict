@@ -7,6 +7,7 @@ import { useInterval } from "@/hooks/useInterval"
 import useOpenAI from "@/hooks/useOpenAI"
 import useAI from "@/hooks/useAI"
 import BigNumber from "bignumber.js"
+import BaseModal from "@/modals/base"
 
 enum SortBy {
     MostPopular = "MostPopular",
@@ -26,10 +27,11 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
     const [values, dispatch] = useReducer(
         (curVal: any, newVal: any) => ({ ...curVal, ...newVal }),
         {
-            sorted: SortBy.MostPopular
+            sorted: SortBy.MostPopular,
+            infoModal: undefined
         })
 
-    const { sorted } = values
+    const { sorted, infoModal } = values
 
     useEffect(() => {
         currentRound && setCurrent(currentRound)
@@ -200,90 +202,177 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
     }
 
     return (
-        <div className="flex flex-col my-2">
+        <>
 
-            <div
-                className="flex flex-row justify-between my-2 text-white ml-4 mx-4"
+            <BaseModal
+                visible={infoModal}
+                close={() => dispatch({ infoModal: undefined })}
+                title={"Outcome Results"}
+                maxWidth="max-w-xl"
             >
-                <div className="flex text-secondary    cursor-pointer" onClick={() => current > 1 && setCurrent(current - 1)}>
-                    <ArrowLeft className="my-auto  " />
-                    <div className='my-auto'>Previous Round</div>
-                </div>
-                <div className=" uppercase text-2xl font-bold text-white  text-center px-4">
-                    Round {current} {current === currentRound && " 🆕"}
-                </div>
-                {currentRound > current ? (
-                    <div className=" flex text-secondary cursor-pointer" onClick={() => setCurrent(current + 1)}>
-                        <div className='my-auto'>Next Round</div>
-                        <ArrowRight className="my-auto " />
+
+                {infoModal && (
+                    <>
+                        <div className="grid grid-cols-2 py-2 text-gray">
+                            <div className=" py-0.5  col-span-2 text-lg font-semibold  text-white flex flex-row">
+                                {infoModal.title}
+                            </div>
+
+                            {!infoModal.revealedTimestamp && (
+                                <>
+                                    <div className=" py-0.5 col-span-2  text-sm  flex flex-row">
+                                        <span className="font-bold mr-2">At:</span>
+                                        <div className={`   flex flex-row  text-white text-sm `}>
+                                            {` ${(new Date(Number(infoModal.resolutionDate) * 1000)).toUTCString()}`}
+                                        </div>
+                                    </div>
+                                    <div className="col-span-2 rounded-lg   h-[100px] mt-[10px] flex border border-gray/30">
+                                        <div className="m-auto text-white font-semibold">
+                                            The result is not yet revealed
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {infoModal.revealedTimestamp && (
+                                <>
+                                    <div className=" py-0.5 col-span-2  text-sm  flex flex-row">
+                                        <span className="font-bold mr-2">Checked At:</span>
+                                        <div className={`   flex flex-row  text-white text-sm `}>
+                                            {` ${(new Date(Number(infoModal.revealedTimestamp) * 1000)).toUTCString()}`}
+                                        </div>
+                                    </div>
+                                    <div className="col-span-2 rounded-lg grid grid-cols-2 mt-[10px] p-4 py-2 border border-gray/30">
+                                        <div className=" py-0.5 col-span-1  text-sm  flex flex-row">
+                                            <span className="font-bold mr-2">Result:</span>
+                                            <div className={`   flex flex-row  text-white text-sm `}>
+                                                {infoModal.isWon ? "✅" : "❌"}
+                                            </div>
+                                        </div>
+                                        <div className=" py-0.5 col-span-1  text-sm  flex flex-row">
+                                            <span className="font-bold mr-2">Disputed:</span>
+                                            <div className={`   flex flex-row  text-white text-sm `}>
+                                                {infoModal.isDisputed ? "✅" : "❌"}
+                                            </div>
+                                        </div>
+                                        <div className=" py-0.5 col-span-2  text-sm  flex flex-row">
+                                            <div className="text-white my-1">
+                                                {infoModal.result}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </>
+                            )}
+
+
+
+                            {/* <div className=" py-0.5 text-sm  flex flex-row">
+                                            <span className="font-bold mr-2">Current Odds:</span>
+                                            <div className={`   flex flex-row  text-white text-sm `}>
+                                                {`${outcome.weight ? `${minOdds.toLocaleString()}-${`${maxOdds !== -1 ? maxOdds.toLocaleString() :"10"}`}` : "N/A"}`}
+                                            </div>
+                                        </div>
+                                        <div className=" py-0.5 text-sm  flex flex-row">
+                                            <span className="font-bold mr-2">Round Pool:</span>
+                                            <div className={`   flex flex-row  text-white text-sm `}>
+                                                {`${totalPool} USDC`}
+                                            </div>
+                                        </div>  */}
+                        </div>
+                    </>
+                )
+
+                }
+
+            </BaseModal>
+
+            <div className="flex flex-col my-2">
+
+                <div
+                    className="flex flex-row justify-between my-2 text-white ml-4 mx-4"
+                >
+                    <div className="flex text-secondary    cursor-pointer" onClick={() => current > 1 && setCurrent(current - 1)}>
+                        <ArrowLeft className="my-auto  " />
+                        <div className='my-auto'>Previous Round</div>
                     </div>
-                ) : <div className="flex w-[100px]"></div>}
-
-            </div>
-
-            <div className="grid grid-cols-3 my-1 mb-0">
-                <div className="flex flex-row">
-                    <div className="text-white my-auto text-sm mr-2 font-semibold">
-                        Sort by
+                    <div className=" uppercase text-2xl font-bold text-white  text-center px-4">
+                        Round {current} {current === currentRound && " 🆕"}
                     </div>
-                    <select value={sorted} onChange={(e: any) => {
-                        dispatch({ sorted: e.target.value })
-                    }} className="  p-2 px-3 py-1 cursor-pointer my-auto rounded-lg text-sm bg-[#141F32] border border-gray/30 placeholder-gray text-white focus:outline-none">
-                        <option value={SortBy.MostPopular}>Most Popular</option>
-                        <option value={SortBy.HighestOdds}>Highest Odds</option>
-                        <option value={SortBy.LowestOdds}>Lowest Odds</option>
-                        <option value={SortBy.Newest}>Newest</option>
-                    </select>
-                </div>
-                <div className="text-center flex">
-                    {currentRound === current && (
-                        <div className="text-white text-sm my-auto mx-auto font-semibold">
-                            🕒 Started revealing results in {endIn}d
+                    {currentRound > current ? (
+                        <div className=" flex text-secondary cursor-pointer" onClick={() => setCurrent(current + 1)}>
+                            <div className='my-auto'>Next Round</div>
+                            <ArrowRight className="my-auto " />
                         </div>
-                    )}
-                    {currentRound > current && (
-                        <div className="text-white text-sm my-auto mx-auto font-semibold">
-                            👀 The outcomes are being revealed
-                        </div>
-                    )}
+                    ) : <div className="flex w-[100px]"></div>}
 
                 </div>
-                <div className="text-white my-auto text-sm ml-auto font-semibold">
-                    🏦 Current Pool Size: {poolSize.toLocaleString() || 0} USDC
+
+                <div className="grid grid-cols-3 my-1 mb-0">
+                    <div className="flex flex-row">
+                        <div className="text-white my-auto text-sm mr-2 font-semibold">
+                            Sort by
+                        </div>
+                        <select value={sorted} onChange={(e: any) => {
+                            dispatch({ sorted: e.target.value })
+                        }} className="  p-2 px-3 py-1 cursor-pointer my-auto rounded-lg text-sm bg-[#141F32] border border-gray/30 placeholder-gray text-white focus:outline-none">
+                            <option value={SortBy.MostPopular}>Most Popular</option>
+                            <option value={SortBy.HighestOdds}>Highest Odds</option>
+                            <option value={SortBy.LowestOdds}>Lowest Odds</option>
+                            <option value={SortBy.Newest}>Newest</option>
+                        </select>
+                    </div>
+                    <div className="text-center flex">
+                        {currentRound === current && (
+                            <div className="text-white text-sm my-auto mx-auto font-semibold">
+                                🕒 Started revealing results in {endIn}d
+                            </div>
+                        )}
+                        {currentRound > current && (
+                            <div className="text-white text-sm my-auto mx-auto font-semibold">
+                                👀 The outcomes are being revealed
+                            </div>
+                        )}
+
+                    </div>
+                    <div className="text-white my-auto text-sm ml-auto font-semibold">
+                        🏦 Current Pool Size: {poolSize.toLocaleString() || 0} USDC
+                    </div>
+                </div>
+
+                {/* <div className="mx-auto text-white font-semibold my-1">
+    🏆 Round Pool: 1000 USDC
+</div> */}
+
+                <div className="my-4 grid grid-cols-3 gap-3">
+                    {outcomesSorted.map((entry: any, index: number) => {
+
+                        return (
+                            <div key={index}>
+                                <OutcomeCard
+                                    index={index}
+                                    item={entry}
+                                    openBetModal={openBetModal}
+                                    openInfoModal={() => dispatch({ infoModal: entry })}
+                                    marketData={marketData}
+                                    current={current}
+                                    minOdds={entry.minOdds}
+                                    maxOdds={entry.maxOdds}
+                                    odds={entry.odds}
+                                    isPast={currentRound > current}
+                                />
+                            </div>
+                        )
+                    })}
                 </div>
             </div>
-
-            {/* <div className="mx-auto text-white font-semibold my-1">
-                🏆 Round Pool: 1000 USDC
-            </div> */}
-
-            <div className="my-4 grid grid-cols-3 gap-3">
-                {outcomesSorted.map((entry: any, index: number) => {
-
-                    return (
-                        <div key={index}>
-                            <OutcomeCard
-                                index={index}
-                                item={entry}
-                                openBetModal={openBetModal}
-                                marketData={marketData}
-                                current={current}
-                                minOdds={entry.minOdds}
-                                maxOdds={entry.maxOdds}
-                                odds={entry.odds}
-                                isPast={currentRound > current}
-                            />
-                        </div>
-                    )
-                })}
-            </div>
-        </div>
+        </>
     )
 }
 
 
 
-const OutcomeCard = ({ index, item, current, marketData, openBetModal, minOdds, maxOdds, odds, isPast }: any) => {
+const OutcomeCard = ({ index, item, current, marketData, openInfoModal, openBetModal, minOdds, maxOdds, odds, isPast }: any) => {
 
     return (
         <div onClick={() => {
@@ -293,6 +382,7 @@ const OutcomeCard = ({ index, item, current, marketData, openBetModal, minOdds, 
                 roundId: current,
                 outcomeId: item.onchainId,
             })
+            isPast && openInfoModal()
 
         }} className=" h-[150px] p-4 px-2 border-2 flex flex-col cursor-pointer border-white/[0.1] bg-transparent bg-gradient-to-b from-white/5 to-transparent rounded-lg" >
 
@@ -321,7 +411,7 @@ const OutcomeCard = ({ index, item, current, marketData, openBetModal, minOdds, 
 
                 {isPast && (
                     <div className=" ">
-                        { item.revealedTimestamp && <> {item.isWon ? "✅" : "❌"} </>  }
+                        {item.revealedTimestamp && <> {item.isWon ? "✅" : "❌"} </>}
                     </div>
                 )}
 

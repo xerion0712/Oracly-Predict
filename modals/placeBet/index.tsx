@@ -178,7 +178,7 @@ const PlaceBetModal = ({ visible, close, bet }: any) => {
                                             {outcome.title}
                                         </div>
                                         <div className=" py-0.5 col-span-2  text-sm  flex flex-row">
-                                            <span className="font-bold mr-2">Resolution Date:</span>
+                                            <span className="font-bold mr-2">At:</span>
                                             <div className={`   flex flex-row  text-white text-sm `}>
                                                 {` ${(new Date(Number(outcome.resolutionDate) * 1000)).toUTCString()}`}
                                             </div>
