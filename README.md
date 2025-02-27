@@ -1,12 +1,15 @@
-# Legato v.2
+# Legato Next
 
-The V2 launch starts with a DeFi prediction market, with additional services potentially merging later. This version leverages **Atoma Network**'s decentralized AI and the **DeepSeek R1** model to make the prediction market more fun and interactive. It's still heavily development with zero-shot learning to improve accuracy is on the way.
+Here is the completely new version of the **Legato** prediction market allows anyone to create prediction markets. Each market is connected to a trusted source like **CoinMarketCap.com** and actively monitored by an AI-agent, allowing users to chat about it or discover new possible outcomes for the prediction market round, whether it's BTC's price next week or the ranking of their favorite token.
+
+Payouts are distributed based on the weight assigned to each outcome by the AI-agent. Once the round concludes, winners can claim their payout proportionally, according to the weight assigned to each outcome. Unclaimed amounts are carried over to the next round, ensuring a dynamic and growing prize pool.
 
 ## Highlighted Improvements
 - **Endlessly Flexible:** Anyone can propose outcomes with AI automatically tracking and revealing the results, such as "Will BTC hit $100,000 by Friday?" or "Will SOL's market cap surpass XRP's by next week?
 - **Ever-Increasing Payouts:** Outcomes are aggregated into a round based on a trusted source. Correct bets will receive payouts based on contribution while unclaimed amounts roll over to the next round’s prize pool.
 - **Support USDC:** Now supports USDC for receiving bets, providing more flexibility for users to participate in the prediction market.
-- **DeepSeek R1:** Used to assist in outcome generation by providing the topic and asset name. Later, users can place bets and others can join. 
+- **Authentication:**  Supports authentication with AWS Amplify, allowing login with email or Google for better tracking of all bet positions.
+- **OpenAI GPT-4:** Assists in outcome generation, periodically reviews proposed outcomes, and assigns weights based on market data.
 
 ## AI-Agent
 The AI-agent plays a major role in the system, leveraging Atoma Network's decentralized AI to ensure the privacy of each user's data. DeepSeek R1 serves as the primary LLM for handling following actions:
