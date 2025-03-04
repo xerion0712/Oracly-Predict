@@ -48,7 +48,7 @@ export const handler: EventBridgeHandler<"Scheduled Event", null, void> = async 
     await reveal(currentRound, market, rounds)
 
     // Update smart contract
-
+    await resolve(currentRound, rounds, aptos, privateKey)
 
 
 }
@@ -132,6 +132,79 @@ const reveal = async (currentRound: number, market: any, rounds: any) => {
     }
 
     console.log("Reveal Outcome Results. Done.")
+}
+
+const resolve = async (currentRound: number, rounds: any, aptos: any, privateKey: any) => {
+
+    console.log("Resolve Market...")
+
+    for (let round of rounds.data) {
+
+        if (currentRound > round.onchainId && ((currentRound - round.onchainId) > 1)) {
+            if (round.finalizedTimestamp && !round.resolvedTimestamp) {
+                const { data } = await round.outcomes()
+                const outcomes = data.sort((a: any, b: any) => {
+                    return a.onchainId - b.onchainId
+                })
+
+                let winning_outcome_ids = []
+                let disputed_outcome_ids = []
+
+                for (let outcome of outcomes) {
+                    if (outcome.onchainId && outcome.weight) {
+                        if (outcome.isDisputed) {
+                            disputed_outcome_ids.push(outcome.onchainId)
+                        } else if (outcome.isWon) {
+                            winning_outcome_ids.push(outcome.onchainId)
+                        }
+                    }
+                }
+
+                // Update smart contract
+
+                console.log("Updating smart contract...")
+
+                const account = Account.fromPrivateKey({
+                    privateKey
+                })
+
+                const transaction = await aptos.transaction.build.simple({
+                    sender: account.accountAddress,
+                    data: {
+                        function: `0xab3922ccb1794928abed8f5a5e8d9dac72fed24f88077e46593bed47dcdb7775::generalized::resolve_market`,
+                        functionArguments: [
+                            MARKET_ID,
+                            round.onchainId,
+                            winning_outcome_ids,
+                            disputed_outcome_ids
+                        ],
+                    },
+                });
+
+                const senderAuthenticator = aptos.transaction.sign({
+                    signer: account,
+                    transaction,
+                });
+
+                const submittedTransaction = await aptos.transaction.submit.simple({
+                    transaction,
+                    senderAuthenticator,
+                });
+
+                console.log(`Submitted Tx: ${submittedTransaction.hash}`)
+
+                // Add timestamp
+                await client.models.Round.update({
+                    id: round.id,
+                    resolvedTimestamp: Math.floor((new Date().valueOf()) / 1000)
+                })
+
+            }
+        }
+
+    }
+
+    console.log("Resolve Market. Done.")
 }
 
 const getOnchainCurrentRound = async (aptos: any) => {

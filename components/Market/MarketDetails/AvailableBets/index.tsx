@@ -190,14 +190,19 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
     const poolSize = onchainMarket ? Number(BigNumber(onchainMarket.balance).dividedBy(10 ** 6)) : 0
     const endTimestamp = onchainMarket ? (Number(onchainMarket.createdTime) * 1000) + (current * (Number(onchainMarket.interval) * 1000)) : 0
 
-    let endIn = "0"
+    let endIn = "0d"
     if (endTimestamp) {
         const now = new Date().valueOf()
         const diff = endTimestamp - now
         if (diff > 0) {
             const totals = Math.floor(diff / 1000)
-            const { days } = secondsToDDHHMMSS(totals)
-            endIn = `${days}`
+            const { days, hours } = secondsToDDHHMMSS(totals)
+            if (days !== "0") {
+                endIn = `${days}d`
+            } else {
+                endIn = `${hours}h`
+            }
+
         }
     }
 
@@ -325,13 +330,21 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
                     <div className="text-center flex">
                         {currentRound === current && (
                             <div className="text-white text-sm my-auto mx-auto font-semibold">
-                                🕒 Started revealing results in {endIn}d
+                                🟢 Accepting bets for the next {endIn}
                             </div>
                         )}
                         {currentRound > current && (
-                            <div className="text-white text-sm my-auto mx-auto font-semibold">
-                                👀 The outcomes are being revealed
-                            </div>
+                            <>
+                                {(currentRound - current === 1) ? (
+                                    <div className="text-white text-sm my-auto mx-auto font-semibold">
+                                        🟡 Determining winning outcomes
+                                    </div>
+                                ) : (
+                                    <div className="text-white text-sm my-auto mx-auto font-semibold">
+                                        🔵 All outcomes have been revealed and verified
+                                    </div>
+                                )}
+                            </>
                         )}
 
                     </div>
