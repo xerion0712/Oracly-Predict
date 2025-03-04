@@ -1,45 +1,41 @@
-# Legato v.2
+# Legato Next
 
-The V2 launch starts with a DeFi prediction market, with additional services potentially merging later. This version leverages **Atoma Network**'s decentralized AI and the **DeepSeek R1** model to make the prediction market more fun and interactive. It's still heavily development with zero-shot learning to improve accuracy is on the way.
+Here is the completely new version of the **Legato** prediction market allows anyone to create prediction markets. Each market is connected to a trusted source like **CoinMarketCap.com** and actively monitored by an AI-agent, allowing users to chat about it or discover new possible outcomes for the prediction market round, whether it's BTC's price next week or the ranking of their favorite token.
+
+Payouts are distributed based on the weight assigned to each outcome by the AI-agent. Once the round concludes, winners can claim their payout proportionally, according to the weight assigned to each outcome. Unclaimed amounts are carried over to the next round, ensuring a dynamic and growing prize pool.
 
 ## Highlighted Improvements
-- **Endlessly Flexible:** Anyone can propose outcomes with AI automatically tracking and revealing the results, such as "Will BTC hit $100,000 by Friday?" or "Will SOL's market cap surpass XRP's by next week?
-- **Ever-Increasing Payouts:** Outcomes are aggregated into a round based on a trusted source. Correct bets will receive payouts based on contribution while unclaimed amounts roll over to the next round’s prize pool.
+- **Endlessly Possibilities:** Anyone can propose outcomes with AI automatically tracking and revealing the results, such as "Will BTC hit $100,000 by Friday?" or "Will SOL's market cap surpass XRP's by next week?
 - **Support USDC:** Now supports USDC for receiving bets, providing more flexibility for users to participate in the prediction market.
-- **DeepSeek R1:** Used to assist in outcome generation by providing the topic and asset name. Later, users can place bets and others can join. 
+- **Supports Authentication:**  With AWS Amplify, allowing login with email or Google for better tracking of all bet positions.
+- **OpenAI GPT-4:** Assists in outcome generation, periodically reviews proposed outcomes, and assigns weights based on market data.
+
+## Overview
+
+The system uses the AWS Amplify Stack to efficiently run AI-agents and eliminate the need for dedicated API services for the client. Market-related data is stored in a database, while bets are processed on-chain via smart contracts. This allows for easy cleanup of duplicate or unrelated entries that may have been mistakenly input by users.
+
+![vapor drawio (6)](https://github.com/user-attachments/assets/00ed2d46-b05a-41a0-8fbb-f6d559570ba5)
+
+Outcomes can only be added before the prediction period (round) begins. For example, if the period is from February 1-7, all outcomes and bets must be placed before February 1. Weights are updated daily in the database but will be permanently stored on the smart contract at the start of the period (February 1). Once finalized, no more bets are allowed.
+ 
+And during the period, the AI-agent monitors the real-world data and marks the result for each outcome and will provide all winning outcomes to the smart contract at the end of the round. Outcomes that can't be clearly determined will be marked as disputed, and users who placed bets on these outcomes will receive a full refund.
+
+When the round concludes, all winning outcomes will receive a proportional share based on the weight assigned. The payout is calculated as follows:
+
+```
+Payout Share = (Total Pool Prize - Total Disputed Amount) × (Outcome Weight / Sum of Winning Outcomes)
+```
+Users can then claim their payout based on their contribution to the outcome they bet on. If no more users participate, the payout will be distributed according to the payout share. 
+
+The total disputed amount remains locked for one round. After the round ends, it will be dissolved and added to the prize pool.
 
 ## AI-Agent
-The AI-agent plays a major role in the system, leveraging Atoma Network's decentralized AI to ensure the privacy of each user's data. DeepSeek R1 serves as the primary LLM for handling following actions:
+The AI-agent plays a major role in the system. We have two types of AI-agents as follows:
 
-### Outcome Suggestions
-When users don't find any interesting outcomes to bet on, they can open a modal to propose new outcomes. The modal requires the following inputs:
+- **Interactive AI-agent:** Assists users in proposing outcomes, placing bets and get insights with real-time data. It helps users discover potential outcomes based on the market data source.
+- **Automated AI-agent:** Runs on the backend to monitor the market, analyze real-time data, assign weights to outcomes, mark results, and update smart contracts. It ensures the system operates autonomously based on the latest data.
 
-- **Market Topic:** Choose a market topic, such as token prices, market cap, or any other category depending on the market type.
-- **Keyword (Optional):** If users want to specify a more focused prediction, they can provide a keyword (e.g., "BTC Price") to narrow down the outcome, though this is optional.
-
-As an AI-based application that works with prompts, we need to provide specific prompts to guide the system, one to suggest the outcome based on the given topic and keywords.
-
-```
-(1) Guide the system
-You are an AI assistant that helps users propose new prediction outcomes for DeFi prediction market project based on real-time data likes Will BTC hits 100,000$ by Friday?
-
-(2) Suggest the outcome
-Suggest a possible prediction outcome on the topic ${topic} 
-With the resolution date set within the week if today is ${(new Date()).toDateString()}
-Provided content:
-${content} (website data in markdown)
-```
-
-### Future Works
-
-The project is under heavy development and aims to deliver more features around AI to helping us achieve our mission of making betting fun on any possible scenario in daily life.
-
-- **Weight Adjustment:** Each outcome is assigned a different weight. For example, a broad prediction like "Will BTC hit $100,000 by Friday?" and a more precise prediction like "Will BTC range between $90,000 and $91,000 on Friday?" will both have different weights to reflect the level of precision.
-
-- **Market Resolution:** Currently, the process is manual, but we aim to develop an automated system that checks results on the website at the given resolution date. It will then stamp the data on the smart contract, allowing the winner to claim their prize.
-
-- **Market Suggestions:** The AI analyzes current trends and identifies new data sources. For example, it can detect new influencers or emerging topics, allowing users to place bets on these new events as they unfold.
-
+All are integrated with OpenAI GPT-4, each having its own guided (system/developer) prompt and a different set of context. It understands real-world data by crawling website data before execution and converting it into markdown format for injection into the prompt.
 
 ## How to Use
 
@@ -73,13 +69,7 @@ npm install
 
 You must retrieve `amplify_outputs.json` from the AWS Dashboard after linking your GitHub repo to AWS and place it in the root folder. 
 
-Also, ensure you obtain API keys from the AI services we use and add them to the .env file:
-
-```
-# 3rd parties AI services
-FIRECRAWL_API_KEY=your-api-key
-ATOMA_API_KEY=your-api-key
-```
+Also, make sure to obtain API keys from the AI services we use and add them to the secret management in the AWS Amplify console.
 
 We can run the frontend with:
 
@@ -87,9 +77,24 @@ We can run the frontend with:
 npm run dev
 ```
 
+For the smart contract, navigate to `/contracts/aptos-market` and run test cases with:
+
+```
+aptos move test
+```
+
 Refer to the documentation for deploying a new contract on the live network and updating the JSON file in the project accordingly.
 
 For detailed instructions on deploying to AWS cloud, refer to the [deployment section](https://docs.amplify.aws/nextjs/start/quickstart/nextjs-app-router-client-components/#deploy-a-fullstack-app-to-aws).
+
+## Deployment
+
+### Aptos Testnet
+
+Component Name | ID/Address
+--- | --- 
+Package ID |  0xab3922ccb1794928abed8f5a5e8d9dac72fed24f88077e46593bed47dcdb7775
+Mock USDC | 0xc77afa5c74640e7d0f34a7cca073ea4e26d126c60c261b5c2b16c97ac6484f01
 
 ## License
 
