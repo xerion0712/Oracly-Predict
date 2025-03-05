@@ -88,7 +88,7 @@ class Agent {
             content: [
                 `You are an AI agent responsible for evaluating prediction market outcomes in the Legato DeFi system.\n`,
                 `Your goal is to analyze the latest market data, determine the most accurate outcome.\n`,
-                `Source: ${source} – The latest data has been fetched and provided as follows:\n`,
+                `Source: ${source} – The data on ${ (new Date().toDateString()) } has been fetched and provided as follows:\n`,
                 `${context}\n`,
                 `**Outcome Evaluation Criteria:**\n`,
                 `1. **Verify Market Data:**\n` ,

@@ -94,6 +94,45 @@ const useAptos = () => {
 
     }, [])
 
+    const checkPayoutAmount = useCallback(async (positionId: number) => {
+
+        const aptos = getAptosConfig(false)
+
+        const payload: InputViewFunctionData = {
+            function: `0xab3922ccb1794928abed8f5a5e8d9dac72fed24f88077e46593bed47dcdb7775::generalized::check_payout_amount`,
+            functionArguments: [
+                positionId
+            ],
+        };
+
+        console.log("checking,.", positionId)
+
+        try {
+            const result = await aptos.view({ payload });
+
+            console.log("result: ", result)
+        } catch (e) { 
+            return 0
+        }
+
+        
+
+        // const entry = {
+        //     balance: result[0],
+        //     maxBet: result[1],
+        //     createdTime: result[2],
+        //     interval: result[3]
+        // }
+
+        // const diff = (new Date().valueOf()) - (Number(entry.createdTime) * 1000)
+        // const interval = Number(entry.interval) * 1000
+        // const round = Math.floor(diff / interval) + 1
+
+        return 0
+
+    }, [])
+
+
     const placeBet = useCallback(async (marketId: number, roundId: number, outcomeId: number, betAmount: number) => {
 
         if (!account) {
@@ -126,7 +165,8 @@ const useAptos = () => {
         getBalanceAPT,
         getBalanceUSDC,
         getMarketInfo,
-        placeBet
+        placeBet,
+        checkPayoutAmount
     }
 }
 

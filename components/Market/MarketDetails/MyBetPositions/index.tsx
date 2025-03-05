@@ -5,6 +5,10 @@ import Link from "next/link";
 import useDatabase from "@/hooks/useDatabase";
 import { BadgePurple } from "@/components/Badge";
 import { shortAddress } from "@/helpers";
+import BaseModal from "@/modals/base";
+import { useWallet } from "@aptos-labs/wallet-adapter-react";
+import { WalletSelector } from "@aptos-labs/wallet-adapter-ant-design";
+import useAptos from "@/hooks/useAptos";
 
 enum SortBy {
     All = "All",
@@ -13,6 +17,9 @@ enum SortBy {
 }
 
 const MyBetPositions = ({ marketData, onchainMarket, currentRound }: any) => {
+
+    const { account, network } = useWallet()
+    const address = account && account.address
 
     const { currentProfile }: any = useContext(LegatoContext)
 
@@ -23,10 +30,13 @@ const MyBetPositions = ({ marketData, onchainMarket, currentRound }: any) => {
         (curVal: any, newVal: any) => ({ ...curVal, ...newVal }),
         {
             sorted: SortBy.All,
-            rounds: []
+            rounds: [],
+            modal: undefined,
+            loading: false,
+            errorMessage: undefined
         })
 
-    const { sorted, rounds } = values
+    const { sorted, rounds, modal, loading, errorMessage } = values
 
     useEffect(() => {
         currentProfile && marketData && getMyPositions(currentProfile.id, marketData.id).then(setPositions)
@@ -64,6 +74,10 @@ const MyBetPositions = ({ marketData, onchainMarket, currentRound }: any) => {
         filter = positions
     }
 
+    const onClaim = useCallback(async () => {
+
+    }, [])
+
     return (
         <div>
             {!currentProfile && (
@@ -78,6 +92,137 @@ const MyBetPositions = ({ marketData, onchainMarket, currentRound }: any) => {
             )}
             {currentProfile && (
                 <>
+
+                    <BaseModal
+                        visible={modal}
+                        close={() => dispatch({ modal: undefined })}
+                        title={"Position Details"}
+                        maxWidth="max-w-xl"
+                    >
+                        {modal && (
+                            <>
+                                <div className="grid grid-cols-2 py-2 text-gray">
+                                    <div className=" py-0.5  col-span-2 text-lg font-semibold  text-white flex flex-row">
+                                        {modal?.outcome?.title}
+                                    </div>
+
+                                    {!modal?.outcome?.revealedTimestamp && (
+                                        <>
+                                            <div className=" py-0.5 col-span-2  text-sm  flex flex-row">
+                                                <span className="font-bold mr-2">At:</span>
+                                                <div className={`   flex flex-row  text-white text-sm `}>
+                                                    {` ${(new Date(Number(modal?.outcome?.resolutionDate) * 1000)).toUTCString()}`}
+                                                </div>
+                                            </div>
+                                            <div className="col-span-2 rounded-lg   h-[100px] mt-[10px] flex border border-gray/30">
+                                                <div className="m-auto text-white font-semibold">
+                                                    The result is not yet revealed
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {modal?.outcome?.revealedTimestamp && (
+                                        <>
+                                            <div className=" py-0.5 col-span-2  text-sm  flex flex-row">
+                                                <span className="font-bold mr-2">Checked At:</span>
+                                                <div className={`   flex flex-row  text-white text-sm `}>
+                                                    {` ${(new Date(Number(modal?.outcome?.revealedTimestamp) * 1000)).toUTCString()}`}
+                                                </div>
+                                            </div>
+                                            <div className="col-span-2 rounded-lg grid grid-cols-2 mt-[10px] p-4 py-2 border border-gray/30">
+                                                <div className=" py-0.5 col-span-1  text-sm  flex flex-row">
+                                                    <span className="font-bold mr-2">Result:</span>
+                                                    <div className={`   flex flex-row  text-white text-sm `}>
+                                                        {modal?.outcome?.isWon ? "✅" : "❌"}
+                                                    </div>
+                                                </div>
+                                                <div className=" py-0.5 col-span-1  text-sm  flex flex-row">
+                                                    <span className="font-bold mr-2">Disputed:</span>
+                                                    <div className={`   flex flex-row  text-white text-sm `}>
+                                                        {modal?.outcome?.isDisputed ? "✅" : "❌"}
+                                                    </div>
+                                                </div>
+                                                <div className=" py-0.5 col-span-2  text-sm  flex flex-row">
+                                                    <div className="text-white my-1">
+                                                        {modal?.outcome?.result}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex mt-4 flex-col col-span-2">
+                                                {address && (
+                                                    <button onClick={onClaim} disabled={loading} type="button" className="btn mx-auto w-full bg-white hover:bg-white hover:text-black rounded-md">
+                                                        {loading
+                                                            ?
+                                                            <Puff
+                                                                stroke="#000"
+                                                                className="w-5 h-5 mx-auto"
+                                                            />
+                                                            :
+                                                            <>
+                                                                Claim
+                                                            </>}
+                                                    </button>
+                                                )}
+
+                                                {!address && (
+                                                    <WalletSelector />
+                                                )}
+
+
+
+                                            </div>
+
+                                            {errorMessage && (
+                                                <div className='text-gray-400 col-span-2 mt-2 text-sm font-medium  text-center w-full '>
+                                                    <div className='p-2 pb-0 text-secondary'>
+                                                        {errorMessage}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {!errorMessage && (
+                                                <div className='text-gray-400 col-span-2 mt-2 text-sm font-medium  text-center w-full '>
+                                                    <div className='p-2 pb-0 text-secondary'>
+                                                        Ensure your wallet is {shortAddress(modal?.position?.walletAddress)}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <style>
+                                                {
+
+                                                    `
+                                        .wallet-button {
+                                            width: 100%;
+                                            z-index: 1;
+                                            border-width: 0px;
+                                        } 
+                                        `
+                                                }
+                                            </style>
+
+                                        </>
+                                    )}
+
+
+
+                                    {/* <div className=" py-0.5 text-sm  flex flex-row">
+                                            <span className="font-bold mr-2">Current Odds:</span>
+                                            <div className={`   flex flex-row  text-white text-sm `}>
+                                                {`${outcome.weight ? `${minOdds.toLocaleString()}-${`${maxOdds !== -1 ? maxOdds.toLocaleString() :"10"}`}` : "N/A"}`}
+                                            </div>
+                                        </div>
+                                        <div className=" py-0.5 text-sm  flex flex-row">
+                                            <span className="font-bold mr-2">Round Pool:</span>
+                                            <div className={`   flex flex-row  text-white text-sm `}>
+                                                {`${totalPool} USDC`}
+                                            </div>
+                                        </div>  */}
+                                </div>
+                            </>
+                        )}
+                    </BaseModal>
 
                     {/* <div className='flex-grow flex flex-col'>
                         <div className={`flex-grow flex flex-col border-2 border-white/[0.1] bg-transparent bg-gradient-to-b from-white/5 to-transparent rounded-lg`} >
@@ -165,6 +310,7 @@ const MyBetPositions = ({ marketData, onchainMarket, currentRound }: any) => {
                                         position={position}
                                         rounds={rounds}
                                         market={onchainMarket}
+                                        openModal={(modal: any) => dispatch({ modal })}
                                     />
                                 </div>
                             )
@@ -178,10 +324,11 @@ const MyBetPositions = ({ marketData, onchainMarket, currentRound }: any) => {
     )
 }
 
-const PositionCard = ({ position, rounds, market }: any) => {
+const PositionCard = ({ position, rounds, market, openModal }: any) => {
 
     const [data, setData] = useState<any>(undefined)
     const { getOutcomeById } = useDatabase()
+    const { checkPayoutAmount } = useAptos()
 
     useEffect(() => {
         position && getOutcomeById(position.predictedOutcome).then(setData)
@@ -195,9 +342,21 @@ const PositionCard = ({ position, rounds, market }: any) => {
     const isEnded = (new Date()).valueOf() > endPeriod
     const isActive = startPeriod > (new Date()).valueOf()
 
+    useEffect(() => {       
+        currentRound && currentRound.resolvedTimestamp && checkPayoutAmount(position.onchainId)
+    }, [currentRound, position])
+    
+
     return (
         <div
-            className=" h-[160px] p-4 px-2 border-2 flex flex-col cursor-pointer border-white/[0.1] bg-transparent bg-gradient-to-b from-white/5 to-transparent rounded-lg" >
+            onClick={() => {
+                data && openModal({
+                    round: currentRound,
+                    position: position,
+                    outcome: data
+                })
+            }}
+            className=" h-[150px] p-4 px-2 border-2 flex flex-col cursor-pointer border-white/[0.1] bg-transparent bg-gradient-to-b from-white/5 to-transparent rounded-lg" >
             <div className="flex flex-row">
                 <div className="px-2">
                     <p className="text-white font-semibold line-clamp-2">
@@ -205,10 +364,11 @@ const PositionCard = ({ position, rounds, market }: any) => {
                     </p>
                 </div>
             </div>
-            <div className="px-2 text-sm font-semibold my-1">
+            <div className="px-2 text-sm flex font-semibold my-1">
                 Round {position.roundId}: {(new Date(startPeriod)).toLocaleDateString()}-{(new Date(endPeriod)).toLocaleDateString()}{isEnded && " "}
+                <span className="      ml-auto  ">{`Bet: ${position.betAmount.toLocaleString()} USDC`}</span>
             </div>
-            <div className="flex px-2 flex-row my-1  justify-between">
+            <div className="flex px-2 flex-row my-1 mt-auto  justify-between">
                 <div className="text-white   ">
                     {isActive && "🟢 Active"}
                     {(!isActive && !isEnded) && "🔵 Outcome Pending"}
@@ -219,13 +379,13 @@ const PositionCard = ({ position, rounds, market }: any) => {
 
 
                 <div className=" flex flex-row">
-                    <p className="text-white mt-auto  ">{`${position.betAmount.toLocaleString()} USDC`}</p>
+                    {/* <p className="text-white   mt-auto  ">{`Bet: ${position.betAmount.toLocaleString()} USDC`}</p> */}
                 </div>
 
             </div>
-            <div className="text-sm text-secondary text-center font-semibold">
+            {/* <div className="text-sm text-secondary text-center font-semibold">
                 { shortAddress( position.walletAddress)}
-            </div>
+            </div> */}
         </div>
     )
 }

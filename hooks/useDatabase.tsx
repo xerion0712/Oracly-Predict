@@ -271,7 +271,7 @@ const useDatabase = () => {
             return result
         }, 0)
 
-        const onchainId = maxPositionId
+        const onchainId = maxPositionId+1
 
         await client.models.Position.create({
             marketId,
