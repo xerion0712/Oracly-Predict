@@ -41,11 +41,13 @@ export const handler: EventBridgeHandler<"Scheduled Event", null, void> = async 
   const market: any = await getMarket(MARKET_ID)
   const rounds: any = await market.rounds()
 
+  // Update outcome weights
+  await updateWeights(currentRound, market, rounds)
+
   // Finalize
   await finalize(currentRound, rounds, aptos, privateKey)
 
-  // Update outcome weights
-  await updateWeights(currentRound, market, rounds)
+
 
 }
 
