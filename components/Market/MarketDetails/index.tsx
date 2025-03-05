@@ -124,6 +124,8 @@ const MarketDetails = () => {
 
                             <MyBetPositions
                                 marketData={marketData}
+                                currentRound={currentRound}
+                                onchainMarket={onchainMarket}
                             />
 
                         </TabPanel>
