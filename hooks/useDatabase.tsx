@@ -271,7 +271,7 @@ const useDatabase = () => {
             return result
         }, 0)
 
-        const onchainId = maxPositionId+1
+        const onchainId = maxPositionId + 1
 
         await client.models.Position.create({
             marketId,
@@ -281,6 +281,15 @@ const useDatabase = () => {
             predictedOutcome: outcomeId,
             betAmount: amount,
             walletAddress
+        })
+
+    }
+
+    const updatePosition = async (positionId: any) => {
+
+        await client.models.Position.update({
+            id: positionId,
+            isClaimed: true
         })
 
     }
@@ -356,7 +365,8 @@ const useDatabase = () => {
         getMyPositions,
         updateOutcomeWeight,
         getAllOutcomes,
-        getOutcomeById
+        getOutcomeById,
+        updatePosition
         // finalizeWeights
     }
 }

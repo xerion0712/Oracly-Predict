@@ -143,12 +143,64 @@ const useAptos = () => {
 
     }, [account])
 
+    const claim = useCallback(async (positionId: number) => {
+
+        if (!account) {
+            return
+        }
+
+        const aptos = getAptosConfig(false)
+
+        const transaction: any = {
+            data: {
+                function: `0xab3922ccb1794928abed8f5a5e8d9dac72fed24f88077e46593bed47dcdb7775::generalized::claim_prize`,
+                functionArguments: [
+                    positionId
+                ]
+            }
+        }
+
+        const response = await signAndSubmitTransaction(transaction);
+        // wait for transaction
+        await aptos.waitForTransaction({ transactionHash: response.hash });
+
+        return response.hash
+
+    }, [account])
+
+    const refund = useCallback(async (positionId: number) => {
+
+        if (!account) {
+            return
+        }
+
+        const aptos = getAptosConfig(false)
+
+        const transaction: any = {
+            data: {
+                function: `0xab3922ccb1794928abed8f5a5e8d9dac72fed24f88077e46593bed47dcdb7775::generalized::refund`,
+                functionArguments: [
+                    positionId
+                ]
+            }
+        }
+
+        const response = await signAndSubmitTransaction(transaction);
+        // wait for transaction
+        await aptos.waitForTransaction({ transactionHash: response.hash });
+
+        return response.hash
+
+    }, [account])
+
     return {
         getBalanceAPT,
         getBalanceUSDC,
         getMarketInfo,
         placeBet,
-        checkPayoutAmount
+        checkPayoutAmount,
+        claim,
+        refund
     }
 }
 

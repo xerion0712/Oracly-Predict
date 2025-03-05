@@ -23,7 +23,8 @@ const MyBetPositions = ({ marketData, onchainMarket, currentRound }: any) => {
 
     const { currentProfile }: any = useContext(LegatoContext)
 
-    const { getMyPositions } = useDatabase()
+    const { getMyPositions, updatePosition } = useDatabase()
+    const { claim, refund } = useAptos()
     const [positions, setPositions] = useState<any>([])
 
     const [values, dispatch] = useReducer(
@@ -33,14 +34,15 @@ const MyBetPositions = ({ marketData, onchainMarket, currentRound }: any) => {
             rounds: [],
             modal: undefined,
             loading: false,
-            errorMessage: undefined
+            errorMessage: undefined,
+            tick: 1
         })
 
-    const { sorted, rounds, modal, loading, errorMessage } = values
+    const { sorted, rounds, modal, loading, errorMessage, tick } = values
 
     useEffect(() => {
         currentProfile && marketData && getMyPositions(currentProfile.id, marketData.id).then(setPositions)
-    }, [currentProfile, marketData])
+    }, [currentProfile, marketData, tick])
 
     useEffect(() => {
         positions && fetchRounds(positions)
@@ -76,7 +78,37 @@ const MyBetPositions = ({ marketData, onchainMarket, currentRound }: any) => {
 
     const onClaim = useCallback(async () => {
 
-    }, [])
+        dispatch({ errorMessage: undefined })
+
+        if (!modal) {
+            return
+        }
+
+        dispatch({ loading: true })
+
+        try {
+
+            const positionId = modal.position.id
+            const onchainId = modal.position.onchainId
+
+            if (!modal.outcome.isDisputed) {
+                await claim(onchainId)
+            } else {
+                await refund(onchainId)
+            }
+
+            await updatePosition(positionId)
+
+            dispatch({ modal: undefined, tick: tick + 1 })
+
+        } catch (e: any) {
+            console.log(e)
+            dispatch({ errorMessage: `${e}`, loading: false })
+        }
+
+        dispatch({ loading: false })
+
+    }, [modal, tick])
 
     return (
         <div>
@@ -152,7 +184,7 @@ const MyBetPositions = ({ marketData, onchainMarket, currentRound }: any) => {
 
                                             <div className="flex mt-4 flex-col col-span-2">
                                                 {address && (
-                                                    <button onClick={onClaim} disabled={loading} type="button" className="btn mx-auto w-full bg-white hover:bg-white hover:text-black rounded-md">
+                                                    <button onClick={onClaim} disabled={loading || (!modal?.outcome?.isWon && !modal?.outcome?.isDisputed)} type="button" className={`btn mx-auto w-full bg-white hover:bg-white hover:text-black rounded-md ${(!modal?.outcome?.isWon && !modal?.outcome?.isDisputed) && " hover:scale-100 opacity-60 "}`}>
                                                         {loading
                                                             ?
                                                             <Puff
@@ -161,7 +193,7 @@ const MyBetPositions = ({ marketData, onchainMarket, currentRound }: any) => {
                                                             />
                                                             :
                                                             <>
-                                                                Claim
+                                                                {modal?.outcome?.isDisputed ? "Refund" : "Claim"}
                                                             </>}
                                                     </button>
                                                 )}
@@ -342,10 +374,10 @@ const PositionCard = ({ position, rounds, market, openModal }: any) => {
     const isEnded = (new Date()).valueOf() > endPeriod
     const isActive = startPeriod > (new Date()).valueOf()
 
-    useEffect(() => {       
+    useEffect(() => {
         currentRound && currentRound.resolvedTimestamp && checkPayoutAmount(position.onchainId)
     }, [currentRound, position])
-    
+
 
     return (
         <div
@@ -366,7 +398,7 @@ const PositionCard = ({ position, rounds, market, openModal }: any) => {
             </div>
             <div className="px-2 text-sm flex font-semibold my-1">
                 Round {position.roundId}: {(new Date(startPeriod)).toLocaleDateString()}-{(new Date(endPeriod)).toLocaleDateString()}{isEnded && " "}
-                <span className="      ml-auto  ">{`Bet: ${position.betAmount.toLocaleString()} USDC`}</span>
+                <span className=" ml-auto  ">{`Bet: ${position.betAmount.toLocaleString()} USDC`}</span>
             </div>
             <div className="flex px-2 flex-row my-1 mt-auto  justify-between">
                 <div className="text-white   ">
@@ -377,9 +409,12 @@ const PositionCard = ({ position, rounds, market, openModal }: any) => {
                     </>}
                 </div>
 
-
                 <div className=" flex flex-row">
-                    {/* <p className="text-white   mt-auto  ">{`Bet: ${position.betAmount.toLocaleString()} USDC`}</p> */}
+                    {position.isClaimed && (
+                        <div className="text-secondary font-semibold text-sm mt-auto">
+                            claimed
+                        </div>
+                    )}
                 </div>
 
             </div>
