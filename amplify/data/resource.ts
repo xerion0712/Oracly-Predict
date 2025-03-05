@@ -87,7 +87,8 @@ const schema = a.schema({
     betAmount: a.integer(),
     hidden: a.boolean(),
     status: a.enum(["PENDING", "WIN", "LOSE", "CANCELLED"]),
-    walletAddress: a.string()
+    walletAddress: a.string(),
+    isClaimed: a.boolean()
   }).authorization((allow) => [allow.publicApiKey()]),
   Round: a.model({
     marketId: a.id().required(),
