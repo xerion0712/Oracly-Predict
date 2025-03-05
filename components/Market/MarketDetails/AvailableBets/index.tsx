@@ -424,7 +424,7 @@ const OutcomeCard = ({ index, item, current, marketData, openInfoModal, openBetM
 
                 {isPast && (
                     <div className=" ">
-                        {item.revealedTimestamp && <> {item.isWon ? "✅" : "❌"} </>}
+                        {item.revealedTimestamp && <> {item.isWon ? "✅" : item.isDisputed ? "⚠️" : "❌"} </>}
                     </div>
                 )}
 
