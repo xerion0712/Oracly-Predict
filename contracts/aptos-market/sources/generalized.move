@@ -856,8 +856,11 @@ module legato_market::generalized {
                 };
 
                 let outcome_weight_ratio = fixed_point64::create_from_rational( (outcome_weights as u128)  , (SCALE as u128) );
-                // TODO: use 1.0 when it hasn't
-                let adjusted_bet_amount = fixed_point64::multiply_u128( (*table_with_length::borrow( &market_store.outcome_bets, winning_outcome_id) as u128) , outcome_weight_ratio); 
+                let adjusted_bet_amount = if (table_with_length::contains( &market_store.outcome_bets, winning_outcome_id )) {
+                    *table_with_length::borrow(&market_store.outcome_bets, winning_outcome_id)
+                } else {
+                    SCALE
+                };
 
                 total_winning_bets = total_winning_bets+(adjusted_bet_amount as u64);
                 outcome_count = outcome_count+1;

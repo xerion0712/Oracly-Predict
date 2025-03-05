@@ -195,6 +195,46 @@ module legato_market::generalized_tests {
         assert!(  (primary_fungible_store::balance(signer::address_of(user_3),  mock_usdc_fa::get_metadata() )) == 100_000000 , 21); // 100 USDC
     }
 
+    // Testing with actual testnet data
+    #[test(aptos_framework = @aptos_framework, deployer = @legato_market, user_1 = @0x1111, user_2 = @0x2222, user_3 = @0x3333 )]
+    fun test_testnet_data_cases(aptos_framework: &signer, deployer: &signer, user_1: &signer, user_2: &signer, user_3: &signer) {
+    
+        setup_markets(aptos_framework, deployer, user_1, user_2, user_3);
+
+        timestamp::fast_forward_seconds(1000);
+
+        // Place bets
+        generalized::place_bet(user_1, MARKET_ID, ROUND_ID, 1, 10_000000 );
+        generalized::place_bet(user_1, MARKET_ID, ROUND_ID, 3, 3_000000 );
+        generalized::place_bet(user_2, MARKET_ID, ROUND_ID, 4, 1_000000 );
+        generalized::place_bet(user_2, MARKET_ID, ROUND_ID, 5, 1_000000 );
+        generalized::place_bet(user_3, MARKET_ID, ROUND_ID, 6, 3_000000 );
+        generalized::place_bet(user_3, MARKET_ID, ROUND_ID, 7, 3_000000 );
+
+        generalized::update_round_weights(deployer , MARKET_ID, ROUND_ID, 10000 );
+    
+        // Finalize the market and fast-forwards the system clock
+        // generalized::finalize_market( deployer, MARKET_ID, ROUND_ID, vector[1,2,3,4,5,6,7,8], vector[2000,1000,800,1000,1200,800,1500,700]);
+        generalized::finalize_market( deployer, MARKET_ID, ROUND_ID, vector[2,8,1,3,4,5,6,7], vector[1000,700,2000,800,1000,1200,800,1500]);
+        timestamp::fast_forward_seconds(1*ROUND_DURATION);
+
+        // Resolves the market and fast-forwards the system clock
+        generalized::resolve_market( deployer, MARKET_ID, ROUND_ID, vector[2,6,9], vector[1,3,4]);
+        timestamp::fast_forward_seconds(1*ROUND_DURATION);
+
+
+        generalized::place_bet(user_1, MARKET_ID, 2, 10, 10_000000 );
+        generalized::place_bet(user_1, MARKET_ID, 2, 11, 3_000000 );
+        generalized::place_bet(user_2, MARKET_ID, 2, 13, 2_000000 );
+        generalized::place_bet(user_2, MARKET_ID, 2, 14, 7_000000 );
+        generalized::place_bet(user_3, MARKET_ID, 2, 18, 10_000000 );
+        generalized::place_bet(user_3, MARKET_ID, 2, 7, 3_000000 );        
+
+        let payout_amount_1 = generalized::check_payout_amount(4); 
+        assert!(  payout_amount_1 == 556289 , 20); // 0.55 USDC
+        
+    }
+
     #[test_only]
     public fun setup_markets(aptos_framework: &signer, deployer: &signer, user_1: &signer, user_2: &signer, user_3: &signer) {
 
