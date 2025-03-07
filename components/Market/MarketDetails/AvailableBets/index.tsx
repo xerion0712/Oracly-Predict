@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useReducer } from "react"
 import { ArrowLeft, ArrowRight } from "react-feather"
 import useDatabase from "../../../../hooks/useDatabase"
 import Agent from "../../../../amplify/lib/agent"
-import { parseTables, secondsToDDHHMMSS } from "../../../../helpers"
+import { parseTables, secondsToDDHHMMSS, titleToIcon } from "../../../../helpers"
 import { useInterval } from "@/hooks/useInterval"
 import useOpenAI from "@/hooks/useOpenAI"
 import useAI from "@/hooks/useAI"
@@ -387,6 +387,8 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
 
 const OutcomeCard = ({ index, item, current, marketData, openInfoModal, openBetModal, minOdds, maxOdds, odds, isPast }: any) => {
 
+    const icon = titleToIcon(item?.title)
+
     return (
         <div onClick={() => {
 
@@ -400,6 +402,7 @@ const OutcomeCard = ({ index, item, current, marketData, openInfoModal, openBetM
         }} className=" h-[150px] p-4 px-2 border-2 flex flex-col cursor-pointer border-white/[0.1] bg-transparent bg-gradient-to-b from-white/5 to-transparent rounded-lg" >
 
             <div className="flex flex-row">
+            <img className="h-8 sm:h-10 w-8 sm:w-10 my-auto rounded-full" src={icon} alt="" />
                 <div className="px-2">
                     <p className="text-white font-semibold line-clamp-2">
                         {item?.title}

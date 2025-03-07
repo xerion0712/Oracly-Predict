@@ -14,6 +14,7 @@ interface IMarketCard {
 
 
 const MarketCard = ({ market_name, icon, popular_outcome, close_in, chains, tag }: IMarketCard) => {
+    
     return (
         <Link href="/markets/coinmarketcap" >
             <div className="p-4 px-2 border-2 cursor-pointer border-white/[0.1] bg-transparent bg-gradient-to-b from-white/5 to-transparent rounded-lg">

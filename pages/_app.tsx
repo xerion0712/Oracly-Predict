@@ -3,6 +3,7 @@ import type { AppProps } from "next/app";
 import { Amplify } from "aws-amplify";
 import outputs from "@/amplify_outputs.json";
 import "@aws-amplify/ui-react/styles.css";
+import 'react-loading-skeleton/dist/skeleton.css'
 
 import { GoogleAnalytics } from '@next/third-parties/google'
 import { Suspense } from 'react';
@@ -14,6 +15,7 @@ import SuiLayout from "@/components/Layouts/Sui";
 import AptosLayout from "@/components/Layouts/Aptos";
 import MainLayout from "@/components/Layouts/Main";
 import AuthProvider from "@/hooks/useAuth";
+import { SkeletonTheme } from 'react-loading-skeleton';
 
 Amplify.configure(outputs);
 
@@ -44,7 +46,9 @@ export default function App({ Component, pageProps }: AppProps) {
             {/* <SuiLayout> */}
               <AptosLayout>
                 <MainLayout>
+                <SkeletonTheme baseColor="#141F32" highlightColor="#444">
                   <Component {...pageProps} />
+                  </SkeletonTheme>
                 </MainLayout>
               </AptosLayout>
             {/* </SuiLayout> */}

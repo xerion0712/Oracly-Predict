@@ -4,7 +4,7 @@ import { useContext, useEffect, useState } from 'react';
 import BlockchainList from "../../data/blockchain.json"
 import MarketCard from './MarketCard';
 import { Swiper, SwiperSlide } from 'swiper/react';
-import { secondsToDDHHMMSS } from '@/helpers';
+import { secondsToDDHHMMSS, titleToIcon } from '@/helpers';
 
 // Import Swiper styles
 import 'swiper/css';
@@ -15,65 +15,8 @@ import { Autoplay, Navigation } from 'swiper/modules';
 import BaseModal from '@/modals/base';
 import { LegatoContext } from '@/hooks/useLegato';
 import useDatabase from '@/hooks/useDatabase';
-
-const DUMMY_CARDS = [
-    {
-        market_name: "Who will win the 2024 US election?",
-        icon: "/assets/images/us-election-icon.png",
-        popular_outcome: "A. Donald Trump",
-        close_in: 0,
-        tag: "politics",
-        chains: ["aptos"]
-    },
-    {
-        market_name: "What will BTC's price be by the end of February 1, 2025?",
-        icon: "/assets/images/btc-icon.png",
-        popular_outcome: "C. $95,000-$100,000",
-        close_in: 4,
-        tag: "crypto",
-        chains: ["sui", "aptos"]
-    },
-    {
-        market_name: "What top position will SUI hold by market cap by February 2025?",
-        icon: "/assets/images/sui-sui-logo.png",
-        popular_outcome: "A. Top 10",
-        close_in: 10,
-        tag: "crypto",
-        chains: ["sui"]
-    },
-    {
-        market_name: "What top position will APT hold by market cap by March 2025?",
-        icon: "/assets/images/aptos-logo.png",
-        popular_outcome: "B. Top 11–20",
-        close_in: 10,
-        tag: "crypto",
-        chains: ["aptos"]
-    },
-    {
-        market_name: "Who will be the winner of the 2025 Six Nations Championship?",
-        icon: "https://cdn.britannica.com/44/344-050-94536674/Flag-England.jpg",
-        popular_outcome: "B. England",
-        close_in: 30,
-        tag: "sports",
-        chains: ["sui", "aptos"]
-    },
-    {
-        market_name: "Who will be the winner of the 2025 Men's Australian Open?",
-        icon: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Flag_of_Australia.svg/2560px-Flag_of_Australia.svg.png",
-        popular_outcome: "A. Jannik Sinner",
-        close_in: 30,
-        tag: "sports",
-        chains: ["sui", "aptos"]
-    },
-    {
-        market_name: "What will be Mo Shaikh’s next move after leaving Aptos?",
-        icon: "/assets/images/aptos-logo.png",
-        popular_outcome: "A. Launch a new project",
-        close_in: 100,
-        tag: "crypto",
-        chains: ["aptos"]
-    }
-]
+import Skeleton  from 'react-loading-skeleton';
+ 
 
 const Hero = () => {
 
@@ -169,8 +112,7 @@ const Highlighted = () => {
     useEffect(() => {
         getAllOutcomes().then(setOutcomes)
     }, [])
-
-
+ 
     return (
         <div className="px-6 sm:px-1">
 
@@ -209,25 +151,25 @@ const Highlighted = () => {
                     },
                 }}
             >
+
+                { outcomes.length === 0 && (
+                    <div className="grid grid-cols-3 gap-5 max-w-5xl mx-auto">
+                        <div className='overflow-hidden   opacity-60'>
+                            <Skeleton height={120} />
+                        </div>
+                        <div className='overflow-hidden  opacity-60'>
+                            <Skeleton height={120} />
+                        </div>
+                        <div className='overflow-hidden  opacity-60'>
+                            <Skeleton height={120} />
+                        </div> 
+                    </div>
+                ) }
+
+
                 {outcomes.map((item: any, index: number) => {
 
-                    let icon = "/assets/images/aptos-logo.png"
-
-                    if (item && (item.title.includes("BTC") || item.title.includes("Bitcoin"))) {
-                        icon = "/assets/images/btc-icon.png"
-                    } else if (item && (item.title.includes("Tether") || item.title.includes("USDT"))) {
-                        icon = "/assets/images/usdt-logo.png"
-                    } else if (item && (item.title.includes("Cardano"))) {
-                        icon = "/assets/images/cardano-icon.webp"
-                    } else if (item && (item.title.includes("XRP"))) {
-                        icon = "/assets/images/xrp-icon.png"
-                    } else if (item && (item.title.includes("Ethereum") || item.title.includes("ETH"))) {
-                        icon = "/assets/images/eth-icon.png"
-                    } else if (item && (item.title.includes("Solana") || item.title.includes("SOL"))) {
-                        icon = "/assets/images/solana-icon.png"
-                    } else if (item && (item.title.includes("SUI") || item.title.includes("Sui"))) {
-                        icon = "/assets/images/sui-sui-logo.svg"
-                    }
+                    const icon = titleToIcon(item.title || "")
 
                     let countdown = "0"
 
@@ -247,9 +189,7 @@ const Highlighted = () => {
                                     market_name={item.title}
                                     icon={icon}
                                     popular_outcome={item.totalBetAmount}
-                                    close_in={countdown}
-                                // chains={item.chains}
-                                // tag={item.tag}
+                                    close_in={countdown} 
                                 />
                             </SwiperSlide>
                         )
@@ -257,11 +197,7 @@ const Highlighted = () => {
                 })}
             </Swiper>
 
-            <div className='mx-2 sm:mx-6 flex mt-[20px] sm:mt-[40px]'>
-                <div className='flex flex-row  container'>
-
-                </div>
-            </div>
+             
 
 
         </div>

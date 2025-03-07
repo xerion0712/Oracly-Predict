@@ -58,6 +58,30 @@ const useDatabase = () => {
         return positions.data
     }
 
+    const getRecentPositions = async () => {
+        const positions = await client.models.Position.list({
+            limit: 10
+        })
+        return positions.data.map(item => {
+            return {
+                ...item,
+                activity: "bet"
+            }
+        })
+    }
+
+    const getRecentOutcomes = async () => {
+        const outcomes = await client.models.Outcome.list({
+            limit: 10
+        })
+        return outcomes.data.map(item => {
+            return {
+                ...item,
+                activity: "outcome"
+            }
+        })
+    }
+
     const getMarkets = async (chainId: string) => {
         // const markets = await client.models.Market.list({
         //     filter: {
@@ -124,7 +148,6 @@ const useDatabase = () => {
 
         const markets = await client.models.Market.list()
 
-
         let output: any = []
 
         for (let market of markets.data) {
@@ -135,6 +158,7 @@ const useDatabase = () => {
             }
         }
 
+        output = output.filter((item: any) => !item.result)
 
         if (output.length <= 8) return output;
         return output.sort(() => 0.5 - Math.random()).slice(0, 8);
@@ -351,6 +375,25 @@ const useDatabase = () => {
         }
     }
 
+    const getRecentActivities = async () => {
+
+        const positions = await getRecentPositions()
+        const outcomes = await getRecentOutcomes()
+
+        const combinedArray = [...positions, ...outcomes]
+
+        // Sort by createdTime in descending order (newest first)
+        const sortedArray = combinedArray.sort((a: any, b: any) => {
+            // Converting to Date objects in case createdTime is a string
+            const timeA = new Date(a.createdAt).getTime();
+            const timeB = new Date(b.createdAt).getTime();
+
+            return timeB - timeA; // Descending order
+        });
+
+        return sortedArray.slice(0, 10);
+    }
+
     return {
         crawl,
         getProfile,
@@ -366,7 +409,10 @@ const useDatabase = () => {
         updateOutcomeWeight,
         getAllOutcomes,
         getOutcomeById,
-        updatePosition
+        updatePosition,
+        getRecentOutcomes,
+        getRecentPositions,
+        getRecentActivities
         // finalizeWeights
     }
 }

@@ -15,6 +15,7 @@ import { ArrowLeft, ArrowRight } from "react-feather"
 import AvailableBets from './AvailableBets'
 import PlaceBetModal from "../../../modals/placeBet"
 import MyBetPositions from './MyBetPositions'
+import MarketActivity from './MarketActivity'
 
 // Fixed on this version
 const MARKET_ID = 1
@@ -137,6 +138,12 @@ const MarketDetails = () => {
 
 
             </TabGroup>
+
+
+           <MarketActivity
+            
+           />
+
         </>
     )
 }
