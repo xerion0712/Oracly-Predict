@@ -8,6 +8,8 @@ import useOpenAI from "@/hooks/useOpenAI"
 import useAI from "@/hooks/useAI"
 import BigNumber from "bignumber.js"
 import BaseModal from "@/modals/base"
+import Skeleton from 'react-loading-skeleton';
+
 
 enum SortBy {
     MostPopular = "MostPopular",
@@ -21,6 +23,7 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
     const { getOutcomes } = useDatabase()
 
     const [outcomes, setOutcomes] = useState([])
+    const [loading, setLoading] = useState(false)
     const [current, setCurrent] = useState(0)
     const [tick, setTick] = useState<number>(0)
 
@@ -37,60 +40,115 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
         currentRound && setCurrent(currentRound)
     }, [currentRound])
 
-    // const increaseTick = useCallback(() => {
-    //     setTick(tick + 1)
-    // }, [tick])
-
     useEffect(() => {
-        current > 0 && marketData ? getOutcomes(marketData.id, current).then(
-            (outcomes) => {
-                const outcomesWithOdds = outcomes.map((outcome: any, index: number) => {
-                    let minOdds = 0
-                    let maxOdds = 0
-                    let odds = "Medium"
 
-                    if (outcome && outcomes) {
-                        const totalPoolAfter = totalPool + 1
+        setLoading(true)
 
-                        // Assumes all outcomes won
-                        const totalShares = outcomes.reduce((output: number, item: any) => {
-                            if (item && item.totalBetAmount) {
-                                output = output + (item.totalBetAmount * (item.weight))
+        if (current > 0 && marketData) {
+            getOutcomes(marketData.id, current).then(
+                (outcomes) => {
+                    const outcomesWithOdds = outcomes.map((outcome: any, index: number) => {
+                        let minOdds = 0
+                        let maxOdds = 0
+                        let odds = "Medium"
+
+                        if (outcome && outcomes) {
+                            const totalPoolAfter = totalPool + 1
+
+                            // Assumes all outcomes won
+                            const totalShares = outcomes.reduce((output: number, item: any) => {
+                                if (item && item.totalBetAmount) {
+                                    output = output + (item.totalBetAmount * (item.weight))
+                                }
+                                if (item.onchainId === outcome.onchainId) {
+                                    output = output + (1 * (item.weight))
+                                }
+                                return output
+                            }, 0)
+                            const outcomeShares = (outcome.totalBetAmount + 1) * (outcome.weight)
+                            const ratio = outcomeShares / totalShares
+
+                            minOdds = ((ratio) * totalPoolAfter) * (1 / (outcome.totalBetAmount + 1))
+                            maxOdds = outcome.totalBetAmount > 0 ? (totalPoolAfter) * (1 / (outcome.totalBetAmount + 1)) : -1
+
+                            if (minOdds >= 3) {
+                                odds = "Very High"
+                            } else if (minOdds >= 2) {
+                                odds = "High"
+                            } else if (minOdds >= 1) {
+                                odds = "Medium"
+                            } else {
+                                odds = "Low"
                             }
-                            if (item.onchainId === outcome.onchainId) {
-                                output = output + (1 * (item.weight))
-                            }
-                            return output
-                        }, 0)
-                        const outcomeShares = (outcome.totalBetAmount + 1) * (outcome.weight)
-                        const ratio = outcomeShares / totalShares
-
-                        minOdds = ((ratio) * totalPoolAfter) * (1 / (outcome.totalBetAmount + 1))
-                        maxOdds = outcome.totalBetAmount > 0 ? (totalPoolAfter) * (1 / (outcome.totalBetAmount + 1)) : -1
-
-                        if (minOdds >= 3) {
-                            odds = "Very High"
-                        } else if (minOdds >= 2) {
-                            odds = "High"
-                        } else if (minOdds >= 1) {
-                            odds = "Medium"
-                        } else {
-                            odds = "Low"
                         }
-                    }
 
-                    return {
-                        minOdds,
-                        maxOdds,
-                        odds,
-                        ...outcome,
-                        totalBetAmount: outcome.totalBetAmount ? outcome.totalBetAmount : 0
-                    }
-                })
+                        return {
+                            minOdds,
+                            maxOdds,
+                            odds,
+                            ...outcome,
+                            totalBetAmount: outcome.totalBetAmount ? outcome.totalBetAmount : 0
+                        }
+                    })
 
-                setOutcomes(outcomesWithOdds)
-            }
-        ) : setOutcomes([])
+                    setOutcomes(outcomesWithOdds)
+                    setLoading(false)
+                }
+            )
+        } else {
+            setOutcomes([])
+            setLoading(false)
+        }
+
+        // current > 0 && marketData ? getOutcomes(marketData.id, current).then(
+        //     (outcomes) => {
+        //         const outcomesWithOdds = outcomes.map((outcome: any, index: number) => {
+        //             let minOdds = 0
+        //             let maxOdds = 0
+        //             let odds = "Medium"
+
+        //             if (outcome && outcomes) {
+        //                 const totalPoolAfter = totalPool + 1
+
+        //                 // Assumes all outcomes won
+        //                 const totalShares = outcomes.reduce((output: number, item: any) => {
+        //                     if (item && item.totalBetAmount) {
+        //                         output = output + (item.totalBetAmount * (item.weight))
+        //                     }
+        //                     if (item.onchainId === outcome.onchainId) {
+        //                         output = output + (1 * (item.weight))
+        //                     }
+        //                     return output
+        //                 }, 0)
+        //                 const outcomeShares = (outcome.totalBetAmount + 1) * (outcome.weight)
+        //                 const ratio = outcomeShares / totalShares
+
+        //                 minOdds = ((ratio) * totalPoolAfter) * (1 / (outcome.totalBetAmount + 1))
+        //                 maxOdds = outcome.totalBetAmount > 0 ? (totalPoolAfter) * (1 / (outcome.totalBetAmount + 1)) : -1
+
+        //                 if (minOdds >= 3) {
+        //                     odds = "Very High"
+        //                 } else if (minOdds >= 2) {
+        //                     odds = "High"
+        //                 } else if (minOdds >= 1) {
+        //                     odds = "Medium"
+        //                 } else {
+        //                     odds = "Low"
+        //                 }
+        //             }
+
+        //             return {
+        //                 minOdds,
+        //                 maxOdds,
+        //                 odds,
+        //                 ...outcome,
+        //                 totalBetAmount: outcome.totalBetAmount ? outcome.totalBetAmount : 0
+        //             }
+        //         })
+
+        //         setOutcomes(outcomesWithOdds)
+        //     }
+        // ) : setOutcomes([])
     }, [marketData, current, tick])
 
     // useInterval(
@@ -353,12 +411,8 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
                     </div>
                 </div>
 
-                {/* <div className="mx-auto text-white font-semibold my-1">
-    🏆 Round Pool: 1000 USDC
-</div> */}
-
                 <div className="my-4 grid grid-cols-3 gap-3">
-                    {outcomesSorted.map((entry: any, index: number) => {
+                    {loading === false && outcomesSorted.map((entry: any, index: number) => {
 
                         return (
                             <div key={index}>
@@ -377,6 +431,39 @@ const AvailableBets = ({ currentRound, marketData, onchainMarket, openBetModal }
                             </div>
                         )
                     })}
+
+                    {loading === true && <>
+                        <div className='overflow-hidden   opacity-60'>
+                            <Skeleton height={120} />
+                        </div>
+                        <div className='overflow-hidden  opacity-60'>
+                            <Skeleton height={120} />
+                        </div>
+                        <div className='overflow-hidden  opacity-60'>
+                            <Skeleton height={120} />
+                        </div>
+                        <div className='overflow-hidden   opacity-60'>
+                            <Skeleton height={120} />
+                        </div>
+                        <div className='overflow-hidden  opacity-60'>
+                            <Skeleton height={120} />
+                        </div>
+                        <div className='overflow-hidden  opacity-60'>
+                            <Skeleton height={120} />
+                        </div> 
+                        <div className='overflow-hidden   opacity-60'>
+                            <Skeleton height={120} />
+                        </div>
+                        <div className='overflow-hidden  opacity-60'>
+                            <Skeleton height={120} />
+                        </div>
+                        <div className='overflow-hidden  opacity-60'>
+                            <Skeleton height={120} />
+                        </div>
+                    </>
+
+                    }
+
                 </div>
             </div>
         </>
@@ -402,7 +489,7 @@ const OutcomeCard = ({ index, item, current, marketData, openInfoModal, openBetM
         }} className=" h-[150px] p-4 px-2 border-2 flex flex-col cursor-pointer border-white/[0.1] bg-transparent bg-gradient-to-b from-white/5 to-transparent rounded-lg" >
 
             <div className="flex flex-row">
-            <img className="h-8 sm:h-10 w-8 sm:w-10 my-auto rounded-full" src={icon} alt="" />
+                <img className="h-8 sm:h-10 w-8 sm:w-10 my-auto rounded-full" src={icon} alt="" />
                 <div className="px-2">
                     <p className="text-white font-semibold line-clamp-2">
                         {item?.title}
