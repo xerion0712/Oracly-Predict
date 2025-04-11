@@ -1,6 +1,7 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
 import { faucet } from "../functions/faucet/resource";
 import { chat } from "../functions/chat/resource";
+import { chat2 } from "../functions/chat2/resource";
 import { weight } from "../functions/weight/resource"
 import { scheduler } from "../functions/scheduler/resource"
 import { resolution } from "../functions/resolution/resource"
@@ -23,6 +24,17 @@ const schema = a.schema({
     })
     .returns(a.json())
     .handler(a.handler.function(chat))
+    .authorization((allow) => [allow.publicApiKey()])
+  ,
+  Chat2: a
+    .query()
+    .arguments({
+      messages: a.json(),
+      roundNumber: a.string(),
+      period: a.string()
+    })
+    .returns(a.json())
+    .handler(a.handler.function(chat2))
     .authorization((allow) => [allow.publicApiKey()])
   ,
   WeightAssignment: a
