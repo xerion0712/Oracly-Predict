@@ -86,16 +86,23 @@ const useAI = () => {
 
     const query2 = async (messages: any, roundNumber: any, period: any) => {
 
-        const tools: any = getUserTools()
+        // const tools: any = getUserTools()
  
-        const result: any = await axios.post("/api/query", {
-            messages,
-            tools,
-            roundNumber,
-            period
+        // const result: any = await axios.post("/api/query", {
+        //     messages,
+        //     tools,
+        //     roundNumber,
+        //     period
+        // })
+
+        const result: any = await client.queries.Chat2({
+            messages: JSON.stringify(messages),
+            roundNumber: `${roundNumber}`,
+            period: `${period}`
         })
 
-        return result.data
+        // return result.data
+        return JSON.parse(result.data)
     }
 
     return {

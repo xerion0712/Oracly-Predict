@@ -142,7 +142,7 @@ const ChatPanelMoveAgentKit = ({
                 const period = `${new Date(startPeriod).toDateString()} - ${new Date(endPeriod).toDateString()}`
 
                 const output: any = await query2([...messages, userPrompt], currentRound, period)
-                const result = output.messages[output.messages.length - 1]
+                const result = output[output.length - 1]
 
                 console.log("result: ", result)
 
