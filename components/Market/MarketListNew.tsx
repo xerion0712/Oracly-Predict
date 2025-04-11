@@ -1,12 +1,8 @@
 
-import MarketCard from "./MarketCard"
-
-
+import CoinMarketCapCard from "./CoinMarketCapCard"
+import MoveAgentKitCard from "./MoveAgentKitCard"
 
 const MarketListNew = () => {
-
-
-
     return (
         <>
 
@@ -20,9 +16,10 @@ const MarketListNew = () => {
                 discover active markets by participating in decentralized market forecasting
             </p>
 
-            <div className="grid grid-cols-1 gap-3 py-6 max-w-[900px]">
+            <div className="grid grid-cols-1 gap-4 py-6 max-w-[1000px]">
 
-                <MarketCard />
+                <CoinMarketCapCard />
+                <MoveAgentKitCard/>
 
             </div>
 

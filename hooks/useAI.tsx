@@ -1,4 +1,5 @@
 
+import axios from "axios"
 import type { Schema } from "../amplify/data/resource"
 import { generateClient } from "aws-amplify/api"
 
@@ -83,9 +84,24 @@ const useAI = () => {
         ];
     }
 
+    const query2 = async (messages: any, roundNumber: any, period: any) => {
+
+        const tools: any = getUserTools()
+ 
+        const result: any = await axios.post("/api/query", {
+            messages,
+            tools,
+            roundNumber,
+            period
+        })
+
+        return result.data
+    }
+
     return {
         query,
-        parse
+        parse,
+        query2
     }
 }
 

@@ -3,7 +3,9 @@ import { useInterval } from "@/hooks/useInterval"
 import { secondsToDDHHMMSS } from "../../../helpers"
 import { useState, useEffect } from "react"
 
-const Overview = ({ market }: any) => {
+// TEMP
+
+const OverviewMoveAgentKit = ({ market }: any) => {
 
     const [countdown, setCountdown] = useState<string | undefined>()
     const [interval, setInterval] = useState(100)
@@ -38,18 +40,18 @@ const Overview = ({ market }: any) => {
         <>
             <div className="heading mb-0 text-center lg:text-left "> 
                 <h4 className="!font-black">
-                    COINMARKETCAP<span className="text-secondary">.COM</span>
+                    APTOS<span className="text-secondary">{` `}DEFI</span>
                 </h4>
             </div>
             <div className="text-center lg:text-left ">
 
-                <a href="https://coinmarketcap.com" target="_blank" className="text-lg mt-1 text-secondary">
-                    https://coinmarketcap.com/
+                <a href="https://metamove.build/" target="_blank" className="text-lg mt-1 text-secondary">
+                https://metamove.build/
                 </a>
             </div>
 
             <p className="mt-1 text-center text-base sm:text-lg font-medium lg:text-left ">
-                Predict anything listed on the website from top token prices to market trends and trading volumes
+            Predict yields, TVL across major protocols including Joule, Thala, LiquidSwap and more  through Move Agent Kit
             </p>
 
             <div className={`py-1 `}>
@@ -69,4 +71,4 @@ const Overview = ({ market }: any) => {
     )
 }
 
-export default Overview
+export default OverviewMoveAgentKit

@@ -1,9 +1,7 @@
 import { ArrowRight } from "react-feather"
-
-
 import Link from "next/link"
 
-const MarketCard = () => {
+const CoinMarketCapCard = () => {
 
 
     return (
@@ -12,7 +10,7 @@ const MarketCard = () => {
             <div  className={`  bg-black bg-gradient-to-b  from-white/[0.03]  to-transparent hidden  md:flex flex-row rounded-lg  overflow-hidden  border  border-gray/30   h-[90px]  `} >
                 <img src={"./assets/images/coinmarketcap.png"} className="h-full scale-125 rotate-6" alt="" />
 
-                <h3 className="text-xl text-white font-semibold my-auto ml-[40px]">CoinMarketCap.com</h3>
+                <h3 className="text-xl text-white font-semibold my-auto ml-[40px] min-w-[220px]">CoinMarketCap.com</h3>
                 <p className="my-auto px-4 ml-2 text-sm  lg:text-base">
                 Predict anything listed on the website from top token prices to market trends and trading volumes
                 </p>
@@ -31,9 +29,7 @@ const MarketCard = () => {
                     <h3 className="text-base sm:text-lg text-white font-semibold mb-0.5 ml-[30px] sm:ml-[40px]">CoinMarketCap.com</h3>
                     <p className="  line-clamp-3 leading-3  text-xs ml-[30px] lg:text-sm">
                         Predict anything listed on the 1st page from top token prices to market trends and trading volumes
-                    </p>
-
-
+                    </p> 
                 </div>
 
 
@@ -45,4 +41,4 @@ const MarketCard = () => {
     )
 }
 
-export default MarketCard
+export default CoinMarketCapCard

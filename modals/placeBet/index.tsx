@@ -13,7 +13,7 @@ import { SpinningCircles } from 'react-loading-icons'
 import useAptos from "@/hooks/useAptos";
 
 
-const PlaceBetModal = ({ visible, close, bet }: any) => {
+const PlaceBetModal = ({ visible, close, bet, onchainMarketId = 1 }: any) => {
 
     const { placeBet } = useAptos()
     const { addPosition, increaseOutcomeBetAmount } = useDatabase()
@@ -73,8 +73,7 @@ const PlaceBetModal = ({ visible, close, bet }: any) => {
         dispatch({ loading: true })
 
         try {
-
-            const onchainMarketId = 1
+ 
             const roundId = bet.roundId
             const outcomeId = bet.outcomeId
 
@@ -101,7 +100,7 @@ const PlaceBetModal = ({ visible, close, bet }: any) => {
 
         dispatch({ loading: false })
 
-    }, [amount, bet, address, currentProfile])
+    }, [amount, bet, address, currentProfile, onchainMarketId])
 
     const totalPool = outcomes.reduce((output: number, item: any) => {
         if (item && item.totalBetAmount) {
