@@ -1,101 +1,114 @@
-# Legato Next
+# Oracly Predict
 
-Here is the completely new version of the **Legato** prediction market allows anyone to create prediction markets. Each market is connected to a trusted source like **CoinMarketCap.com** and actively monitored by an AI-agent, allowing users to chat about it or discover new possible outcomes for the prediction market round, whether it's BTC's price next week or the ranking of their favorite token.
+**Oracly Predict** is a decentralized prediction market platform where anyone can create and participate in prediction markets. Each market is linked to trusted data sources (like CoinMarketCap) and monitored by AI agents, enabling informed betting and real-time insights.
 
-Payouts are distributed based on the weight assigned to each outcome by the AI-agent. Once the round concludes, winners can claim their payout proportionally, according to the weight assigned to each outcome. Unclaimed amounts are carried over to the next round, ensuring a dynamic and growing prize pool.
+---
 
-## Highlighted Improvements
-- **Endlessly Possibilities:** Anyone can propose outcomes with AI automatically tracking and revealing the results, such as "Will BTC hit $100,000 by Friday?" or "Will SOL's market cap surpass XRP's by next week?
-- **Support USDC:** Now supports USDC for receiving bets, providing more flexibility for users to participate in the prediction market.
-- **Supports Authentication:**  With AWS Amplify, allowing login with email or Google for better tracking of all bet positions.
-- **OpenAI GPT-4:** Assists in outcome generation, periodically reviews proposed outcomes, and assigns weights based on market data.
+## 🔹 Key Features
 
-## Overview
+* **User-Generated Prediction Markets**
+  Users can propose outcomes such as “Will BTC reach \$100,000 by Friday?” or “Will SOL’s market cap surpass XRP next week?” AI tracks results automatically.
 
-The system uses the AWS Amplify Stack to efficiently run AI-agents and eliminate the need for dedicated API services for the client. Market-related data is stored in a database, while bets are processed on-chain via smart contracts. This allows for easy cleanup of duplicate or unrelated entries that may have been mistakenly input by users.
+* **AI-Weighted Payouts**
+  Each outcome is assigned a weight by the AI agent. Winners receive payouts proportional to their contribution and the AI-assigned weight.
 
-![vapor drawio (6)](https://github.com/user-attachments/assets/00ed2d46-b05a-41a0-8fbb-f6d559570ba5)
+* **USDC Support**
+  Bets can be placed using USDC for seamless stablecoin transactions.
 
-Outcomes can only be added before the prediction period (round) begins. For example, if the period is from February 1-7, all outcomes and bets must be placed before February 1. Weights are updated daily in the database but will be permanently stored on the smart contract at the start of the period (February 1). Once finalized, no more bets are allowed.
- 
-And during the period, the AI-agent monitors the real-world data and marks the result for each outcome and will provide all winning outcomes to the smart contract at the end of the round. Outcomes that can't be clearly determined will be marked as disputed, and users who placed bets on these outcomes will receive a full refund.
+* **Authentication**
+  Login via email or Google through AWS Amplify, allowing secure tracking of user positions.
 
-When the round concludes, all winning outcomes will receive a proportional share based on the weight assigned. The payout is calculated as follows:
+* **AI Assistance**
+  OpenAI GPT-4 powers AI agents that propose outcomes, update weights daily, and mark results based on real-world market data.
 
-```
-Payout Share = (Total Pool Prize - Total Disputed Amount) × (Outcome Weight / Sum of Winning Outcomes)
-```
-Users can then claim their payout based on their contribution to the outcome they bet on. If no more users participate, the payout will be distributed according to the payout share. 
+---
 
-The total disputed amount remains locked for one round. After the round ends, it will be dissolved and added to the prize pool.
+## 🔹 How It Works
 
-## AI-Agent
-The AI-agent plays a major role in the system. We have two types of AI-agents as follows:
+1. **Market Creation**
 
-- **Interactive AI-agent:** Assists users in proposing outcomes, placing bets and get insights with real-time data. It helps users discover potential outcomes based on the market data source.
-- **Automated AI-agent:** Runs on the backend to monitor the market, analyze real-time data, assign weights to outcomes, mark results, and update smart contracts. It ensures the system operates autonomously based on the latest data.
+   * Outcomes can only be submitted before a round starts.
+   * AI updates weights daily and finalizes them at the beginning of the prediction round.
 
-All are integrated with OpenAI GPT-4, each having its own guided (system/developer) prompt and a different set of context. It understands real-world data by crawling website data before execution and converting it into markdown format for injection into the prompt.
+2. **Bet Placement**
 
-## How to Use
+   * Users place bets on outcomes they predict will succeed.
+   * Bets are recorded on-chain via Move smart contracts.
 
-Simply navigate to https://legato.finance, select a market to bet on, and follow these steps:
+3. **AI Monitoring & Resolution**
 
-**1. Login & Connect**
+   * AI monitors market data in real-time.
+   * Results are updated to the smart contract at the end of the round.
+   * Disputed or unclear outcomes are refunded.
 
-* Click 'Login' and choose an authentication method (currently supports Google or email).
-* Check your wallet. Ensure it's funded.
+4. **Payout Calculation**
 
-**2. Choose an Outcome**
+   ```text
+   Payout Share = (Total Pool Prize - Total Disputed Amount) × (Outcome Weight / Sum of Winning Outcomes)
+   ```
 
-* On the market page, review the prize pool and browse all available outcomes.
-* If no interesting outcome is found, you can use the AI agent to assist in creating a new outcome.
-* Place bets on one (or more) outcomes that you believe will succeed.
+   * Users claim payouts according to their contribution.
+   * Unclaimed amounts roll over to the next round, growing the prize pool dynamically.
 
-**3. Claim Payouts**
+---
 
-* Once the round ends, if your chosen outcome wins, you can claim your payout.
-* Correct bets will receive payouts based on contributions, while unclaimed amounts roll over to the next round’s prize pool.
+## 🔹 AI-Agent Roles
 
-## How to Test
+* **Interactive AI-Agent**: Assists users in outcome discovery, placing bets, and generating insights.
+* **Automated AI-Agent**: Continuously monitors markets, evaluates outcomes, updates weights, and writes results to smart contracts.
 
-The project is built using the AWS Amplify Stack with Next.js for the frontend. All backend configurations are managed inside the `/amplify` folder. When the GitHub repo is updated, AWS automatically deploys services like real-time databases and APIs. 
+---
 
-However, outside of this stack, we also have a Move smart contract that handles all betting processes. To run the system locally after downloading:
+## 🔹 Getting Started
 
-```
-npm install
-```
+1. **Clone the repository**
 
-You must retrieve `amplify_outputs.json` from the AWS Dashboard after linking your GitHub repo to AWS and place it in the root folder. 
+   ```bash
+   git clone https://github.com/xerion0712/oracly-predict.git
+   cd oracly-predict
+   ```
 
-Also, make sure to obtain API keys from the AI services we use and add them to the secret management in the AWS Amplify console.
+2. **Install dependencies**
 
-We can run the frontend with:
+   ```bash
+   npm install
+   ```
 
-```
-npm run dev
-```
+3. **Configure AWS Amplify**
 
-For the smart contract, navigate to `/contracts/aptos-market` and run test cases with:
+   * Download `amplify_outputs.json` from AWS after linking the repo.
+   * Add API keys for AI services in the Amplify secret manager.
 
-```
-aptos move test
-```
+4. **Run Frontend**
 
-Refer to the documentation for deploying a new contract on the live network and updating the JSON file in the project accordingly.
+   ```bash
+   npm run dev
+   ```
 
-For detailed instructions on deploying to AWS cloud, refer to the [deployment section](https://docs.amplify.aws/nextjs/start/quickstart/nextjs-app-router-client-components/#deploy-a-fullstack-app-to-aws).
+5. **Run Smart Contract Tests**
 
-## Deployment
+   ```bash
+   cd contracts/aptos-market
+   aptos move test
+   ```
 
-### Aptos Testnet
+---
 
-Component Name | ID/Address
---- | --- 
-Package ID |  0xab3922ccb1794928abed8f5a5e8d9dac72fed24f88077e46593bed47dcdb7775
-Mock USDC | 0xc77afa5c74640e7d0f34a7cca073ea4e26d126c60c261b5c2b16c97ac6484f01
+## 🔹 Deployment
 
-## License
+* **Testnet Addresses** (Aptos)
 
-This library is licensed under the MIT-0 License. See the LICENSE file.
+  | Component  | ID/Address                                                           |
+  | ---------- | -------------------------------------------------------------------- |
+  | Package ID | `0xab9c322cb1794928abed8f57775a5dac72fed24f88077e46593bed47dcdbe8d9` |
+  | Mock USDC  | `0xc477c7640e7d0f4f0134a7cca073ea4e26d126c60c261b5c2b16c97ac648afa5` |
+
+* **Frontend & Backend** deploy automatically via AWS Amplify on GitHub updates.
+
+---
+
+## 🔹 License
+
+This project is licensed under **MIT-0 License**. See the [LICENSE](LICENSE) file.
+
+
